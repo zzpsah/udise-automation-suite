@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 import pandas as pd
 import requests
+import openpyxl
 
 class FacilityTests(unittest.TestCase):
     def setUp(self):
@@ -86,6 +87,36 @@ class FacilityTests(unittest.TestCase):
                     self.assertTrue(list(Path(folder).glob('*.xlsx')))
                 finally:
                     os.chdir(cwd)
+
+    def test_export_conditional_controls(self):
+        source = Path(__file__).with_name('facility_cells.py').read_text(encoding='utf-8').split('# %%\n')[2]
+        colab = types.ModuleType('google.colab')
+        colab.files = types.SimpleNamespace(download=lambda p: None)
+        auto = types.ModuleType('tqdm.auto')
+        auto.tqdm = lambda sequence, **kwargs: sequence
+        data = self.env['facility_payload'](self.row, False)
+        self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}], facility_get=lambda sid: data, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
+        with tempfile.TemporaryDirectory() as folder:
+            cwd = os.getcwd()
+            try:
+                os.chdir(folder)
+                with patch.dict(sys.modules, {'google.colab': colab, 'tqdm.auto': auto}), contextlib.redirect_stdout(io.StringIO()):
+                    exec(source, self.env)
+                book = openpyxl.load_workbook(self.env['facility_export_file'])
+                sheet = book['Facility Update']
+                headers = {c.value: c.column for c in sheet[1]}
+                self.assertTrue(sheet.protection.sheet)
+                self.assertEqual(sheet.cell(2, headers['CWSN Student (reference)']).value, 'No')
+                for field in ('CWSN Facilities Provided', 'CWSN: Braille Book'):
+                    self.assertTrue(sheet.cell(2, headers[field]).protection.locked)
+                self.assertFalse(sheet.cell(2, headers['Facilities Provided']).protection.locked)
+                rules = list(sheet.data_validations.dataValidation)
+                self.assertTrue(any(str(r.formula1).startswith('IF(') and 'facility_disabled' in r.formula1 for r in rules))
+                self.assertTrue(any(r.type == 'whole' and r.formula1 == '60' and r.formula2 == '256' for r in rules))
+                self.assertTrue(any(r.type == 'whole' and r.formula1 == '10' and r.formula2 == '150' for r in rules))
+                book.close()
+            finally:
+                os.chdir(cwd)
 
 if __name__ == '__main__':
     unittest.main()

@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.0 (2026-09-21)"
+FACILITY_BUILD = "v1.2.1 (2026-09-21)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -127,7 +127,8 @@ print(f'Facility Profile {FACILITY_BUILD}: {FACILITY_CLASS}. Reference options o
 # %%
 #@title Facility Profile — Export Selected Class Excel { display-mode: "form" }
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Font
+from openpyxl.styles import PatternFill, Font, Protection
+from openpyxl.formatting.rule import FormulaRule
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.utils import get_column_letter
@@ -142,14 +143,24 @@ rows, failed = [], []
 for sid, student in tqdm(selected, desc='Facility profiles'):
     try:
         data = facility_get(sid)
+        status, general = facility_request('GET', f'/p0/api/cy/students/{sid}')
+        cwsn_flag = (general.get('data') or {}).get('cwsnYN')
+        if status != 200 or general.get('status') is not True or cwsn_flag not in (1, 2):
+            raise ValueError('Cannot establish current CWSN status; profile not exported')
         row = {'PEN': str(student.get('studentCodeNat', '')), 'Student Name': student.get('studentName', ''), 'Class': {9: 'IX', 10: 'X'}[int(student['classId'])], 'Student ID (system)': sid}
+        row['CWSN Student (reference)'] = 'Yes' if cwsn_flag == 1 else 'No'
         for label, field in FACILITY_YN.items():
             row[label] = {1: 'Yes', 2: 'No', 9: '', None: ''}.get(data.get(field), '')
+        if cwsn_flag == 2:
+            row['CWSN Facilities Provided'] = ''
         for prefix, mapping, field in [('Benefit: ', FACILITY_BENEFITS, 'facProvided'), ('CWSN: ', FACILITY_CWSN, 'facProvidedCwsn')]:
             codes = {int(v) for v in (data.get(field) or [])}
             if codes - set(mapping):
                 raise ValueError('Unknown facility option codes: refresh portal reference data')
             row.update({prefix + label: 'Yes' if code in codes else 'No' for code, label in mapping.items()})
+        if cwsn_flag == 2:
+            for label in FACILITY_CWSN.values():
+                row['CWSN: '+label] = 'No'
         row.update({'Height (cm)': data.get('heightInCm') or '', 'Weight (kg)': data.get('weightInKg') or '', 'Distance to School': facility_label(data.get('distanceFrmSchool'), FACILITY_DISTANCE), 'Parent/Guardian Education': facility_label(data.get('parentEducation'), FACILITY_EDUCATION)})
         rows.append(row)
     except Exception as exc:
@@ -164,29 +175,59 @@ columns = list(rows[0])
 sheet.append(columns)
 for row in rows:
     sheet.append([row[c] for c in columns])
-sheet.freeze_panes = 'E2'
+sheet.freeze_panes = 'F2'
 sheet.auto_filter.ref = sheet.dimensions
 for c in sheet[1]:
     c.fill = PatternFill('solid', fgColor='1F4E78')
     c.font = Font(color='FFFFFF', bold=True)
 for i, col in enumerate(columns, 1):
     sheet.column_dimensions[get_column_letter(i)].width = min(38, max(18, len(col)+2))
+    for row_number in range(2, sheet.max_row+1):
+        cell = sheet.cell(row_number, i)
+        non_cwsn = rows[row_number-2]['CWSN Student (reference)'] == 'No'
+        locked = i <= 5 or (non_cwsn and (col == 'CWSN Facilities Provided' or col.startswith('CWSN: ')))
+        cell.protection = Protection(locked=locked)
+        if locked:
+            cell.fill = PatternFill('solid', fgColor='E7E6E6')
+sheet.protection.sheet = True
+sheet.protection.autoFilter = False
+for label, low, high in [('Height (cm)', 60, 256), ('Weight (kg)', 10, 150)]:
+    column = get_column_letter(columns.index(label)+1)
+    rule = DataValidation(type='whole', operator='between', formula1=str(low), formula2=str(high), allow_blank=True)
+    rule.showErrorMessage = True
+    rule.errorStyle = 'stop'
+    rule.error = f'Enter the actual measured value, whole numbers {low}–{high}.'
+    rule.showInputMessage = True
+    rule.prompt = f'Actual measurement required ({low}–{high}); do not estimate by gender.'
+    sheet.add_data_validation(rule)
+    rule.add(f'{column}2:{column}{sheet.max_row}')
 lists = book.create_sheet('Dropdown Lists')
 lists.sheet_state = 'hidden'
-options = {label: ['Yes', 'No'] for label in columns[4:] if label not in {'Height (cm)', 'Weight (kg)', 'Distance to School', 'Parent/Guardian Education'}}
+options = {label: ['Yes', 'No'] for label in columns[5:] if label not in {'Height (cm)', 'Weight (kg)', 'Distance to School', 'Parent/Guardian Education'}}
 options['Distance to School'] = [f'{k} - {v}' for k, v in FACILITY_DISTANCE.items()]
 options['Parent/Guardian Education'] = [f'{k} - {v}' for k, v in FACILITY_EDUCATION.items()]
+off_col = get_column_letter(len(options)+1)
+lists.cell(1, len(options)+1, 'No')
+book.defined_names.add(DefinedName('facility_disabled', attr_text=f"'Dropdown Lists'!${off_col}$1"))
 for i, (label, choices) in enumerate(options.items(), 1):
     letter = get_column_letter(i)
     for j, value in enumerate(choices, 1):
         lists.cell(j, i, value)
     name = f'facility_options_{i}'
     book.defined_names.add(DefinedName(name, attr_text=f"'Dropdown Lists'!${letter}$1:${letter}${len(choices)}"))
-    validation = DataValidation(type='list', formula1='='+name, allow_blank=True)
-    validation.showErrorMessage = True
-    validation.error = 'Choose a listed value.'
-    sheet.add_data_validation(validation)
     column = get_column_letter(columns.index(label)+1)
+    formula = '='+name
+    parent = 'Facilities Provided' if label.startswith('Benefit: ') else 'CWSN Facilities Provided' if label.startswith('CWSN: ') else None
+    if parent:
+        parent_col = get_column_letter(columns.index(parent)+1)
+        formula = f'IF(${parent_col}2="Yes",{name},facility_disabled)'
+        sheet.conditional_formatting.add(f'{column}2:{column}{sheet.max_row}', FormulaRule(formula=[f'${parent_col}2<>"Yes"'], fill=PatternFill('solid', fgColor='E7E6E6'), font=Font(color='808080')))
+        sheet.conditional_formatting.add(f'{column}2:{column}{sheet.max_row}', FormulaRule(formula=[f'AND(${parent_col}2<>"Yes",{column}2="Yes")'], fill=PatternFill('solid', fgColor='FFC7CE'), stopIfTrue=True))
+    validation = DataValidation(type='list', formula1=formula, allow_blank=True)
+    validation.errorStyle = 'stop'
+    validation.showErrorMessage = True
+    validation.error = 'Choose a listed value. Benefits require the parent field to be Yes.'
+    sheet.add_data_validation(validation)
     validation.add(f'{column}2:{column}{sheet.max_row}')
 if failed:
     error_sheet = book.create_sheet('Export Errors')
@@ -246,7 +287,7 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.0_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.1_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}

@@ -1,5 +1,15 @@
 # Facility Profile — v1.2.0, 21 September 2026
 
+## v1.2.1 conditional workbook inputs
+
+Export now reads the student's current General Profile CWSN flag, includes it as a locked reference column, and locks CWSN inputs for non-CWSN students. Unknown CWSN status prevents that record's export and is reported on Export Errors. Applicable CWSN fields remain editable.
+
+When a benefit group's parent answer is not Yes, its child cells are grey and the dropdown permits only No (or clearing the cell). Yes enables the Yes/No list. Excel without macros cannot dynamically change cell protection or erase old entries when the parent changes; validation still rejects stale contradictory Yes values and pasted invalid values before submission. Non-CWSN cells, in contrast, are actually locked using worksheet protection at export time. Reference columns are locked too. Protection is a convenience, not an authorization boundary.
+
+Height and weight cells have whole-number validation and input prompts displaying the portal's observed ranges (60–256 cm and 10–150 kg). They require actual measurements. No generated values or gender assumptions are used for official records.
+
+Verification: an additional offline test executes the export cell with synthetic data and reloads the resulting workbook to check worksheet protection, CWSN locking, dependent validation formulas and measurement rules. Eight Facility tests, four enrollment submission tests and two class-selector tests pass. Excel interactive rendering and a live Facility write remain untested for this release.
+
 ## Usage
 
 After common setup, authentication, school detection and roster fetch, use the Facility Profile cells after Enrollment. Enrollment submission is not a prerequisite. Choose IX, X or IX and X, export, edit the workbook, upload/validate, then enable the Facility submission cell for reviewed records. Initial submission limit is one. XI/XII remains future development.
