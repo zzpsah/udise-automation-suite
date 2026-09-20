@@ -45,6 +45,12 @@ The observed IX/X form marked medium, previous-schooling status, previous class,
 
 One observed save remained pending in the browser after sending. Therefore HTTP status alone is insufficient; ambiguous POST requests are not retried, and the notebook reads the record again before classifying success.
 
+## Live submission evidence
+
+On 20 September 2026, one reviewed Class IX enrollment update was sent using the compact UI-shaped payload and then read back through the enrollment GET route. The response returned `HTTP 200` with `status: true`, and fresh read-back confirmed the intended admission number, medium of instruction, and Subjects 1–6.
+
+This confirms the payload shape for that one-record scenario. It does not authorize unattended or bulk submissions, and each future portal change still requires read-back verification.
+
 ## Re-discovery after a portal change
 
 Log in manually, navigate to an IX/X enrollment form without saving, observe the subject-rule and enrollment GET calls, compare fields/options to this document, update documentation and notebook together, then use only a reviewed one-record write test if needed.
