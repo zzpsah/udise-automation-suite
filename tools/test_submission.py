@@ -14,7 +14,7 @@ import pandas as pd
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-NB = json.loads((ROOT / 'UDISE_Automation_Enhanced_v1.1.3_2026-09-20.ipynb').read_text(encoding='utf-8'))
+NB = json.loads((ROOT / 'UDISE_Automation_Enhanced_v1.1.4_2026-09-20.ipynb').read_text(encoding='utf-8'))
 SOURCE = next(''.join(c['source']) for c in NB['cells'] if 'Enrolment Profile — Submit Reviewed Updates' in ''.join(c.get('source', [])))
 SOURCE = SOURCE.replace('ALLOW_ENROLMENT_UPDATE = False', 'ALLOW_ENROLMENT_UPDATE = True').replace('ENROLMENT_MAX_SUBMISSIONS = 1', 'ENROLMENT_MAX_SUBMISSIONS = 3').replace('ALLOW_ENROLMENT_BATCH = False', 'ALLOW_ENROLMENT_BATCH = True')
 
@@ -46,7 +46,7 @@ class SubmissionTests(unittest.TestCase):
             return response({'status': True, 'data': data})
         fake_colab = types.ModuleType('google.colab')
         fake_colab.files = types.SimpleNamespace(download=lambda path: None)
-        env = dict(df_enrolment=pd.DataFrame(rows), errors=[], BASE_URL='https://example.invalid', SCHOOL_ID='school', HEADERS={}, session=types.SimpleNamespace(request=request), enrolment_log=lambda *a: None, ENROLMENT_SUBJECT_RULES={9: [{'fieldName': f'subject{j}', 'options': [{'subjectDesc': f'S{j}', 'subjectId': j}]} for j in range(1, 9)]})
+        env = dict(df_enrolment=pd.DataFrame(rows), errors=[], BASE_URL='https://example.invalid', SCHOOL_ID='school', HEADERS={}, session=types.SimpleNamespace(request=request), enrolment_log=lambda *a: None, ENROLMENT_CLASS='IX', CLASS_NAME_TO_ID={'IX': 9, 'X': 10}, ENROLMENT_SELECTED_CLASS_IDS={9: 'IX'}, ENROLMENT_SUBJECT_RULES={9: [{'fieldName': f'subject{j}', 'options': [{'subjectDesc': f'S{j}', 'subjectId': j}]} for j in range(1, 9)]})
         with tempfile.TemporaryDirectory() as folder, patch.dict(sys.modules, {'google.colab': fake_colab}), patch('time.sleep'), contextlib.redirect_stdout(io.StringIO()):
             before = os.getcwd()
             try:
