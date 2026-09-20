@@ -39,6 +39,7 @@ Read the detailed guides before changing an API call or submission payload:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Portal discovery and API evidence](docs/PORTAL_DISCOVERY.md)
+- [AI browser navigation and information retrieval](docs/AI_BROWSER_RETRIEVAL.md)
 - [Colab runbook](docs/COLAB_RUNBOOK.md)
 - [Data handling rules](docs/DATA_HANDLING.md)
 
