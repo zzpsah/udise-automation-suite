@@ -2,13 +2,15 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.1.4_2026-09-20.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.0_2026-09-21.ipynb`
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.1.4 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.1.4_2026-09-20.ipynb)
+[Open build v1.2.0 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.0_2026-09-21.ipynb)
+
+Build v1.2.0 adds Facility Profile after Enrollment: class selection, prefilled Excel with dropdowns, conditional validation, reviewed submission, progress and fresh read-back. Existing enrollment cells are retained. Facility API/field discovery was performed in the authenticated portal; Facility submission has passed mocked tests but has not been live-tested. See [Facility Profile](docs/FACILITY_PROFILE.md).
 
 Build v1.1.4 adds one enrollment class selector to the working v1.1.3 flow. In **Load IX/X subject rules**, choose **IX**, **X**, or **IX and X**, then run that cell. Export, validation and submission use this selection. To switch class, rerun that cell and validate the corresponding workbook again. Export filenames show the selected class. The working payload, heartbeats, timeouts and read-back behavior are retained.
 
