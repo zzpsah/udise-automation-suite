@@ -2,13 +2,15 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.1.2_2026-09-20.ipynb`
+- `UDISE_Automation_Enhanced_v1.1.3_2026-09-20.ipynb`
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.1.2 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.1.2_2026-09-20.ipynb)
+[Open build v1.1.3 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.1.3_2026-09-20.ipynb)
+
+Build v1.1.3 adds request heartbeats, explicit POST response logging, 60-second read-back timeouts, per-row checkpoints, timestamped results and preserved POST errors when read-back fails. Submission still allows a five-minute read timeout. A read timeout limits inactivity, not the entire run duration. Local mocked tests cover two skipped rows followed by one submission; the remaining live third-student failure has not been diagnosed or proven fixed.
 
 Because the repository is private, Colab may ask to read your private GitHub repositories.
 
