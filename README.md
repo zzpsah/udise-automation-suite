@@ -2,13 +2,13 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced.ipynb`
+- `UDISE_Automation_Enhanced_v1.1.0_2026-09-20.ipynb`
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open the maintained notebook in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced.ipynb)
+[Open build v1.1.0 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.1.0_2026-09-20.ipynb)
 
 Because the repository is private, Colab may ask to read your private GitHub repositories.
 
