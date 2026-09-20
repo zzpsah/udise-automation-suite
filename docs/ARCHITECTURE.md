@@ -22,7 +22,7 @@ The notebook has no telemetry or Apps Script call. Its only external workflow de
 
 Submission toggles default to `False`. Enrollment starts with `ENROLMENT_MAX_SUBMISSIONS = 1`.
 
-GET requests may retry after timeout. POST requests never retry automatically, because a timeout may still mean the portal received the record. After a failed or ambiguous response, the notebook fetches the record again and reports `SUCCESS_CONFIRMED_BY_RESPONSE`, `SUCCESS_CONFIRMED_BY_READBACK`, or `FAILED`.
+GET requests may retry after timeout. POST requests never retry automatically, because a timeout may still mean the portal received the record. Every POST, including one that returns a success message, is followed by fresh portal read-back checks. The notebook reports `SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK`, `SUCCESS_CONFIRMED_BY_READBACK`, `RESPONSE_SUCCESS_NOT_PERSISTED`, or `FAILED`.
 
 ## Versioning
 

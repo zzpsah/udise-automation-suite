@@ -100,6 +100,7 @@ Before adding a new UDISE form or field:
 - A browser page is loaded: navigation success only.
 - A GET returns HTTP `200`: transport success only.
 - A POST returns HTTP `200` with `status: false`: validation failure.
-- A POST returns an explicit success response, or a fresh GET matches the submitted fields: record-save success.
+- A POST returns an explicit success response but fresh GET does not match: `RESPONSE_SUCCESS_NOT_PERSISTED`, not success.
+- A fresh GET matches the submitted fields after POST: record-save success.
 
 Never upgrade one status into another without the evidence shown above.
