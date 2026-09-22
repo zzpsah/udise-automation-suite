@@ -49,7 +49,7 @@ class FacilityTests(unittest.TestCase):
                 self.assertEqual(len(calls), 0)
                 self.assertEqual('facility_reviewed' in self.env, case == 'success')
                 if case == 'input':
-                    self.assertIn('INPUT ERROR', output.getvalue())
+                    self.assertIn('Excel row 2 needs attention', output.getvalue())
 
     def test_payload_fields_and_non_cwsn(self):
         p = self.env['facility_payload'](self.row, False)

@@ -15,6 +15,12 @@ def cell(title):
     return next(''.join(c['source']) for c in NB['cells'] if ''.join(c.get('source', [])).splitlines()[0].find(title) >= 0)
 
 class SelectorTests(unittest.TestCase):
+    def test_profile_modules_have_separate_top_level_sections(self):
+        headings = [''.join(c['source']).splitlines()[0] for c in NB['cells'] if c['cell_type'] == 'markdown' and c.get('source')]
+        self.assertIn('# 🧾 General Profile', headings)
+        self.assertIn('# 🎓 Enrollment Profile — Classes IX and X', headings)
+        self.assertIn('# 🏫 Facility Profile — Classes IX and X', headings)
+
     def test_all_choices(self):
         for choice, ids in [('IX', {9}), ('X', {10}), ('IX and X', {9, 10})]:
             with self.subTest(choice=choice), contextlib.redirect_stdout(io.StringIO()):

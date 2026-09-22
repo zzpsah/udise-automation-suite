@@ -70,6 +70,7 @@ for stale in ('students', 'pen_to_studentid', 'df_enrolment', 'facility_reviewed
 students = fetch_current_roster()
 pen_to_studentid = {str(s['studentCodeNat']).strip(): s['studentId'] for s in students if s.get('studentCodeNat')}
 fetch_status('COMPLETE', f'Fetched {len(students)} students; indexed {len(pen_to_studentid)} PENs')
+print(f'✅ Student list ready: {len(students)} students found. You can now choose a profile section.', flush=True)
 if not globals().get('SCHOOL_NAME'):
     for key in ('schoolName', 'schoolNameEng', 'schoolDesc'):
         value = next((str(row.get(key)).strip() for row in students if row.get(key) and str(row.get(key)).strip()), '')

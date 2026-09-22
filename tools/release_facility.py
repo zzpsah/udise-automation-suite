@@ -8,7 +8,11 @@ nb = json.loads(source)
 nb['cells'] = [cell for cell in nb['cells'] if not (cell['cell_type'] == 'markdown' and ''.join(cell.get('source', [])).startswith(('# Made with', '## Operator workflow')))]
 for cell in nb['cells']:
     if cell['cell_type'] == 'markdown' and ''.join(cell.get('source', [])).startswith('# 🎓 UDISE+ Professional Automation Suite'):
-        cell['source'] = ['**Workflow:** Setup → Authenticate → Detect school → Fetch students → Choose **General Profile / Enrollment IX–X / Facility IX–X** → Export → Edit → Upload & validate → Review & submit → Download result\n']
+        cell['source'] = ['**🧭 Workflow:** 🛠️ Setup → 🔐 Login → 🏫 School → 👨‍🎓 Students → <span style="color:#2563eb"><b>Choose General / Enrollment IX–X / Facility IX–X</b></span> → 📥 Export → ✏️ Edit → ✅ Validate → 🚀 Submit → 📊 Result\n']
+    elif cell['cell_type'] == 'markdown' and ''.join(cell.get('source', [])).startswith('# GENERAL PROFILE UPDATE'):
+        cell['source'] = ['# 🧾 General Profile\n', '\n', 'Update student general details using this section’s own Excel workbook.\n']
+    elif cell['cell_type'] == 'markdown' and ''.join(cell.get('source', [])).startswith('## Enrolment Profile — Classes IX and X'):
+        cell['source'] = ['# 🎓 Enrollment Profile — Classes IX and X\n', '\n', 'Choose IX, X or both, then use this section’s own subject workbook and result.\n']
 for cell in nb['cells']:
     if cell['cell_type'] != 'code':
         continue
@@ -21,6 +25,25 @@ for cell in nb['cells']:
         detect_source = (ROOT/'tools/detect_school_cell.py').read_text(encoding='utf-8')
         compile(detect_source, 'detect_school_cell', 'exec')
         cell['source'] = detect_source.splitlines(keepends=True)
+    if 'Enrolment Profile — Submit Reviewed Updates' in code.splitlines()[0]:
+        friendly = '''enrolment_result_df = pd.DataFrame(results)
+enrolment_result_df["Result for user"] = enrolment_result_df["Status"].map({
+    "SKIPPED_ALREADY_UP_TO_DATE": "✅ Already up to date — no change sent",
+    "SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK": "✅ Saved and confirmed",
+    "SUCCESS_CONFIRMED_BY_READBACK": "✅ Saved and confirmed",
+    "FAILED": "❌ Not saved — check details",
+    "RESPONSE_SUCCESS_NOT_PERSISTED": "❌ Portal replied success, but changes were not saved",
+    "UNCONFIRMED": "⚠️ Could not confirm save — check the portal before retrying",
+}).fillna("⚠️ Check details")
+print("📊 Enrollment result:")
+for label, count in enrolment_result_df["Result for user"].value_counts().items():
+    print(f"{label}: {count}")
+'''
+        updated = code.replace('enrolment_result_df = pd.DataFrame(results)\n', friendly, 1)
+        if updated == code:
+            raise RuntimeError('Enrollment result summary was not found')
+        compile(updated, 'enrolment_friendly_result', 'exec')
+        cell['source'] = updated.splitlines(keepends=True)
 for cell in nb['cells']:
     if cell['cell_type'] == 'code' and ''.join(cell.get('source', [])).splitlines()[0].startswith('#@title Fetch current academic-session students'):
         roster_source = (ROOT/'tools/roster_cell.py').read_text(encoding='utf-8')
@@ -33,11 +56,11 @@ for part in (ROOT/'tools/facility_cells.py').read_text(encoding='utf-8').split('
     compile(part, 'facility_cell', 'exec')
     cells.append(dict(cell_type='code', metadata={'cellView': 'form'}, execution_count=None, outputs=[], source=part.splitlines(keepends=True)))
 index = next(i for i,c in enumerate(nb['cells']) if 'Enrolment Profile — Submit Reviewed Updates' in ''.join(c.get('source', [])))+1
-intro = '## Facility Profile — IX/X\nChoose a class, download the workbook, enter actual student information, validate the sheet, then submit only reviewed rows. Validation does not save anything. Begin with one student.\n'
+intro = '# 🏫 Facility Profile — Classes IX and X\n\nChoose IX or X, then use this section’s own facility workbook and result. Enter actual height and weight; validation does not submit anything.\n'
 nb['cells'][index:index] = [dict(cell_type='markdown', metadata={}, source=intro.splitlines(keepends=True))]+cells
 nb['cells'][0]['source'] = ['> **Notebook build: v1.2.5 (2026-09-22)**\n', '> Guided operator interface for General Profile, Enrollment and Facility Profile.\n']
 nb['cells'][1]['source'] = ['# UDISE+ School Automation\n', '\n', '**Project owner:** Prashant  \n', '**Purpose:** simple, guided UDISE+ workbook processing for authorized school use.\n']
-guide = '''## Start here\n\nRun **Setup → Authentication → Detect School → Fetch Students** once. Then choose **General Profile**, **Enrollment IX/X**, or **Facility IX/X** below and follow its export → edit → validate → submit → result steps.\n\n**Status:** Passed = workbook valid (not submitted); Input error = fix Excel; Network/portal error = retry later. Saved = confirmed only after fresh read-back.\n'''
+guide = '''## 🚀 Start here\n\nRun 🛠️ **Setup** → 🔐 **Authentication** → 🏫 **Detect School** → 👨‍🎓 **Fetch Students** once. Then choose <span style="color:#2563eb"><b>General Profile / Enrollment IX–X / Facility IX–X</b></span> below.\n\n**📊 Status:** <span style="color:#16803c"><b>✅ Passed</b></span> = Excel valid, not submitted · <span style="color:#b45309"><b>✏️ Input error</b></span> = fix Excel · <span style="color:#b91c1c"><b>⚠️ Portal error</b></span> = retry later · <span style="color:#16803c"><b>💾 Saved</b></span> = confirmed by fresh read-back.\n'''
 nb['cells'][2:2] = [dict(cell_type='markdown', metadata={}, source=guide.splitlines(keepends=True))]
 name = 'UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb'
 nb['metadata']['colab']['name'] = name

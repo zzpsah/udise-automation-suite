@@ -1,5 +1,5 @@
 # %%
-#@title Facility Profile — Select Class and Load Reference Data { display-mode: "form" }
+#@title 🏫 Facility Profile — Choose Class { display-mode: "form" }
 import io
 import time
 import threading
@@ -127,9 +127,9 @@ def facility_mismatches(saved, payload):
         return str(value) if value is not None else ''
     return [key for key, value in payload.items() if normal(key, saved.get(key)) != normal(key, value)]
 
-print(f'Facility Profile {FACILITY_BUILD}: {FACILITY_CLASS}. Reference options observed on 21 September 2026.')
+print(f'✅ Class {FACILITY_CLASS} selected. Facility choices are ready.')
 # %%
-#@title Facility Profile — Export Selected Class Excel { display-mode: "form" }
+#@title 📥 Facility Profile — Download Excel { display-mode: "form" }
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Protection
 from openpyxl.formatting.rule import FormulaRule
@@ -240,10 +240,10 @@ if failed:
         error_sheet.append(list(error.values()))
 facility_export_file = f'UDISE_Facility_{FACILITY_CLASS.replace(" ", "_")}_{SCHOOL_ID}_{datetime.now():%Y%m%d_%H%M%S}.xlsx'
 book.save(facility_export_file)
-print(f'Exported {len(rows)}; unavailable {len(failed)}. Fill blank required answers and height/weight before validation.')
+print(f'📥 Workbook ready: {len(rows)} students. {len(failed)} could not be included. Enter actual height and weight before uploading.')
 files.download(facility_export_file)
 # %%
-#@title Facility Profile — Upload and Validate { display-mode: "form" }
+#@title ✅ Facility Profile — Check Uploaded Excel { display-mode: "form" }
 globals().pop('facility_reviewed', None)
 upload = files.upload()
 if len(upload) != 1:
@@ -255,7 +255,7 @@ if required - set(facility_frame):
     raise ValueError('Missing columns: ' + ', '.join(sorted(required-set(facility_frame))))
 roster = facility_roster()
 reviewed, issues, seen = [], [], set()
-print('[FACILITY] SHEET CHECK: validating workbook only; no UDISE request will be made', flush=True)
+print('🔎 Checking the Excel file. No student record will be changed.', flush=True)
 for index, row in facility_frame.iterrows():
     sid = facility_text(row['Student ID (system)'])
     try:
@@ -273,14 +273,14 @@ for index, row in facility_frame.iterrows():
         reviewed.append({'sid': sid, 'pen': facility_text(row['PEN']), 'cwsn': cwsn_flag, 'payload': payload})
     except (ValueError, TypeError, KeyError) as exc:
         issues.append((index+2, str(exc)))
-        print(f'[INPUT ERROR] Row {index+2}: {exc}', flush=True)
+        print(f'✏️ Excel row {index+2} needs attention: {exc}', flush=True)
 if issues or not reviewed:
-    print(f'Sheet validation incomplete: {len(issues)} input error(s). Nothing submitted.')
+    print(f'⚠️ Please fix {len(issues)} Excel issue(s) and check the file again. Nothing was submitted.')
 else:
     facility_reviewed = {'school': str(SCHOOL_ID), 'class': FACILITY_CLASS, 'rows': reviewed}
-    print(f'Sheet validation passed: {len(reviewed)} rows. No UDISE request was made. Review before enabling submission.')
+    print(f'✅ Excel check passed for {len(reviewed)} student(s). Nothing was submitted. Review the file before choosing Submit.')
 # %%
-#@title Facility Profile — Submit Reviewed Updates { display-mode: "form" }
+#@title 🚀 Facility Profile — Submit Reviewed Updates { display-mode: "form" }
 ALLOW_FACILITY_UPDATE = False #@param {type:"boolean"}
 FACILITY_MAX_SUBMISSIONS = 1 #@param {type:"integer"}
 if not ALLOW_FACILITY_UPDATE:
@@ -295,7 +295,7 @@ for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSI
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}
     try:
-        print(f'[FACILITY] PRECHECK {position}', flush=True)
+        print(f'🔎 Student {position}: checking the current portal record', flush=True)
         current = facility_get(sid)
         changes = facility_mismatches(current, payload)
         result['Changed Fields'] = ', '.join(changes)
@@ -318,10 +318,10 @@ for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSI
                         result['Detail'] += '; ' + str(fields)
             except requests.RequestException as exc:
                 result['Detail'] = f'POST {type(exc).__name__}; outcome unknown'
-            print('[FACILITY] POST RESULT:', result['Detail'], flush=True)
+            print('📨 Portal response received; checking whether the changes were saved.', flush=True)
             result['Status'] = 'UNCONFIRMED'
             for attempt, delay in enumerate((2, 5, 10), 1):
-                print(f'[FACILITY] VERIFY {attempt}/3', flush=True)
+                print(f'🔄 Confirming saved details ({attempt}/3)', flush=True)
                 time.sleep(delay)
                 try:
                     changes = facility_mismatches(facility_get(sid), payload)
@@ -330,12 +330,14 @@ for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSI
                         break
                     result.update(Status='FAILED', Detail=result['Detail']+'; mismatched: '+', '.join(changes))
                 except Exception as exc:
-                    print('[FACILITY] VERIFY ERROR:', type(exc).__name__, flush=True)
+                    print('⚠️ Could not confirm the saved details yet:', type(exc).__name__, flush=True)
     except Exception as exc:
         result['Detail'] += '; ' + str(exc)
+    friendly_status = {'SKIPPED_ALREADY_UP_TO_DATE': '✅ Already up to date — no change sent', 'SUCCESS_CONFIRMED_BY_READBACK': '✅ Saved and confirmed', 'FAILED': '❌ Not saved — check the result file', 'UNCONFIRMED': '⚠️ Save not confirmed — check the portal before retrying'}.get(result['Status'], '⚠️ Check the result file')
+    result['Result for user'] = friendly_status
     facility_results.append(result)
     pd.DataFrame(facility_results).to_excel(result_file, index=False)
-    print(f'[{position}] {result["Status"]}: {result["Detail"]}', flush=True)
+    print(f'Student {position}: {friendly_status}', flush=True)
     if result['Status'] not in {'SKIPPED_ALREADY_UP_TO_DATE', 'SUCCESS_CONFIRMED_BY_READBACK'}:
         break
 files.download(result_file)
