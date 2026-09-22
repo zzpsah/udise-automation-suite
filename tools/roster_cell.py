@@ -70,5 +70,15 @@ for stale in ('students', 'pen_to_studentid', 'df_enrolment', 'facility_reviewed
 students = fetch_current_roster()
 pen_to_studentid = {str(s['studentCodeNat']).strip(): s['studentId'] for s in students if s.get('studentCodeNat')}
 fetch_status('COMPLETE', f'Fetched {len(students)} students; indexed {len(pen_to_studentid)} PENs')
+if not globals().get('SCHOOL_NAME'):
+    for key in ('schoolName', 'schoolNameEng', 'schoolDesc'):
+        value = next((str(row.get(key)).strip() for row in students if row.get(key) and str(row.get(key)).strip()), '')
+        if value:
+            SCHOOL_NAME = value
+            break
+if globals().get('SCHOOL_NAME'):
+    fetch_status('SCHOOL', f'UDISE code {SCHOOL_ID}; school name: {SCHOOL_NAME}')
+else:
+    fetch_status('SCHOOL', f'UDISE code {SCHOOL_ID}; school name was not included in this roster response')
 if not students:
     fetch_status('EMPTY', 'The portal returned a successful empty list. Check the selected school/year before continuing.')

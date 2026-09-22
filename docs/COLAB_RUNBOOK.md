@@ -6,7 +6,7 @@
 2. Log into UDISE+ manually in a separate browser tab.
 3. Run **Setup environment**.
 4. Run **Authentication** and paste the active Cookie request-header only into the hidden Colab prompt.
-5. Run **Detect school** using the current school student-list URL.
+5. Run **Detect school** using the current school student-list URL or its numeric UDISE code. You may enter the school name for display; the roster will display a name automatically only when the UDISE response includes one.
 6. Run **Fetch current academic-session students**.
 7. For enrollment, run **Load IX/X subject rules**, then **Export IX/X Excel**.
 8. Edit the workbook, save it, and run **Validate IX/X Excel**.

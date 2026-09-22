@@ -2,15 +2,15 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.4_2026-09-22.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb`
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.4 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.4_2026-09-22.ipynb)
+[Open build v1.2.5 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb)
 
-Build v1.2.4 presents every code cell as a Colab form by default, adds a plain-language Start here guide and identifies the project owner as Prashant. Operators use the visible forms, workbook downloads and result messages without reading implementation code. This is a usability setting; a private-notebook editor can still choose Show code. Facility upload validation remains sheet-only: it checks the workbook and saved roster/reference columns without calling UDISE. The submit cell retains a fresh CWSN check immediately before a POST. Twenty offline tests pass; this release has not been tested against a live Facility save.
+Build v1.2.5 presents every code cell as a Colab form by default, adds a plain-language Start here guide and identifies the project owner as Prashant. Detect School accepts either a complete UDISE URL or a 7–15 digit UDISE code; an optional school name is displayed and the roster is checked for a supplied name without an extra portal call. Operators use the visible forms, workbook downloads and result messages without reading implementation code. This is a usability setting; a private-notebook editor can still choose Show code. Facility upload validation remains sheet-only. Twenty-two offline tests pass; this release has not been tested against a live Facility save.
 
 Build v1.2.1 adds conditional Facility benefit dropdowns, protected non-CWSN cells based on current General Profile, and measurement input messages/range checks. Generate a fresh Facility export to obtain these controls. Enter actual height and weight; no random or gender-based values are generated.
 
