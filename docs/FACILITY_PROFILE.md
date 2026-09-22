@@ -36,13 +36,15 @@ Distance IDs 1–4: Less than 1 km; Between 1–3 Kms; Between 3–5 Kms; More t
 
 Parent education IDs 1–6: Primary; Upper Primary; Secondary or Equivalent; Higher Secondary or Equivalent; More than Higher Secondary; No Schooling Experience.
 
-## v1.2.5 sheet-only validation
+## v1.2.8 sheet-only validation
 
 Upload validation makes no UDISE request. It checks the workbook, selected class, PEN/system ID against the roster already loaded in Colab, required answers, dropdown values, benefit dependencies, measurements, and the exported `CWSN Student (reference)` column. NCC, NSS and Scouts still require explicit Yes/No answers; blank/9 is not automatically changed to No.
 
 The CWSN reference is mandatory, so generate a fresh Facility workbook before validation. A locally valid workbook becomes reviewed without waiting on the portal. Immediately before an actual POST, the submit cell gets the current General Profile CWSN flag and stops if it differs from the exported reference. Every validation attempt clears previous approval. Missing cells are normalized with `where(pd.notna(...), '')` instead of the warning-producing fillna call.
 
-Twenty offline test methods across roster, Facility, enrollment and class selection pass for v1.2.5, including zero UDISE requests during Facility validation. No live Facility submission was performed.
+Class IX export fills unanswered Facilities, Competitions, NCC, NSS, Scouts and Guides, and applicable CWSN Facilities with No; benefit detail columns also show No unless saved as Yes. Unanswered distance defaults to `2 - Between 1-3 Kms`. Height and weight export blank for staff to enter current measurements. Existing saved Yes answers are retained. Non-CWSN parent support stays blank because that field is not applicable. Parent education must have a valid portal value or be selected by the operator.
+
+Twenty-three offline tests across roster, school detection, Facility, enrollment and class selection pass for v1.2.8, including zero UDISE requests during Facility validation. No live Facility submission was performed.
 
 ## Verification and limitations
 
