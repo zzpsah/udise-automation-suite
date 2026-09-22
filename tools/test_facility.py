@@ -94,21 +94,29 @@ class FacilityTests(unittest.TestCase):
 
     def test_submission_scenarios(self):
         source = Path(__file__).with_name('facility_cells.py').read_text(encoding='utf-8').split('# %%\n')[-1].replace('ALLOW_FACILITY_UPDATE = False', 'ALLOW_FACILITY_UPDATE = True')
-        for case in ('success', 'timeout_saved', 'rejected'):
+        for case in ('success', 'timeout_saved', 'rejected', 'precheck_retry', 'cwsn_retry'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as folder:
                 payload = self.env['facility_payload'](self.row, False)
                 before = {**payload, 'nccYn': 9}
                 reads = [before, payload] if case != 'rejected' else [before]*4
                 calls = []
+                facility_reads = []
+                def get_facility(sid):
+                    facility_reads.append(sid)
+                    if case == 'precheck_retry' and len(facility_reads) == 1:
+                        raise requests.ReadTimeout()
+                    return reads.pop(0)
                 def request(method, route, **kwargs):
                     calls.append((method, route))
                     if method == 'GET':
+                        if case == 'cwsn_retry' and sum(kind == 'GET' for kind, _ in calls) == 1:
+                            raise requests.ReadTimeout()
                         return 200, {'status': True, 'data': {'cwsnYN': 2}}
                     self.assertEqual(route, '/p0/api/v2/AY/students/facility/test')
                     if case == 'timeout_saved':
                         raise requests.Timeout()
                     return 200, {'status': case == 'success', 'message': 'Successful' if case == 'success' else 'Rejected'}
-                self.env.update(facility_reviewed={'school': '123', 'class': 'IX', 'rows': [{'sid': 'test', 'pen': 'test', 'payload': payload, 'cwsn': 2}]}, facility_get=lambda sid: reads.pop(0), facility_request=request, files=types.SimpleNamespace(download=lambda p: None))
+                self.env.update(facility_reviewed={'school': '123', 'class': 'IX', 'rows': [{'sid': 'test', 'pen': 'test', 'payload': payload, 'cwsn': 2}]}, facility_get=get_facility, facility_request=request, files=types.SimpleNamespace(download=lambda p: None))
                 cwd = os.getcwd()
                 try:
                     os.chdir(folder)
@@ -129,7 +137,7 @@ class FacilityTests(unittest.TestCase):
             cwd = os.getcwd()
             try:
                 os.chdir(folder)
-                with contextlib.redirect_stdout(io.StringIO()):
+                with patch('time.sleep'), contextlib.redirect_stdout(io.StringIO()):
                     exec(source, self.env)
                 self.assertEqual(self.env['facility_results'][0]['Status'], 'PRECHECK_UNAVAILABLE')
             finally:

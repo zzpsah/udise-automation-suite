@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.10 (2026-09-23)"
+FACILITY_BUILD = "v1.2.11 (2026-09-23)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -312,19 +312,29 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.10_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.11_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+def facility_precheck_read(label, action):
+    for attempt in (1, 2):
+        try:
+            return action()
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            print(f'[FACILITY] {label}: {type(exc).__name__} on pre-check read {attempt}/2', flush=True)
+            if attempt == 2:
+                raise RuntimeError(f'{label}: {type(exc).__name__} after two pre-check reads; no save sent') from exc
+            print(f'[FACILITY] {label}: retrying this read-only pre-check in 2s', flush=True)
+            time.sleep(2)
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}
     try:
         print(f'🔎 Student {position}: checking the current portal record', flush=True)
-        current = facility_get(sid)
+        current = facility_precheck_read('Facility details', lambda: facility_get(sid))
         changes = facility_mismatches(current, payload)
         result['Changed Fields'] = ', '.join(changes)
         if not changes:
             result.update(Status='SKIPPED_ALREADY_UP_TO_DATE', Detail='Fresh record already matches')
         else:
-            status, general = facility_request('GET', f'/p0/api/cy/students/{sid}')
+            status, general = facility_precheck_read('CWSN status', lambda: facility_request('GET', f'/p0/api/cy/students/{sid}'))
             if status != 200 or general.get('status') is not True or (general.get('data') or {}).get('cwsnYN') != item['cwsn']:
                 raise ValueError('CWSN status changed or unavailable; validate again')
             result.update(Status='SUBMISSION_PENDING', Detail='Check fresh portal state before any retry')
@@ -356,7 +366,7 @@ for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSI
     except Exception as exc:
         if result['Status'] == 'FAILED':
             result['Status'] = 'PRECHECK_UNAVAILABLE'
-        result['Detail'] += '; ' + str(exc)
+        result['Detail'] = '; '.join(part for part in (result['Detail'], str(exc)) if part)
     friendly_status = {'SKIPPED_ALREADY_UP_TO_DATE': '✅ Already up to date — no change sent', 'SUCCESS_CONFIRMED_BY_READBACK': '✅ Saved and confirmed', 'PRECHECK_UNAVAILABLE': '⚠️ Could not read current record — no save sent', 'FAILED': '❌ Not saved — check the result file', 'UNCONFIRMED': '⚠️ Save not confirmed — check the portal before retrying'}.get(result['Status'], '⚠️ Check the result file')
     result['Result for user'] = friendly_status
     facility_results.append(result)
