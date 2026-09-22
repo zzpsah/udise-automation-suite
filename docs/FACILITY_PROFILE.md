@@ -36,6 +36,14 @@ Distance IDs 1–4: Less than 1 km; Between 1–3 Kms; Between 3–5 Kms; More t
 
 Parent education IDs 1–6: Primary; Upper Primary; Secondary or Equivalent; Higher Secondary or Equivalent; More than Higher Secondary; No Schooling Experience.
 
+## v1.2.2 validation changes
+
+All workbook rows receive local input checks first. If any local errors are found, no portal calls are made. NCC, NSS and Scouts still require explicit Yes/No answers; blank/9 is not automatically changed to No. The exported CWSN reference permits early dependent-field checks, but current CWSN status is verified remotely before approval. Older workbooks without that reference remain supported.
+
+Only locally valid workbooks proceed to sequential CWSN GET checks. INPUT ERROR, NETWORK ERROR and PORTAL ERROR are counted separately. Any failure prevents submission approval; expired/access-denied sessions stop remaining checks. Every validation attempt clears previous approval. Missing cells are normalized with `where(pd.notna(...), '')` instead of the warning-producing fillna call.
+
+Twenty offline test methods across roster, Facility, enrollment and class selection pass for v1.2.2, including local-error zero-request behavior, network/auth classification and legacy workbook validation. No live Facility submission was performed.
+
 ## Verification and limitations
 
 Seven offline test methods cover exact payload keys, unanswered codes, conditional benefits, non-CWSN exclusion, measurement ranges, read-back normalization and mocked save outcomes (success, timeout then saved, rejection). Enrollment regression and class-selector tests also pass against the new notebook.
