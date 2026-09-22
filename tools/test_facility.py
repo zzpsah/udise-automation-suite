@@ -24,31 +24,32 @@ class FacilityTests(unittest.TestCase):
 
     def test_validation_local_first_and_error_classes(self):
         source = Path(__file__).with_name('facility_cells.py').read_text(encoding='utf-8').split('# %%\n')[3]
-        for case in ('input', 'network', 'auth', 'success', 'legacy'):
+        for case in ('input', 'success', 'missing_reference'):
             with self.subTest(case=case):
                 row = dict(self.row, PEN='p1', Class='IX', **{'Student ID (system)': 's1', 'CWSN Student (reference)': 'No'})
                 for values, prefix in ((self.env['FACILITY_BENEFITS'], 'Benefit: '), (self.env['FACILITY_CWSN'], 'CWSN: ')):
                     row.update({prefix+v: 'No' for v in values.values()})
                 if case == 'input':
                     row['NCC'] = 9
-                if case == 'legacy':
+                if case == 'missing_reference':
                     row.pop('CWSN Student (reference)')
                 calls = []
                 def request(*args):
                     calls.append(args)
-                    if case == 'network':
-                        raise requests.Timeout()
-                    return (401, {}) if case == 'auth' else (200, {'status': True, 'data': {'cwsnYN': 2}})
+                    raise AssertionError('Sheet validation must not call UDISE')
                 self.env.update(facility_reviewed='stale', files=types.SimpleNamespace(upload=lambda: {'test.xlsx': b'x'}),
                                 facility_roster=lambda: {'s1': {'studentCodeNat': 'p1', 'classId': 9}}, facility_request=request)
                 output = io.StringIO()
                 with patch.object(pd, 'read_excel', return_value=pd.DataFrame([row])), contextlib.redirect_stdout(output):
-                    exec(source, self.env)
-                self.assertEqual(len(calls), 0 if case == 'input' else 1)
-                self.assertEqual('facility_reviewed' in self.env, case in ('success', 'legacy'))
-                if case in ('input', 'network', 'auth'):
-                    label = {'input': 'INPUT ERROR', 'network': 'NETWORK ERROR', 'auth': 'PORTAL ERROR'}[case]
-                    self.assertIn(label, output.getvalue())
+                    if case == 'missing_reference':
+                        with self.assertRaisesRegex(ValueError, 'CWSN Student'):
+                            exec(source, self.env)
+                    else:
+                        exec(source, self.env)
+                self.assertEqual(len(calls), 0)
+                self.assertEqual('facility_reviewed' in self.env, case == 'success')
+                if case == 'input':
+                    self.assertIn('INPUT ERROR', output.getvalue())
 
     def test_payload_fields_and_non_cwsn(self):
         p = self.env['facility_payload'](self.row, False)

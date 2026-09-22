@@ -2,15 +2,15 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.2_2026-09-22.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.3_2026-09-22.ipynb`
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.2 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.2_2026-09-22.ipynb)
+[Open build v1.2.3 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.3_2026-09-22.ipynb)
 
-Build v1.2.2 fixes roster refresh and Facility validation. Roster GET uses a 300-second read timeout, ten-second waiting messages and at most two attempts by default. Failed refreshes clear stale roster/validated state; authentication and malformed responses are rejected. Facility validation checks local inputs before any portal request, separates input/network/portal errors, and avoids the pandas fillna warning. Open this new version link (an existing Colab copy does not automatically update). Twenty offline tests pass; this release has not been tested against a live portal session. See [roster troubleshooting](docs/ROSTER_FETCH.md).
+Build v1.2.3 makes Facility upload validation sheet-only: it checks the workbook and saved roster/reference columns without calling UDISE. This prevents portal timeouts during review. The submit cell retains a fresh CWSN check immediately before a POST. Roster GET uses a 300-second read timeout, ten-second waiting messages and at most two attempts by default. Failed refreshes clear stale roster/validated state; authentication and malformed responses are rejected. Twenty offline tests pass; this release has not been tested against a live Facility save.
 
 Build v1.2.1 adds conditional Facility benefit dropdowns, protected non-CWSN cells based on current General Profile, and measurement input messages/range checks. Generate a fresh Facility export to obtain these controls. Enter actual height and weight; no random or gender-based values are generated.
 

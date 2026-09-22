@@ -36,13 +36,13 @@ Distance IDs 1–4: Less than 1 km; Between 1–3 Kms; Between 3–5 Kms; More t
 
 Parent education IDs 1–6: Primary; Upper Primary; Secondary or Equivalent; Higher Secondary or Equivalent; More than Higher Secondary; No Schooling Experience.
 
-## v1.2.2 validation changes
+## v1.2.3 sheet-only validation
 
-All workbook rows receive local input checks first. If any local errors are found, no portal calls are made. NCC, NSS and Scouts still require explicit Yes/No answers; blank/9 is not automatically changed to No. The exported CWSN reference permits early dependent-field checks, but current CWSN status is verified remotely before approval. Older workbooks without that reference remain supported.
+Upload validation makes no UDISE request. It checks the workbook, selected class, PEN/system ID against the roster already loaded in Colab, required answers, dropdown values, benefit dependencies, measurements, and the exported `CWSN Student (reference)` column. NCC, NSS and Scouts still require explicit Yes/No answers; blank/9 is not automatically changed to No.
 
-Only locally valid workbooks proceed to sequential CWSN GET checks. INPUT ERROR, NETWORK ERROR and PORTAL ERROR are counted separately. Any failure prevents submission approval; expired/access-denied sessions stop remaining checks. Every validation attempt clears previous approval. Missing cells are normalized with `where(pd.notna(...), '')` instead of the warning-producing fillna call.
+The CWSN reference is mandatory, so generate a fresh Facility workbook before validation. A locally valid workbook becomes reviewed without waiting on the portal. Immediately before an actual POST, the submit cell gets the current General Profile CWSN flag and stops if it differs from the exported reference. Every validation attempt clears previous approval. Missing cells are normalized with `where(pd.notna(...), '')` instead of the warning-producing fillna call.
 
-Twenty offline test methods across roster, Facility, enrollment and class selection pass for v1.2.2, including local-error zero-request behavior, network/auth classification and legacy workbook validation. No live Facility submission was performed.
+Twenty offline test methods across roster, Facility, enrollment and class selection pass for v1.2.3, including zero UDISE requests during Facility validation. No live Facility submission was performed.
 
 ## Verification and limitations
 

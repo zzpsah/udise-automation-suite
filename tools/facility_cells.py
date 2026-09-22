@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.2 (2026-09-22)"
+FACILITY_BUILD = "v1.2.3 (2026-09-22)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -250,13 +250,12 @@ if len(upload) != 1:
     raise ValueError('Upload exactly one Facility Update workbook')
 facility_frame = pd.read_excel(io.BytesIO(next(iter(upload.values()))), sheet_name='Facility Update', dtype=object)
 facility_frame = facility_frame.where(pd.notna(facility_frame), '')
-required = {'PEN', 'Class', 'Student ID (system)', 'Height (cm)', 'Weight (kg)', 'Distance to School', 'Parent/Guardian Education'} | set(FACILITY_YN) | {'Benefit: '+v for v in FACILITY_BENEFITS.values()} | {'CWSN: '+v for v in FACILITY_CWSN.values()}
+required = {'PEN', 'Class', 'Student ID (system)', 'CWSN Student (reference)', 'Height (cm)', 'Weight (kg)', 'Distance to School', 'Parent/Guardian Education'} | set(FACILITY_YN) | {'Benefit: '+v for v in FACILITY_BENEFITS.values()} | {'CWSN: '+v for v in FACILITY_CWSN.values()}
 if required - set(facility_frame):
     raise ValueError('Missing columns: ' + ', '.join(sorted(required-set(facility_frame))))
 roster = facility_roster()
 reviewed, issues, seen = [], [], set()
-network_issues, portal_issues, candidates = [], [], []
-print('[FACILITY] LOCAL CHECK: checking workbook inputs before portal requests', flush=True)
+print('[FACILITY] SHEET CHECK: validating workbook only; no UDISE request will be made', flush=True)
 for index, row in facility_frame.iterrows():
     sid = facility_text(row['Student ID (system)'])
     try:
@@ -266,45 +265,20 @@ for index, row in facility_frame.iterrows():
         student = roster[sid]
         if facility_text(row['PEN']) != str(student.get('studentCodeNat', '')) or row['Class'] != {9: 'IX', 10: 'X'}[int(student['classId'])]:
             raise ValueError('PEN/class does not match current roster')
-        reference = facility_text(row.get('CWSN Student (reference)')).lower()
-        local_cwsn = True if reference == 'yes' else False if reference == 'no' else None
-        facility_payload(row, local_cwsn)
-        candidates.append((index+2, sid, row))
+        reference = facility_text(row['CWSN Student (reference)']).lower()
+        if reference not in {'yes', 'no'}:
+            raise ValueError('CWSN Student (reference) must be Yes or No. Export a fresh Facility workbook.')
+        cwsn_flag = 1 if reference == 'yes' else 2
+        payload = facility_payload(row, cwsn_flag == 1)
+        reviewed.append({'sid': sid, 'pen': facility_text(row['PEN']), 'cwsn': cwsn_flag, 'payload': payload})
     except (ValueError, TypeError, KeyError) as exc:
         issues.append((index+2, str(exc)))
         print(f'[INPUT ERROR] Row {index+2}: {exc}', flush=True)
-if issues:
-    print(f'Local validation: {len(issues)} input error(s). No portal requests made. Correct these and validate again.', flush=True)
-else:
-    print(f'[FACILITY] PORTAL CHECK: verifying CWSN status for {len(candidates)} row(s)', flush=True)
-    for position, (excel_row, sid, row) in enumerate(candidates, 1):
-        print(f'[FACILITY] CWSN CHECK {position}/{len(candidates)} (Excel row {excel_row})', flush=True)
-        try:
-            status, general = facility_request('GET', f'/p0/api/cy/students/{sid}')
-        except requests.RequestException as exc:
-            network_issues.append((excel_row, type(exc).__name__))
-            print(f'[NETWORK ERROR] Row {excel_row}: {type(exc).__name__}; input validity is not affected. Re-run validation after connectivity recovers.', flush=True)
-            continue
-        data = general.get('data')
-        if status != 200 or general.get('status') is not True or not isinstance(data, dict) or data.get('cwsnYN') not in (1, 2):
-            portal_issues.append((excel_row, f'HTTP {status}; current CWSN status unavailable'))
-            print(f'[PORTAL ERROR] Row {excel_row}: HTTP {status}; current CWSN status unavailable', flush=True)
-            if status in (401, 403):
-                print('Authentication expired or access denied. Remaining rows were not checked; authenticate again.', flush=True)
-                break
-            continue
-        cwsn_flag = data['cwsnYN']
-        try:
-            payload = facility_payload(row, cwsn_flag == 1)
-            reviewed.append({'sid': sid, 'pen': facility_text(row['PEN']), 'cwsn': cwsn_flag, 'payload': payload})
-        except (ValueError, TypeError) as exc:
-            issues.append((excel_row, str(exc)))
-            print(f'[INPUT ERROR] Row {excel_row}: {exc}', flush=True)
-if issues or network_issues or portal_issues or not reviewed:
-    print(f'Validation incomplete: {len(issues)} input error(s), {len(network_issues)} network failure(s), {len(portal_issues)} portal failure(s). Nothing submitted.')
+if issues or not reviewed:
+    print(f'Sheet validation incomplete: {len(issues)} input error(s). Nothing submitted.')
 else:
     facility_reviewed = {'school': str(SCHOOL_ID), 'class': FACILITY_CLASS, 'rows': reviewed}
-    print(f'Validation passed: {len(reviewed)} rows. Review before enabling submission.')
+    print(f'Sheet validation passed: {len(reviewed)} rows. No UDISE request was made. Review before enabling submission.')
 # %%
 #@title Facility Profile — Submit Reviewed Updates { display-mode: "form" }
 ALLOW_FACILITY_UPDATE = False #@param {type:"boolean"}
@@ -316,7 +290,7 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.2_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.3_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}
