@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.8 (2026-09-23)"
+FACILITY_BUILD = "v1.2.9 (2026-09-23)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -302,7 +302,7 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.8_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.9_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}

@@ -3,7 +3,7 @@ import traceback
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 
-DASHBOARD_SOURCES = __SOURCE_MAP__
+globals()['DASHBOARD_SOURCES'] = __SOURCE_MAP__
 
 def dash_button(label, action, color='#24558c'):
     button = widgets.Button(description=label, layout=widgets.Layout(width='230px', height='42px'))
