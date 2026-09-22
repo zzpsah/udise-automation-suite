@@ -2,15 +2,17 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.7_2026-09-23.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.8_2026-09-23.ipynb`
 
-The previous v1.2.5 and v1.2.6 notebooks remain in the repository as rollback copies; use v1.2.7 for current Facility exports.
+The previous v1.2.5–v1.2.7 notebooks remain in the repository as rollback copies; use v1.2.8 for the current workflow.
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.7 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.7_2026-09-23.ipynb)
+[Open build v1.2.8 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.8_2026-09-23.ipynb)
+
+Build v1.2.8 removes manual UDISE-code and school-name fields from Detect School. Paste the school URL or its 7-digit internal ID; the confirmed school identity is displayed automatically when available.
 
 Build v1.2.7 retains the working v1.2.5 workflow and Detect School behavior. Facility export prefills unanswered Yes/No fields as No, unanswered distance as `2 - Between 1-3 Kms`, and missing Parent/Guardian Education as `3 - Secondary or Equivalent`; saved values and measurements remain unchanged. Facility export reads the portal; upload validation checks the Excel sheet only and sends no portal request. The separate reviewed submission cell performs the save and read-back check. Code cells appear as Colab forms by default. Live Facility saving has not been verified.
 
