@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.10 (2026-09-23)"
+FACILITY_BUILD = "v1.2.5 (2026-09-22)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -166,18 +166,6 @@ for sid, student in tqdm(selected, desc='Facility profiles'):
             for label in FACILITY_CWSN.values():
                 row['CWSN: '+label] = 'No'
         row.update({'Height (cm)': data.get('heightInCm') or '', 'Weight (kg)': data.get('weightInKg') or '', 'Distance to School': facility_label(data.get('distanceFrmSchool'), FACILITY_DISTANCE), 'Parent/Guardian Education': facility_label(data.get('parentEducation'), FACILITY_EDUCATION)})
-        if int(student['classId']) == 9:
-            # User-provided Class IX defaults apply only where the portal has
-            # not already supplied an answer for this student.
-            row['Height (cm)'] = ''
-            row['Weight (kg)'] = ''
-            for label in ('Facilities Provided', 'Competitions/Olympiads', 'NCC', 'NSS', 'Scouts and Guides'):
-                if not row[label]:
-                    row[label] = 'No'
-            if cwsn_flag == 1 and not row['CWSN Facilities Provided']:
-                row['CWSN Facilities Provided'] = 'No'
-            if not row['Distance to School']:
-                row['Distance to School'] = facility_label(2, FACILITY_DISTANCE)
         rows.append(row)
     except Exception as exc:
         failed.append({'Student ID (system)': sid, 'Error': str(exc)})
@@ -302,7 +290,7 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.10_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.5_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}

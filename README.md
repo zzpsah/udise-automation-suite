@@ -2,15 +2,15 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.10_2026-09-23.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb`
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.10 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.10_2026-09-23.ipynb)
+[Open build v1.2.5 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb)
 
-Build v1.2.10 adds one Colab dashboard with clickable cards for Start, General Profile, Enrollment, Facility and other tools. Inputs, action buttons and the latest result remain in one cell; the original cells remain below as a fallback. Detect School distinguishes the internal API school ID from the 11-digit UDISE code. The confirmed identity for internal ID `2497128` is displayed automatically; other schools can enter their own name and UDISE code. Class IX Facility export defaults unanswered Yes/No fields to No and an unanswered distance to `2 - Between 1-3 Kms`; height and weight are blank for new measurements. Existing saved Yes answers remain visible. Enrollment submission has one approval switch and an optional ending Excel row; `0` processes all validated rows. Facility upload validation remains sheet-only. Twenty-four offline tests pass; live Facility saving has not yet been verified in Colab against UDISE.
+The working v1.2.5 workflow has been restored. Its retained Detect School improvement accepts a school URL or 7-digit internal school ID and displays the separately identified 11-digit UDISE code and school name for the confirmed school. The UPI/support and “Made with” sections have been removed. Code cells appear as Colab forms by default, but an editor can still choose Show code. Facility upload validation remains sheet-only. Twenty-two offline tests pass; live Facility saving has not been verified.
 
 Build v1.2.1 adds conditional Facility benefit dropdowns, protected non-CWSN cells based on current General Profile, and measurement input messages/range checks. Generate a fresh Facility export to obtain these controls. Enter actual height and weight; no random or gender-based values are generated.
 

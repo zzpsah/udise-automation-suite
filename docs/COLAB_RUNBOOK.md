@@ -2,13 +2,11 @@
 
 ## Read-only run
 
-Open the **UDISE dashboard** cell near the top. Its Start, General, Enrollment, Facility and Other cards keep controls and the latest result in one view. The original cells remain below if a card does not work in the current Colab runtime.
-
 1. Open the notebook from this private repository.
 2. Log into UDISE+ manually in a separate browser tab.
-3. Click **Set up environment** on the Start card.
+3. Run **Setup environment**.
 4. Run **Authentication** and paste the active Cookie request-header only into the hidden Colab prompt.
-5. Run **Detect school** using the current school URL or its 7-digit internal school ID. The 11-digit UDISE code has a separate field. Internal ID `2497128` displays its confirmed school name and UDISE code automatically.
+5. Run **Detect school** using the current school student-list URL or its numeric UDISE code. You may enter the school name for display; the roster will display a name automatically only when the UDISE response includes one.
 6. Run **Fetch current academic-session students**.
 7. For enrollment, run **Load IX/X subject rules**, then **Export IX/X Excel**.
 8. Edit the workbook, save it, and run **Validate IX/X Excel**.
@@ -17,7 +15,7 @@ Open the **UDISE dashboard** cell near the top. Its Start, General, Enrollment, 
 
 Only after validation passes and the intended row is reviewed:
 
-1. For an initial one-row test, set `ENROLMENT_END_ROW = 2` (Excel row 2). The default `0` processes every validated row.
+1. Leave `ENROLMENT_MAX_SUBMISSIONS = 1`.
 2. Set `ALLOW_ENROLMENT_UPDATE = True`.
 3. Run the cell once and inspect the result workbook.
 4. Independently confirm the record in UDISE before considering a larger batch.

@@ -76,6 +76,9 @@ if not globals().get('SCHOOL_NAME'):
         if value:
             SCHOOL_NAME = value
             break
-fetch_status('SCHOOL', f'Internal school ID {SCHOOL_ID}; UDISE code {globals().get("UDISE_CODE") or "not entered"}; school name: {globals().get("SCHOOL_NAME") or "not available"}')
+if globals().get('SCHOOL_NAME'):
+    fetch_status('SCHOOL', f'UDISE code {SCHOOL_ID}; school name: {SCHOOL_NAME}')
+else:
+    fetch_status('SCHOOL', f'UDISE code {SCHOOL_ID}; school name was not included in this roster response')
 if not students:
     fetch_status('EMPTY', 'The portal returned a successful empty list. Check the selected school/year before continuing.')

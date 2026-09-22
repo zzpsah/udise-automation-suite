@@ -124,8 +124,6 @@ class FacilityTests(unittest.TestCase):
         auto = types.ModuleType('tqdm.auto')
         auto.tqdm = lambda sequence, **kwargs: sequence
         data = self.env['facility_payload'](self.row, False)
-        data.update(facilityYn=9, nccYn=9, nssYn=9, scoutsYn=9, olympdsNlc=9,
-                    distanceFrmSchool='9', heightInCm='150', weightInKg='40')
         self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}], facility_get=lambda sid: data, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
         with tempfile.TemporaryDirectory() as folder:
             cwd = os.getcwd()
@@ -138,11 +136,6 @@ class FacilityTests(unittest.TestCase):
                 headers = {c.value: c.column for c in sheet[1]}
                 self.assertTrue(sheet.protection.sheet)
                 self.assertEqual(sheet.cell(2, headers['CWSN Student (reference)']).value, 'No')
-                for field in ('Facilities Provided', 'Competitions/Olympiads', 'NCC', 'NSS', 'Scouts and Guides'):
-                    self.assertEqual(sheet.cell(2, headers[field]).value, 'No')
-                self.assertEqual(sheet.cell(2, headers['Distance to School']).value, '2 - Between 1-3 Kms')
-                self.assertIsNone(sheet.cell(2, headers['Height (cm)']).value)
-                self.assertIsNone(sheet.cell(2, headers['Weight (kg)']).value)
                 for field in ('CWSN Facilities Provided', 'CWSN: Braille Book'):
                     self.assertTrue(sheet.cell(2, headers[field]).protection.locked)
                 self.assertFalse(sheet.cell(2, headers['Facilities Provided']).protection.locked)
