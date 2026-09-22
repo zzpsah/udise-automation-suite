@@ -14,7 +14,7 @@ import pandas as pd
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-NB = json.loads((ROOT / 'UDISE_Automation_Enhanced_v1.2.8_2026-09-23.ipynb').read_text(encoding='utf-8'))
+NB = json.loads((ROOT / 'UDISE_Automation_Enhanced_v1.2.9_2026-09-23.ipynb').read_text(encoding='utf-8'))
 SOURCE = next(''.join(c['source']) for c in NB['cells'] if 'Enrolment Profile — Submit Reviewed Updates' in ''.join(c.get('source', [])))
 SOURCE = SOURCE.replace('ALLOW_ENROLMENT_UPDATE = False', 'ALLOW_ENROLMENT_UPDATE = True').replace('ENROLMENT_MAX_SUBMISSIONS = 1', 'ENROLMENT_MAX_SUBMISSIONS = 3').replace('ALLOW_ENROLMENT_BATCH = False', 'ALLOW_ENROLMENT_BATCH = True')
 

@@ -135,8 +135,11 @@ class FacilityTests(unittest.TestCase):
             cwd = os.getcwd()
             try:
                 os.chdir(folder)
-                with patch.dict(sys.modules, {'google.colab': colab, 'tqdm.auto': auto}), contextlib.redirect_stdout(io.StringIO()):
+                output = io.StringIO()
+                with patch.dict(sys.modules, {'google.colab': colab, 'tqdm.auto': auto}), contextlib.redirect_stdout(output):
                     exec(source, self.env)
+                self.assertIn('50% (1/2)', output.getvalue())
+                self.assertIn('100% (2/2)', output.getvalue())
                 book = openpyxl.load_workbook(self.env['facility_export_file'])
                 sheet = book['Facility Update']
                 headers = {c.value: c.column for c in sheet[1]}

@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.8 (2026-09-23)"
+FACILITY_BUILD = "v1.2.9 (2026-09-23)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -136,15 +136,16 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.utils import get_column_letter
-from tqdm.auto import tqdm
-
 FACILITY_FETCH_LIMIT = 0 #@param {type:"integer"}
 roster = facility_roster()
 selected = list(roster.items())[:FACILITY_FETCH_LIMIT or None]
 if not selected:
     raise ValueError('No students found in the selected class')
 rows, failed = [], []
-for sid, student in tqdm(selected, desc='Facility profiles'):
+total = len(selected)
+print(f'[FACILITY] Starting export for {total} students. Each student needs two portal reads.', flush=True)
+for position, (sid, student) in enumerate(selected, 1):
+    print(f'[FACILITY] Student {position}/{total}: fetching details', flush=True)
     try:
         data = facility_get(sid)
         status, general = facility_request('GET', f'/p0/api/cy/students/{sid}')
@@ -173,7 +174,12 @@ for sid, student in tqdm(selected, desc='Facility profiles'):
         rows.append(row)
     except Exception as exc:
         failed.append({'Student ID (system)': sid, 'Error': str(exc)})
-        print(f'[FACILITY] EXPORT ERROR: {type(exc).__name__}', flush=True)
+        print(f'[FACILITY] Student {position}/{total} could not be exported: {type(exc).__name__}', flush=True)
+    completed = position
+    percent = completed * 100 // total
+    filled = percent * 20 // 100
+    bar = '█' * filled + '░' * (20 - filled)
+    print(f'[FACILITY] [{bar}] {percent}% ({completed}/{total}) | included {len(rows)} | failed {len(failed)}', flush=True)
 if not rows:
     raise RuntimeError('No profiles exported; check authentication and response logs')
 book = Workbook()
@@ -294,7 +300,7 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.8_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.9_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}
