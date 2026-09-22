@@ -2,7 +2,7 @@
 
 ## Current export defaults
 
-For Classes IX and X, the export keeps saved Yes answers, fills unanswered Yes/No choices as No, and fills an unanswered distance as `2 - Between 1-3 Kms`. Benefit and CWSN item columns show Yes only when that saved item is present; otherwise they show No. For a non-CWSN student, the CWSN Facilities Provided parent cell stays blank and its CWSN inputs are locked. Saved height and weight are shown; only missing measurements need manual entry. Parent/Guardian Education comes from the saved portal value; a missing value is highlighted yellow and must be verified because the form has no No option.
+For Classes IX and X, the export keeps saved Yes answers, fills unanswered Yes/No choices as No, and fills an unanswered distance as `2 - Between 1-3 Kms`. Benefit and CWSN item columns show Yes only when that saved item is present; otherwise they show No. For a non-CWSN student, the CWSN Facilities Provided parent cell stays blank and its CWSN inputs are locked. Saved height and weight are shown; only missing measurements need manual entry. Parent/Guardian Education keeps a saved value; when blank, it defaults to the user-requested `3 - Secondary or Equivalent`.
 
 ## v1.2.1 conditional workbook inputs
 

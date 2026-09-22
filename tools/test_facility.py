@@ -129,7 +129,8 @@ class FacilityTests(unittest.TestCase):
         auto.tqdm = lambda sequence, **kwargs: sequence
         data = self.env['facility_payload'](self.row, False)
         data.update(nccYn=9, nssYn=9, olympdsNlc=1, distanceFrmSchool=9)
-        self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}], facility_get=lambda sid: data, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
+        missing_education = dict(data, parentEducation=9)
+        self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}, {'studentId': 's2', 'studentCodeNat': 'p2', 'classId': 10}], FACILITY_CLASSES={9, 10}, facility_get=lambda sid: missing_education if sid == 's1' else data, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
         with tempfile.TemporaryDirectory() as folder:
             cwd = os.getcwd()
             try:
@@ -146,6 +147,8 @@ class FacilityTests(unittest.TestCase):
                 self.assertEqual(sheet.cell(2, headers['NSS']).value, 'No')
                 self.assertEqual(sheet.cell(2, headers['Competitions/Olympiads']).value, 'Yes')
                 self.assertEqual(sheet.cell(2, headers['Distance to School']).value, '2 - Between 1-3 Kms')
+                self.assertEqual(sheet.cell(2, headers['Parent/Guardian Education']).value, '3 - Secondary or Equivalent')
+                self.assertEqual(sheet.cell(3, headers['Parent/Guardian Education']).value, '4 - Higher Secondary or Equivalent')
                 self.assertEqual(sheet.cell(2, headers['Height (cm)']).value, '150')
                 self.assertEqual(sheet.cell(2, headers['Weight (kg)']).value, '40')
                 for field in ('CWSN Facilities Provided', 'CWSN: Braille Book'):

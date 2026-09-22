@@ -2,17 +2,17 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.6_2026-09-23.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.7_2026-09-23.ipynb`
 
-The previous v1.2.5 notebook remains in the repository as a rollback copy; use v1.2.6 for current Facility exports.
+The previous v1.2.5 and v1.2.6 notebooks remain in the repository as rollback copies; use v1.2.7 for current Facility exports.
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.6 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.6_2026-09-23.ipynb)
+[Open build v1.2.7 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.7_2026-09-23.ipynb)
 
-Build v1.2.6 retains the working v1.2.5 workflow and Detect School behavior. Facility export prefills unanswered Yes/No fields as No and unanswered distance as `2 - Between 1-3 Kms`, preserves saved Yes answers and measurements, and leaves the non-CWSN parent field blank. Facility upload validation checks the Excel sheet only; portal reads and writes happen later, only when the reviewed submission cell is run. Code cells appear as Colab forms by default. Live Facility saving has not been verified.
+Build v1.2.7 retains the working v1.2.5 workflow and Detect School behavior. Facility export prefills unanswered Yes/No fields as No, unanswered distance as `2 - Between 1-3 Kms`, and missing Parent/Guardian Education as `3 - Secondary or Equivalent`; saved values and measurements remain unchanged. Facility export reads the portal; upload validation checks the Excel sheet only and sends no portal request. The separate reviewed submission cell performs the save and read-back check. Code cells appear as Colab forms by default. Live Facility saving has not been verified.
 
 Build v1.2.1 adds conditional Facility benefit dropdowns, protected non-CWSN cells based on current General Profile, and measurement input messages/range checks. Generate a fresh Facility export to obtain these controls. Enter actual height and weight; no random or gender-based values are generated.
 
