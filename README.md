@@ -2,15 +2,17 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.9_2026-09-23.ipynb`
+- `UDISE_Automation_Enhanced_v1.2.10_2026-09-23.ipynb`
 
-The previous v1.2.5–v1.2.8 notebooks remain in the repository as rollback copies; use v1.2.9 for the current workflow.
+The previous v1.2.5–v1.2.9 notebooks remain in the repository as rollback copies; use v1.2.10 for the current workflow.
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.9 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.9_2026-09-23.ipynb)
+[Open build v1.2.10 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.10_2026-09-23.ipynb)
+
+Build v1.2.10 retries timed-out read-only Facility export requests once after a short pause, identifies whether Facility details or CWSN status failed, and prominently warns when the workbook is incomplete. Submission POST behavior is unchanged; it is never automatically retried.
 
 Build v1.2.9 shows a persistent text percentage bar and included/failed counts during Facility export, even when the notebook progress widget is not displayed. The Facility request behavior and timeouts are unchanged.
 

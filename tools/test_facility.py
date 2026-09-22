@@ -121,6 +121,20 @@ class FacilityTests(unittest.TestCase):
                 finally:
                     os.chdir(cwd)
 
+    def test_submission_precheck_timeout_sends_no_post(self):
+        source = Path(__file__).with_name('facility_cells.py').read_text(encoding='utf-8').split('# %%\n')[-1].replace('ALLOW_FACILITY_UPDATE = False', 'ALLOW_FACILITY_UPDATE = True')
+        payload = self.env['facility_payload'](self.row, False)
+        self.env.update(facility_reviewed={'school': '123', 'class': 'IX', 'rows': [{'sid': 'test', 'pen': 'test', 'payload': payload, 'cwsn': 2}]}, facility_get=lambda sid: (_ for _ in ()).throw(requests.ReadTimeout()), facility_request=lambda *args, **kwargs: self.fail('No request should be sent after precheck timeout'), files=types.SimpleNamespace(download=lambda p: None))
+        with tempfile.TemporaryDirectory() as folder:
+            cwd = os.getcwd()
+            try:
+                os.chdir(folder)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    exec(source, self.env)
+                self.assertEqual(self.env['facility_results'][0]['Status'], 'PRECHECK_UNAVAILABLE')
+            finally:
+                os.chdir(cwd)
+
     def test_export_conditional_controls(self):
         source = Path(__file__).with_name('facility_cells.py').read_text(encoding='utf-8').split('# %%\n')[2]
         colab = types.ModuleType('google.colab')
@@ -130,14 +144,22 @@ class FacilityTests(unittest.TestCase):
         data = self.env['facility_payload'](self.row, False)
         data.update(nccYn=9, nssYn=9, olympdsNlc=1, distanceFrmSchool=9)
         missing_education = dict(data, parentEducation=9)
-        self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}, {'studentId': 's2', 'studentCodeNat': 'p2', 'classId': 10}], FACILITY_CLASSES={9, 10}, facility_get=lambda sid: missing_education if sid == 's1' else data, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
+        facility_reads = []
+        def get_facility(sid):
+            facility_reads.append(sid)
+            if sid == 's1' and facility_reads.count('s1') == 1:
+                raise requests.ReadTimeout()
+            return missing_education if sid == 's1' else data
+        self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}, {'studentId': 's2', 'studentCodeNat': 'p2', 'classId': 10}], FACILITY_CLASSES={9, 10}, facility_get=get_facility, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
         with tempfile.TemporaryDirectory() as folder:
             cwd = os.getcwd()
             try:
                 os.chdir(folder)
                 output = io.StringIO()
-                with patch.dict(sys.modules, {'google.colab': colab, 'tqdm.auto': auto}), contextlib.redirect_stdout(output):
+                with patch.dict(sys.modules, {'google.colab': colab, 'tqdm.auto': auto}), patch('time.sleep'), contextlib.redirect_stdout(output):
                     exec(source, self.env)
+                self.assertEqual(facility_reads, ['s1', 's1', 's2'])
+                self.assertIn('retrying this read-only request', output.getvalue())
                 self.assertIn('50% (1/2)', output.getvalue())
                 self.assertIn('100% (2/2)', output.getvalue())
                 book = openpyxl.load_workbook(self.env['facility_export_file'])
