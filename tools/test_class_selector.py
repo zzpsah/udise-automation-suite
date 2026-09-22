@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 import pandas as pd
 
-NB = json.loads((Path(__file__).resolve().parents[1] / 'UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb').read_text(encoding='utf-8'))
+NB = json.loads((Path(__file__).resolve().parents[1] / 'UDISE_Automation_Enhanced_v1.2.6_2026-09-23.ipynb').read_text(encoding='utf-8'))
 def cell(title):
     return next(''.join(c['source']) for c in NB['cells'] if ''.join(c.get('source', [])).splitlines()[0].find(title) >= 0)
 

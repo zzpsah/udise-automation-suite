@@ -10,7 +10,7 @@ import requests
 from google.colab import files
 
 FACILITY_CLASS = "IX" #@param ["IX", "X", "IX and X"]
-FACILITY_BUILD = "v1.2.5 (2026-09-22)"
+FACILITY_BUILD = "v1.2.6 (2026-09-23)"
 FACILITY_CLASSES = {"IX": {9}, "X": {10}, "IX and X": {9, 10}}[FACILITY_CLASS]
 globals().pop('facility_reviewed', None)
 FACILITY_BENEFITS = dict(enumerate(['Free Text Book', 'Free Uniforms', 'Free Transport facility', 'Free Bi-Cycle', 'Free hostel', 'Free Escort', 'Free Mobile/Tablet/Computer', 'Other'], 1))
@@ -143,7 +143,7 @@ roster = facility_roster()
 selected = list(roster.items())[:FACILITY_FETCH_LIMIT or None]
 if not selected:
     raise ValueError('No students found in the selected class')
-rows, failed = [], []
+rows, failed, missing_parent_education = [], [], []
 for sid, student in tqdm(selected, desc='Facility profiles'):
     try:
         data = facility_get(sid)
@@ -154,7 +154,11 @@ for sid, student in tqdm(selected, desc='Facility profiles'):
         row = {'PEN': str(student.get('studentCodeNat', '')), 'Student Name': student.get('studentName', ''), 'Class': {9: 'IX', 10: 'X'}[int(student['classId'])], 'Student ID (system)': sid}
         row['CWSN Student (reference)'] = 'Yes' if cwsn_flag == 1 else 'No'
         for label, field in FACILITY_YN.items():
-            row[label] = {1: 'Yes', 2: 'No', 9: '', None: ''}.get(data.get(field), '')
+            # Keep a saved Yes, but make unanswered choices ready as No.
+            value = facility_text(data.get(field))
+            if value not in {'1', '2', '9', '0', ''}:
+                raise ValueError(f'Unknown {field} value; profile not exported')
+            row[label] = 'Yes' if value == '1' else 'No'
         if cwsn_flag == 2:
             row['CWSN Facilities Provided'] = ''
         for prefix, mapping, field in [('Benefit: ', FACILITY_BENEFITS, 'facProvided'), ('CWSN: ', FACILITY_CWSN, 'facProvidedCwsn')]:
@@ -165,7 +169,9 @@ for sid, student in tqdm(selected, desc='Facility profiles'):
         if cwsn_flag == 2:
             for label in FACILITY_CWSN.values():
                 row['CWSN: '+label] = 'No'
-        row.update({'Height (cm)': data.get('heightInCm') or '', 'Weight (kg)': data.get('weightInKg') or '', 'Distance to School': facility_label(data.get('distanceFrmSchool'), FACILITY_DISTANCE), 'Parent/Guardian Education': facility_label(data.get('parentEducation'), FACILITY_EDUCATION)})
+        row.update({'Height (cm)': data.get('heightInCm') or '', 'Weight (kg)': data.get('weightInKg') or '', 'Distance to School': facility_label(data.get('distanceFrmSchool'), FACILITY_DISTANCE) or facility_label(2, FACILITY_DISTANCE), 'Parent/Guardian Education': facility_label(data.get('parentEducation'), FACILITY_EDUCATION)})
+        if not row['Parent/Guardian Education']:
+            missing_parent_education.append(row['PEN'])
         rows.append(row)
     except Exception as exc:
         failed.append({'Student ID (system)': sid, 'Error': str(exc)})
@@ -193,6 +199,8 @@ for i, col in enumerate(columns, 1):
         cell.protection = Protection(locked=locked)
         if locked:
             cell.fill = PatternFill('solid', fgColor='E7E6E6')
+        elif col == 'Parent/Guardian Education' and not cell.value:
+            cell.fill = PatternFill('solid', fgColor='FFF2CC')
 sheet.protection.sheet = True
 sheet.protection.autoFilter = False
 for label, low, high in [('Height (cm)', 60, 256), ('Weight (kg)', 10, 150)]:
@@ -240,7 +248,9 @@ if failed:
         error_sheet.append(list(error.values()))
 facility_export_file = f'UDISE_Facility_{FACILITY_CLASS.replace(" ", "_")}_{SCHOOL_ID}_{datetime.now():%Y%m%d_%H%M%S}.xlsx'
 book.save(facility_export_file)
-print(f'📥 Workbook ready: {len(rows)} students. {len(failed)} could not be included. Enter actual height and weight before uploading.')
+print(f'📥 Workbook ready: {len(rows)} students. {len(failed)} could not be included. Saved measurements are shown; enter actual height or weight only where blank.')
+if missing_parent_education:
+    print(f'⚠️ {len(missing_parent_education)} student(s) have no saved Parent/Guardian Education. Their yellow cells need a verified answer before submission; no value was guessed.')
 files.download(facility_export_file)
 # %%
 #@title ✅ Facility Profile — Check Uploaded Excel { display-mode: "form" }
@@ -290,7 +300,7 @@ if 'facility_reviewed' not in globals() or facility_reviewed['school'] != str(SC
 if FACILITY_MAX_SUBMISSIONS < 1:
     raise ValueError('Submission limit must be at least one')
 facility_results = []
-result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.5_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
+result_file = f'UDISE_Facility_Result_{SCHOOL_ID}_v1.2.6_{datetime.now():%Y%m%d_%H%M%S_%f}.xlsx'
 for position, item in enumerate(facility_reviewed['rows'][:FACILITY_MAX_SUBMISSIONS], 1):
     sid, payload = item['sid'], item['payload']
     result = {'PEN': item['pen'], 'Student ID (system)': sid, 'Status': 'FAILED', 'Detail': '', 'Build': FACILITY_BUILD}

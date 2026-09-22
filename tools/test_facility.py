@@ -24,13 +24,15 @@ class FacilityTests(unittest.TestCase):
 
     def test_validation_local_first_and_error_classes(self):
         source = Path(__file__).with_name('facility_cells.py').read_text(encoding='utf-8').split('# %%\n')[3]
-        for case in ('input', 'success', 'missing_reference'):
+        for case in ('input', 'success', 'missing_measurement', 'missing_reference'):
             with self.subTest(case=case):
                 row = dict(self.row, PEN='p1', Class='IX', **{'Student ID (system)': 's1', 'CWSN Student (reference)': 'No'})
                 for values, prefix in ((self.env['FACILITY_BENEFITS'], 'Benefit: '), (self.env['FACILITY_CWSN'], 'CWSN: ')):
                     row.update({prefix+v: 'No' for v in values.values()})
                 if case == 'input':
                     row['NCC'] = 9
+                if case == 'missing_measurement':
+                    row['Height (cm)'] = ''
                 if case == 'missing_reference':
                     row.pop('CWSN Student (reference)')
                 calls = []
@@ -50,6 +52,8 @@ class FacilityTests(unittest.TestCase):
                 self.assertEqual('facility_reviewed' in self.env, case == 'success')
                 if case == 'input':
                     self.assertIn('Excel row 2 needs attention', output.getvalue())
+                if case == 'missing_measurement':
+                    self.assertIn('Height (cm)', output.getvalue())
 
     def test_payload_fields_and_non_cwsn(self):
         p = self.env['facility_payload'](self.row, False)
@@ -124,6 +128,7 @@ class FacilityTests(unittest.TestCase):
         auto = types.ModuleType('tqdm.auto')
         auto.tqdm = lambda sequence, **kwargs: sequence
         data = self.env['facility_payload'](self.row, False)
+        data.update(nccYn=9, nssYn=9, olympdsNlc=1, distanceFrmSchool=9)
         self.env.update(students=[{'studentId': 's1', 'studentCodeNat': 'p1', 'classId': 9}], facility_get=lambda sid: data, facility_request=lambda *args: (200, {'status': True, 'data': {'cwsnYN': 2}}), files=colab.files)
         with tempfile.TemporaryDirectory() as folder:
             cwd = os.getcwd()
@@ -136,6 +141,13 @@ class FacilityTests(unittest.TestCase):
                 headers = {c.value: c.column for c in sheet[1]}
                 self.assertTrue(sheet.protection.sheet)
                 self.assertEqual(sheet.cell(2, headers['CWSN Student (reference)']).value, 'No')
+                self.assertEqual(sheet.cell(2, headers['Facilities Provided']).value, 'No')
+                self.assertEqual(sheet.cell(2, headers['NCC']).value, 'No')
+                self.assertEqual(sheet.cell(2, headers['NSS']).value, 'No')
+                self.assertEqual(sheet.cell(2, headers['Competitions/Olympiads']).value, 'Yes')
+                self.assertEqual(sheet.cell(2, headers['Distance to School']).value, '2 - Between 1-3 Kms')
+                self.assertEqual(sheet.cell(2, headers['Height (cm)']).value, '150')
+                self.assertEqual(sheet.cell(2, headers['Weight (kg)']).value, '40')
                 for field in ('CWSN Facilities Provided', 'CWSN: Braille Book'):
                     self.assertTrue(sheet.cell(2, headers[field]).protection.locked)
                 self.assertFalse(sheet.cell(2, headers['Facilities Provided']).protection.locked)

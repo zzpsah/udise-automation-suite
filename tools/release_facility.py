@@ -56,13 +56,13 @@ for part in (ROOT/'tools/facility_cells.py').read_text(encoding='utf-8').split('
     compile(part, 'facility_cell', 'exec')
     cells.append(dict(cell_type='code', metadata={'cellView': 'form'}, execution_count=None, outputs=[], source=part.splitlines(keepends=True)))
 index = next(i for i,c in enumerate(nb['cells']) if 'Enrolment Profile — Submit Reviewed Updates' in ''.join(c.get('source', [])))+1
-intro = '# 🏫 Facility Profile — Classes IX and X\n\nChoose IX or X, then use this section’s own facility workbook and result. Enter actual height and weight; validation does not submit anything.\n'
+intro = '# 🏫 Facility Profile — Classes IX and X\n\nChoose IX or X, then use this section’s own facility workbook and result. Most answers are prefilled as No; saved Yes answers and measurements remain visible. Fill missing measurements before validation. Validation does not submit anything.\n'
 nb['cells'][index:index] = [dict(cell_type='markdown', metadata={}, source=intro.splitlines(keepends=True))]+cells
-nb['cells'][0]['source'] = ['> **Notebook build: v1.2.5 (2026-09-22)**\n', '> Guided operator interface for General Profile, Enrollment and Facility Profile.\n']
+nb['cells'][0]['source'] = ['> **Notebook build: v1.2.6 (2026-09-23)**\n', '> Guided operator interface for General Profile, Enrollment and Facility Profile.\n']
 nb['cells'][1]['source'] = ['# UDISE+ School Automation\n', '\n', '**Project owner:** Prashant  \n', '**Purpose:** simple, guided UDISE+ workbook processing for authorized school use.\n']
 guide = '''## 🚀 Start here\n\nRun 🛠️ **Setup** → 🔐 **Authentication** → 🏫 **Detect School** → 👨‍🎓 **Fetch Students** once. Then choose <span style="color:#2563eb"><b>General Profile / Enrollment IX–X / Facility IX–X</b></span> below.\n\n**📊 Status:** <span style="color:#16803c"><b>✅ Passed</b></span> = Excel valid, not submitted · <span style="color:#b45309"><b>✏️ Input error</b></span> = fix Excel · <span style="color:#b91c1c"><b>⚠️ Portal error</b></span> = retry later · <span style="color:#16803c"><b>💾 Saved</b></span> = confirmed by fresh read-back.\n'''
 nb['cells'][2:2] = [dict(cell_type='markdown', metadata={}, source=guide.splitlines(keepends=True))]
-name = 'UDISE_Automation_Enhanced_v1.2.5_2026-09-22.ipynb'
+name = 'UDISE_Automation_Enhanced_v1.2.6_2026-09-23.ipynb'
 nb['metadata']['colab']['name'] = name
 (ROOT/name).write_text(json.dumps(nb, indent=2, ensure_ascii=False)+'\n', encoding='utf-8')
 print(name)
