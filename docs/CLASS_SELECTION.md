@@ -1,13 +1,41 @@
-# Enrollment class selector — v1.1.4, 2026-09-20
+# Class selection — current baseline
 
-This release adds the requested class selection to v1.1.3. Choose IX, X, or IX and X in the Colab form field `ENROLMENT_CLASS` inside Load IX/X subject rules. Run the cell to apply the selection, then export, edit, validate and submit as before.
+Current baseline: `UDISE_Automation_v2.7.3_2026-09-23.ipynb`.
 
-Only selected classes have their subject catalogues loaded and their roster records exported. Validation rejects rows outside the selection. Submission checks the complete validated workbook before any request. Rerunning class selection clears prior validation data, requiring validation again for the new selection. When both classes are selected, the export includes both; use IX or X for separate workbooks.
+Class scope is module-specific; do not assume every module supports the same forms merely because a class ID can be selected.
 
-No submission payload fields, retry behavior or read-back logic were changed. Result build markers now report v1.1.4. Prior notebooks remain recoverable from Git history; the repository maintains one current notebook.
+## General Profile AUTO
 
-Offline verification: `tools/test_class_selector.py` checks each choice, roster filtering, validation rejection, stale validation clearing, and mismatch rejection before HTTP. `tools/test_submission.py` runs the four existing mocked submission scenarios against v1.1.4. No new live portal requests were made for this change.
+`AUTO_GP_CLASS`:
 
-The user supplied a successful v1.1.3 log (three skips and one response/read-back confirmed update). This is recorded as user-reported evidence, not an independently observed test of the selector release.
+- IX
+- X
+- XI
+- XII
+- IX and X
+- IX to XI
+- XI and XII
+- All IX-XII
 
-XI/XII is the next development module: discover stream-specific forms, mandatory fields and subject lists before implementing export, validation and submission. Existing IX/X selection remains limited to classes 9 and 10.
+`AUTO_GP_RUN_MODE`:
+
+- All students
+- First N students
+
+When First N is selected, `AUTO_GP_ROW_LIMIT` is applied before preview generation.
+
+## Facility Profile
+
+The UI exposes IX, X, XI, XII and grouped IX–XII scopes. Historical Facility discovery was performed on IX/X. XI/XII writes remain unverified until live-tested.
+
+## Completion Overview
+
+Supports IX, X, XI, XII and grouped IX–XII scopes. It reads General Profile status and does not itself submit Complete Data.
+
+## Enrollment
+
+Enrollment remains IX/X only. XI/XII has stream-specific requirements and must not be enabled simply by extending a numeric class selector.
+
+## Safety
+
+Changing a selector must clear/rebuild any stale reviewed/validated data for workflows that depend on the selected class. Never submit rows outside the currently reviewed scope.
