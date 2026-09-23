@@ -196,3 +196,25 @@ When changing this project:
 6. For writes, start with one reviewed record.
 7. Record what is implemented vs mocked vs live-read vs live-save.
 8. Update README + this handoff when the baseline changes.
+
+
+## 12. Next development plan — AUTO EP
+
+The next planned enhancement is an upload-driven AUTO Enrollment Profile workflow for Classes IX and XI.
+
+Core decisions:
+
+- Keep AUTO EP inside the Enrollment Profile section.
+- First source mode is uploaded eShikshaKosh export; no second portal authentication is required for the first implementation.
+- The new eShikshaKosh export may not contain PEN.
+- Match using DOB + Aadhaar last 4 + normalized student/father names, with mother name as optional supporting evidence.
+- Class and section are informational only and may differ.
+- Process the whole file first; unresolved cases go into a serial-numbered Manual Review queue at the end.
+- First cross-portal field to automate is Admission Number.
+- Existing conflicting UDISE Admission Number must never be overwritten automatically.
+- For Class XI, user selects Science / Arts / Commerce before uploading that stream's file.
+- Stream is supplied by the selector, not by a file column.
+- Initial XI rule proposal: Admission Number from eShikshaKosh; Roll Number = Admission Number; Class Roll Number blank; Stream = selected stream.
+- XI EP field/API contract must be discovered before live implementation; do not extend IX/X payloads blindly.
+- Keep preview-first gating, one-record first live test, no blind POST retry, and fresh read-back confirmation.
+- Mapping engine should stay source/storage independent so upload, retrieval helper, or optional Supabase can feed the same normalized schema later.
