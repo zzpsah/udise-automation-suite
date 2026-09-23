@@ -4,13 +4,17 @@ This private repository is the **single source of truth** for the UDISE+ automat
 
 - `UDISE_Automation_v2.0_2026-09-23.ipynb`
 
-Previous v1.2.5–v1.2.11 notebooks remain as rollback copies. v2.0 is based on the user's supplied **Fixed v1.2.11**, which differs from the repository's **Enhanced v1.2.11**. It preserves the supplied combined Login/School/Roster workflow. It is not a claim that all previous Enhanced changes have been carried forward.
+Previous v1.2.5–v1.2.11 and v2.0 notebooks remain as rollback copies. v2.6 keeps the maintained v2.0 Login/School/Roster, GP, Enrollment and Facility workflow and adds the live-tested Class Completion Overview and guarded Finalize workflow.
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[▶ Open v2.0 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_v2.0_2026-09-23.ipynb)
+[▶ Open v2.6 baseline in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_v2.6_2026-09-23.ipynb)
+
+
+
+**v2.6 baseline — 23 September 2026:** adds Class Completion Overview with the observed project status progression `0 → 1 → 2 → 3 → 6`, exports separate readiness sheets, exposes only `formStatus=3` as `completion_ready_pens`, and adds AUTO / MANUAL / FILE Finalize modes with preview, fresh pre-write status verification, one-shot Complete Data POST, and fresh read-back. Bulk Completion Overview GETs use short safe retries; Finalize GETs use stronger retries. POST is never blindly retried. A live test successfully finalized a fresh `formStatus=3` student and confirmed `formStatus=6` by read-back. The status mapping is observed project behaviour, not an official published UDISE enum.
 
 **v2.0 — 23 September 2026:** corrects the supplied file's Facility POST to `/p0/api/v2/AY/students/facility/{studentId}` while retaining its GET route; prints the portal result immediately; handles non-dictionary error details; turns measurement generation off by default; and embeds the full API reference in a final notebook section. Use real measurements. Six synthetic v2.0 tests cover syntax/routes, matching read-back, rejection visibility, POST timeout, precheck timeout and unchanged records. **Corrected live Facility saving remains unverified.** No portal submission is part of these offline tests.
 
