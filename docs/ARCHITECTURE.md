@@ -1,29 +1,65 @@
 # Architecture
 
-## One-notebook design
+## Current baseline
 
-`UDISE_Automation_Enhanced.ipynb` is the sole operational artifact. It contains setup, authentication, school detection, roster fetch, General Profile workflow, and Class IX/X Enrollment workflow in ordered sections.
+The maintained operational artifact is:
+
+`UDISE_Automation_v2.7.3_2026-09-23.ipynb`
+
+The repository keeps older notebooks as rollback/history, but v2.7.3 is the current baseline.
+
+## Runtime flow
 
 ```
 Manual UDISE browser login
         |
-Cookie header in private Colab runtime
+active session information -> private Colab runtime
         |
-Session validation -> school URL -> school ID
+Setup -> Login -> detect school -> fetch roster
         |
-Roster + live reference rules -> Excel export -> local validation
+        +-> General Profile AUTO (preferred)
+        |      -> choose class/run scope
+        |      -> fresh GP reads
+        |      -> blank-only defaults
+        |      -> preview
+        |      -> optional gated POST
+        |      -> fresh read-back
         |
-Optional guarded one-record update -> response/read-back result
+        +-> Manual GP Excel fallback
+        |
+        +-> Enrollment IX/X
+        |
+        +-> Facility Profile
+        |
+        +-> Completion Overview
+               -> formStatus grouping
+               -> status 3 ready list
+               -> guarded Finalize
+               -> fresh status 6 confirmation
 ```
 
-The notebook has no telemetry or Apps Script call. Its only external workflow destination is the UDISE+ portal used by the signed-in school account.
+## Write boundary
 
-## Submission boundary
+All write workflows must be explicitly enabled. Read-only GETs may use bounded retries. POST requests are never blindly retried because the portal may have received a request even when the client saw a timeout.
 
-Submission toggles default to `False`. Enrollment starts with `ENROLMENT_MAX_SUBMISSIONS = 1`.
+A transport HTTP 200 is not sufficient proof of persistence. A save is confirmed only when the application response and/or a fresh read-back establishes the expected stored state.
 
-GET requests may retry after timeout. POST requests never retry automatically, because a timeout may still mean the portal received the record. Every POST, including one that returns a success message, is followed by fresh portal read-back checks. The notebook reports `SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK`, `SUCCESS_CONFIRMED_BY_READBACK`, `RESPONSE_SUCCESS_NOT_PERSISTED`, or `FAILED`.
+## General Profile AUTO rules
 
-## Versioning
+AUTO GP modifies only the approved fields that are blank. Existing values are kept. A current CWSN=Yes record is skipped in full and sent to manual review.
 
-Commit every intended notebook change with: the affected section, reason, evidence (syntax, local, or live read-only test), and remaining unknowns.
+AUTO GP class scope supports IX–XII combinations; run scope supports All students or First N students.
+
+## Status-driven completion
+
+The observed project status progression is `0 → 1 → 2 → 3 → 6`. Only fresh status 3 is eligible for Complete Data. Status 6 means already complete.
+
+This mapping is empirical project evidence, not an official API contract.
+
+## External destinations
+
+The notebook communicates with the authenticated UDISE+ portal. It has no telemetry destination. Credentials remain runtime-only.
+
+## Versioning rule
+
+Promote one reviewed notebook as the baseline. Record the change reason, evidence type, remaining unknowns, and update README + `docs/AI_HANDOFF.md`.
