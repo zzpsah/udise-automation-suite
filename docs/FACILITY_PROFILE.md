@@ -1,5 +1,19 @@
 # Facility Profile — v1.2.0, 21 September 2026
 
+## Current baseline note — v2.7.3
+
+The maintained notebook is now `UDISE_Automation_v2.7.3_2026-09-23.ipynb`.
+
+The Facility selector in this baseline exposes IX, X, XI, XII and grouped IX–XII scopes. This is a **UI/roster-scope extension** of the existing Facility workflow. Historical route and payload discovery was performed against IX/X. **Do not claim XI/XII Facility persistence is verified until a reviewed live save and fresh matching read-back are observed.**
+
+The established route distinction remains unchanged:
+
+- GET/read-back: `/p0/api/v2/students/facility/{studentId}`
+- current-year POST: `/p0/api/v2/AY/students/facility/{studentId}`
+
+Real measurements are required. Never generate height/weight values to satisfy validation.
+
+
 ## Current export defaults
 
 For Classes IX and X, the export keeps saved Yes answers, fills unanswered Yes/No choices as No, and fills an unanswered distance as `2 - Between 1-3 Kms`. Benefit and CWSN item columns show Yes only when that saved item is present; otherwise they show No. For a non-CWSN student, the CWSN Facilities Provided parent cell stays blank and its CWSN inputs are locked. Saved height and weight are shown; only missing measurements need manual entry. Parent/Guardian Education keeps a saved value; when blank, it defaults to the user-requested `3 - Secondary or Equivalent`.
