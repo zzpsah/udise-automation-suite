@@ -129,6 +129,128 @@ Current important limits:
 - [AI browser retrieval](docs/AI_BROWSER_RETRIEVAL.md)
 - [Data handling](docs/DATA_HANDLING.md)
 
+
+## Next development plan — AUTO Enrollment Profile (EP)
+
+Priority: **Class IX and Class XI**, with Class XI stream-wise processing.
+
+### Goal
+
+Add a cross-portal AUTO EP workflow that uses an uploaded **eShikshaKosh export** to supply the key EP value that is difficult to re-enter manually: **Admission Number**.
+
+The first implementation should be upload-driven and must not require eShikshaKosh authentication inside the UDISE notebook. Automatic eShikshaKosh retrieval can remain a later optional adapter.
+
+### Placement in the notebook
+
+AUTO EP should live **inside the Enrollment Profile section** and run before the existing manual EP Excel fallback:
+
+1. eShikshaKosh source upload
+2. Cross-portal student matching
+3. AUTO EP preview
+4. End-of-batch Manual Review queue
+5. Final EP preview
+6. Guarded AUTO EP submit
+7. Existing Manual EP Excel fallback
+
+### eShikshaKosh upload assumptions
+
+The uploaded export is expected to provide enough identity evidence to match students even when PEN is absent. Expected useful fields include:
+
+- Student name
+- Father name
+- Mother name when available
+- DOB
+- Aadhaar last 4 digits
+- Admission Number
+- Class / section may be present but must not be used as hard identity keys
+
+For Class XI, **stream is not expected as a file column**. The user will select the stream before upload, and the uploaded file is assumed to contain only that selected stream.
+
+### Matching rules
+
+The new eShikshaKosh export may not contain PEN, so matching should use identity evidence:
+
+- DOB
+- Aadhaar last 4
+- normalized student name
+- normalized father name
+- mother name as supporting evidence when available
+
+Class and section are informational only and may differ between portals.
+
+Recommended behavior:
+
+- strong evidence → AUTO MATCH
+- ambiguous candidate(s) → MANUAL REVIEW
+- no confident candidate → NO MATCH
+- Aadhaar/DOB conflict → do not auto-match
+- never use Aadhaar last 4 as a standalone unique key
+
+The entire file should be processed first. **Manual review must happen at the end of the batch**, not interrupt student-by-student processing.
+
+Each unresolved record should keep a serial number so it can be reviewed by Sr. No. after automatic processing finishes.
+
+### Admission Number mapping
+
+For matched students:
+
+- UDISE Admission Number blank + eShikshaKosh value available → PREFILL
+- same nonblank value already in UDISE → KEEP
+- different nonblank UDISE value → CONFLICT / MANUAL REVIEW
+- no confident student match → MANUAL REVIEW / NO MATCH
+
+Do not overwrite an existing conflicting Admission Number automatically.
+
+### Class XI stream-wise workflow
+
+AUTO EP should support:
+
+- XI Science
+- XI Arts
+- XI Commerce
+
+Preferred UI structure:
+
+- AUTO_EP_CLASS = XI
+- AUTO_EP_STREAM = Science / Arts / Commerce
+- upload the eShikshaKosh export for that selected stream
+
+For Class XI, the selected stream becomes the EP stream for all matched rows from that uploaded file.
+
+### Class XI first-pass field rules
+
+Subject to final live discovery of the XI EP form/API contract:
+
+- Admission Number = from eShikshaKosh upload
+- Roll Number = same as Admission Number
+- Class Roll Number = leave blank
+- Stream = selected stream (Science / Arts / Commerce)
+
+The XI EP form contract still needs dedicated portal discovery before these values are submitted live. Do not assume IX/X EP payloads or subject rules apply to XI.
+
+### Safety / submission
+
+AUTO EP should follow the same safety model as AUTO GP:
+
+- preview first
+- ALLOW_AUTO_EP_SUBMIT=False by default
+- first live test limit = 1
+- fresh EP read before write
+- no blind POST retry
+- fresh read-back required to confirm persistence
+- stop on ambiguous/unconfirmed failure
+
+### Future optional source modes
+
+Keep the mapping engine storage-independent so the same normalized input can later come from:
+
+- uploaded Excel/CSV (first implementation)
+- existing eShikshaKosh automation/retrieval helper
+- optional Supabase-backed snapshot
+
+Supabase must remain optional so the notebook can be reused for other schools without centralizing every school's data.
+
+
 ## Never commit
 
 - browser cookies, session IDs, XSRF tokens, passwords, OTPs or CAPTCHA material;
