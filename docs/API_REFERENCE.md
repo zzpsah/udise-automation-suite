@@ -1,6 +1,69 @@
 # UDISE API reference and verification record
 
-Documentation revision: 2026-09-23-r1. These are observed implementation details, not an official supported API contract. Base URL: `https://sdms.udiseplus.gov.in`. Never store cookies, tokens, raw student responses or completed workbooks in this reference.
+## Current baseline — v2.7.3 (23 September 2026)
+
+Maintained notebook: `UDISE_Automation_v2.7.3_2026-09-23.ipynb`.
+
+### General Profile AUTO
+
+AUTO GP uses the existing General Profile GET/POST route:
+
+- GET `/p0/api/cy/students/{studentId}`
+- POST `/p0/api/cy/students/{studentId}`
+
+The current AUTO defaults are applied only to blank fields:
+
+- `motherTongue=42` — HINDI - Hindi
+- `isBplYN=2` — No
+- `ewsYN=2` — No
+- `cwsnYN=2` — No
+- `natIndYN=1` — Yes
+- `ooscYN=2` — No
+- `bloodGroup="9"` — Under Investigation
+
+If the fresh current record has `cwsnYN=1`, the student is skipped entirely for manual review. Existing nonblank values are preserved.
+
+AUTO GP supports class scopes IX–XII and run scopes All students / First N students. This does **not** prove that every downstream module has an equivalent XI/XII form contract.
+
+### Completion / Complete Data
+
+Project-observed `formStatus` progression:
+
+`0 → GP → 1 → EP → 2 → FP → 3 → Complete Data → 6`
+
+Observed meanings:
+
+- 0 = GP + EP + FP pending
+- 1 = GP completed; EP + FP pending
+- 2 = GP + EP completed; FP pending
+- 3 = GP + EP + FP completed; ready to Complete Data
+- 6 = Complete Data completed
+
+This mapping is empirical project evidence, not an official published enum.
+
+Observed Complete Data write:
+
+- POST `/p0/api/v2/students/submit/{studentId}`
+- `Content-Type: text/plain`
+- body: the `studentId` string
+
+Finalize rules in the baseline:
+
+1. Fresh status 3 only is eligible.
+2. Status 6 is already complete; no POST.
+3. Status 0/1/2/unknown is blocked.
+4. Fresh read again immediately before POST.
+5. POST is never blindly retried.
+6. After an apparently successful POST, fresh GET must show status 6.
+7. If POST connection outcome is ambiguous, fresh GET recovery is required before any decision.
+8. A real status 3 → POST → status 6 transition has been observed live.
+
+### Class IDs
+
+The roster uses class IDs 9, 10, 11 and 12 for IX, X, XI and XII in current project selection logic. This is sufficient for roster scoping and General Profile/Completion reads. It must **not** be treated as proof that XI/XII Enrollment or Facility write contracts are identical to IX/X.
+
+
+Documentation revision: 2026-09-23-r2. These are observed implementation details, not an official supported API contract. Base URL: `https://sdms.udiseplus.gov.in`. Never store cookies, tokens, raw student responses or completed workbooks in this reference.
 
 ## v2.0 release
 
@@ -18,7 +81,7 @@ Six offline tests in `tools/test_v2.py` passed: syntax/metadata/routes, matching
 
 ## Core API inventory
 
-All routes below are relative to the base URL. `schoolId` is the internal API ID, not the 11-digit UDISE code. `studentId` is the system ID, not PEN. Class IDs 9 and 10 mean IX and X. Do not infer XI/XII support.
+All routes below are relative to the base URL. `schoolId` is the internal API ID, not the 11-digit UDISE code. `studentId` is the system ID, not PEN. Class IDs 9, 10, 11 and 12 are used by current project roster scoping for IX, X, XI and XII. Do not infer identical XI/XII Enrollment/Facility write contracts from class IDs alone.
 
 | Module / purpose | Method | Exact route pattern | Evidence and limits |
 | --- | --- | --- | --- |
