@@ -1,8 +1,8 @@
 # UDISE Automation Suite
 
-This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
+This repository is the **single source of truth** for the UDISE+ automation project. The maintained Google Colab baseline is:
 
-- `UDISE_Automation_v2.0_2026-09-23.ipynb`
+- `UDISE_Automation_v2.6_2026-09-23.ipynb`
 
 Previous v1.2.5–v1.2.11 and v2.0 notebooks remain as rollback copies. v2.6 keeps the maintained v2.0 Login/School/Roster, GP, Enrollment and Facility workflow and adds the live-tested Class Completion Overview and guarded Finalize workflow.
 
