@@ -18,9 +18,9 @@ Verification: an additional offline test executes the export cell with synthetic
 
 After common setup, authentication, school detection and roster fetch, use the Facility Profile cells after Enrollment. Enrollment submission is not a prerequisite. Choose IX, X or IX and X, export, edit the workbook, upload/validate, then enable the Facility submission cell for reviewed records. Initial submission limit is one. XI/XII remains future development.
 
-Required answers: facilities provided; competitions/Olympiads; NCC, NSS and Scouts; height; weight; distance and parent/guardian education. CWSN support is required only for a CWSN student. Validation reads General Profile to determine applicability. A non-CWSN student's CWSN Facilities Provided cell stays blank. Other CWSN benefit columns may remain No.
+Required answers: facilities provided; competitions/Olympiads; NCC, NSS and Scouts; height; weight; distance and parent/guardian education. CWSN support is required only for a CWSN student. Since v1.2.5, validation checks the workbook CWSN reference locally; export and submission read General Profile to establish/recheck applicability. A non-CWSN student's CWSN Facilities Provided cell stays blank. Other CWSN benefit columns may remain No.
 
-Select Yes for individual benefit columns received. A Yes parent field requires at least one selected benefit. A No/not-applicable parent cannot have Yes benefit columns. Numeric code 9 means unanswered/not applicable according to context, not No. Missing answers remain blank on export. Enter measured height (whole cm, 60–256) and weight (whole kg, 10–150). Never fill invented measurements to pass validation.
+Select Yes for individual benefit columns received. A Yes parent field requires at least one selected benefit. A No/not-applicable parent cannot have Yes benefit columns. Numeric code 9 means unanswered/not applicable according to context, not No. Current export defaults are described above; they must be reviewed, not treated as verified student facts. Enter measured height (whole cm, 60–256) and weight (whole kg, 10–150). Never fill invented measurements to pass validation.
 
 ## Observed source
 

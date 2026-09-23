@@ -2,6 +2,8 @@
 
 ## Purpose
 
+For exact GET/POST paths, evidence levels, the 23 September Facility rejection and rediscovery procedure, see [API reference and verification record](API_REFERENCE.md). The same reference is embedded in the v2.0 Colab notebook. Facility GET and current-year POST differ by `/AY/`; a matching version label does not prove two notebook files contain the same code.
+
 This guide explains how a future AI-assisted enhancement reaches the correct UDISE+ page and obtains the data needed to improve the notebook. It documents the observed navigation sequence and the boundary between safe discovery and a record update.
 
 It is not a way to bypass UDISE+ login, OTP, CAPTCHA, access rules, or portal permissions.

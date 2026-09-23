@@ -2,15 +2,19 @@
 
 This private repository is the **single source of truth** for the UDISE+ automation project. It contains one maintained Google Colab notebook:
 
-- `UDISE_Automation_Enhanced_v1.2.11_2026-09-23.ipynb`
+- `UDISE_Automation_v2.0_2026-09-23.ipynb`
 
-The previous v1.2.5–v1.2.10 notebooks remain in the repository as rollback copies; use v1.2.11 for the current workflow.
+Previous v1.2.5–v1.2.11 notebooks remain as rollback copies. v2.0 is based on the user's supplied **Fixed v1.2.11**, which differs from the repository's **Enhanced v1.2.11**. It preserves the supplied combined Login/School/Roster workflow. It is not a claim that all previous Enhanced changes have been carried forward.
 
 Do not create parallel notebooks for fixes or experiments. Make changes in this notebook, test them safely, and use Git history to track versions.
 
 ## Open in Colab
 
-[Open build v1.2.11 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_Enhanced_v1.2.11_2026-09-23.ipynb)
+[▶ Open v2.0 in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_v2.0_2026-09-23.ipynb)
+
+**v2.0 — 23 September 2026:** corrects the supplied file's Facility POST to `/p0/api/v2/AY/students/facility/{studentId}` while retaining its GET route; prints the portal result immediately; handles non-dictionary error details; turns measurement generation off by default; and embeds the full API reference in a final notebook section. Use real measurements. Six synthetic v2.0 tests cover syntax/routes, matching read-back, rejection visibility, POST timeout, precheck timeout and unchanged records. **Corrected live Facility saving remains unverified.** No portal submission is part of these offline tests.
+
+[API reference and verified paths](docs/API_REFERENCE.md) records all core routes, field mappings, browser discovery steps, the observed failure, and the distinction between source evidence and live-save proof. The original supplied notebook is left unchanged in Downloads. Build v2.0 with `tools/release_v2.py SOURCE.ipynb`; the older `release_facility.py` generator does not reproduce this supplied-based release.
 
 Build v1.2.11 retries timed-out read-only Facility and CWSN submission pre-checks once; if they remain unavailable, no save is sent. It also removes an unnecessary leading semicolon from the result detail. POST requests are never automatically retried.
 
@@ -60,6 +64,7 @@ An HTTP `200` alone is not treated as a saved record. The portal must report suc
 Read the detailed guides before changing an API call or submission payload:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [API reference and verified paths](docs/API_REFERENCE.md)
 - [Portal discovery and API evidence](docs/PORTAL_DISCOVERY.md)
 - [AI browser navigation and information retrieval](docs/AI_BROWSER_RETRIEVAL.md)
 - [Colab runbook](docs/COLAB_RUNBOOK.md)

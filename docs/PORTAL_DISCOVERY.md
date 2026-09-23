@@ -2,6 +2,8 @@
 
 ## Scope
 
+**23 September update:** [API reference and verification record](API_REFERENCE.md) is the consolidated inventory for General, Enrollment and Facility. It distinguishes source-verified paths, prior live evidence, current failure observations and unverified saves.
+
 This is a record of read-only authenticated discovery performed on **20 September 2026**. It is implementation evidence, not a public UDISE API contract. Re-check every route and payload after a portal release.
 
 No cookies, credentials, raw responses, student names, PENs, Aadhaar information, or other personal records are stored here.
