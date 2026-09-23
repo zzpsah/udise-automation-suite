@@ -1,31 +1,59 @@
-# Colab runbook
+# Colab runbook — v2.7.3 baseline
 
-## Read-only run
+## Start
 
-1. Open the notebook from this private repository.
-2. Log into UDISE+ manually in a separate browser tab.
+1. Open `UDISE_Automation_v2.7.3_2026-09-23.ipynb`.
+2. Log into UDISE+ normally in the browser. User handles OTP/CAPTCHA.
 3. Run **Setup environment**.
-4. Run **Authentication** and paste the active Cookie request-header only into the hidden Colab prompt.
-5. Run **Detect school** using the current school student-list URL or its numeric UDISE code. You may enter the school name for display; the roster will display a name automatically only when the UDISE response includes one.
-6. Run **Fetch current academic-session students**.
-7. For enrollment, run **Load IX/X subject rules**, then **Export IX/X Excel**.
-8. Edit the workbook, save it, and run **Validate IX/X Excel**.
+4. Run **Login**. It authenticates the Colab session, detects the school and fetches the roster.
+5. Choose only the module needed.
 
-## First live enrollment test
+## General Profile AUTO
 
-Only after validation passes and the intended row is reviewed:
+1. Choose `AUTO_GP_CLASS`.
+2. Choose `AUTO_GP_RUN_MODE`:
+   - All students, or
+   - First N students.
+3. For First N, set `AUTO_GP_ROW_LIMIT`.
+4. Keep `ALLOW_AUTO_GP_SUBMIT=False` for preview.
+5. Review preview/result rows.
+6. For the first live test, enable submission and keep `AUTO_GP_MAX_SUBMISSIONS=1`.
+7. Treat only fresh read-back confirmation as a saved result.
 
-1. Leave `ENROLMENT_MAX_SUBMISSIONS = 1`.
-2. Set `ALLOW_ENROLMENT_UPDATE = True`.
-3. Run the cell once and inspect the result workbook.
-4. Independently confirm the record in UDISE before considering a larger batch.
+AUTO GP fills only approved blank defaults. Existing values stay unchanged. Current CWSN=Yes is a hard skip/manual-review case.
 
-Never immediately rerun a timed-out record; server read-back is used to determine whether it was saved.
+## Manual GP Excel
 
-## Common errors
+Use only when AUTO GP is insufficient. Open the Manual GP fallback and use Reference Data → Download → Upload → Check → Submit.
 
-| Symptom | Meaning | Action |
-| --- | --- | --- |
-| `Unknown subject: 0` | An old export treated empty subject codes as data | Re-export with this notebook |
-| Read timeout | Portal was slow | Wait and retry the read-only cell with a fresh session if needed |
-| HTTP 200 with `status: false` | Transport succeeded but portal validation rejected values | Read the error, fix data, do not call it success |
+## Enrollment
+
+Enrollment remains IX/X. Export, edit, validate, review, then explicitly enable the write. Start with one record.
+
+## Facility
+
+Choose the desired class scope, export, edit, check, then explicitly enable submit. Use actual measurements. XI/XII selector support is present but XI/XII writes are not yet live-verified.
+
+## Completion Overview
+
+Choose class/group and run the overview. Only `formStatus=3` is considered Ready to Complete. Status 6 is already complete.
+
+## Finalize
+
+1. Prefer AUTO after a fresh Completion Overview.
+2. Keep `ALLOW_FINALIZE=False` for preview.
+3. For first live write, set `FINALIZE_MAX_SUBMISSIONS=1`.
+4. Finalize performs fresh status checks before POST.
+5. Never replay a timed-out POST blindly.
+6. Success requires fresh `formStatus=6`.
+
+## Common interpretation
+
+| Result | Meaning |
+| --- | --- |
+| Preview / Checked / Ready | Read/validation succeeded; no write implied |
+| No change | Current saved values already satisfy the workflow |
+| Manual review / Blocked | No automatic write should occur |
+| HTTP 200 + application error | Portal did not confirm success |
+| POST ambiguity | Read back before any decision; do not replay |
+| Saved / Success confirmed | Fresh portal state confirms persistence |
