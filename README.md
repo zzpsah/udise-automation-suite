@@ -117,6 +117,29 @@ Current important limits:
 7. Preserve user-entered/saved values unless a workflow explicitly says to update them.
 8. Keep private student data and credentials out of Git.
 
+## DevOS / Vibe Coding project context
+
+This repository now carries the full project-context layer used by DevOS:
+
+- [PRD](PRD.md)
+- [Development rules](RULES.md)
+- [Tasks](TASKS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Design](docs/DESIGN.md)
+- [Test plan](docs/TEST_PLAN.md)
+- [Security](docs/SECURITY.md)
+- [Decisions](docs/DECISIONS.md)
+- [Project memory](docs/MEMORY.md)
+- [Commands / runbook](docs/COMMANDS.md)
+- [History](docs/HISTORY.md)
+- [AI handoff](docs/AI_HANDOFF.md)
+
+Material work follows:
+
+```text
+READ -> UNDERSTAND -> PLAN -> IMPLEMENT -> TEST -> REVIEW -> FIX -> COMMIT -> UPDATE DOCUMENTATION
+```
+
 ## Documentation
 
 - [AI handoff / current project state](docs/AI_HANDOFF.md)
