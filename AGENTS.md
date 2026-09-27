@@ -5,14 +5,22 @@ This repository is managed by ChatGPT Development OS (DevOS).
 Before substantial work:
 
 1. Read `DEVOS.md`.
-2. Read the repository README and any `.ai/` project context.
-3. Inspect the current source and Git history.
-4. Recover current architecture, decisions, tasks, test expectations, and security constraints from durable evidence.
+2. Read `PRD.md`, `RULES.md`, and `TASKS.md`.
+3. Read `docs/AI_HANDOFF.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/TEST_PLAN.md`, `docs/SECURITY.md`, `docs/DECISIONS.md`, and `docs/MEMORY.md`.
+4. Read `.ai/PROJECT.md`, `.ai/CURRENT-STATE.md`, `.ai/ARCHITECTURE.md`, `.ai/DECISIONS.md`, and `.ai/TASKS.md`.
+5. Inspect the maintained notebook, current source, and Git history before changing behavior.
+6. Distinguish implemented, offline-tested, live-read, and live-save evidence.
 
 ## DevOS Vibe Coding baseline
 
 ```text
-READ → UNDERSTAND → PLAN → IMPLEMENT → TEST → REVIEW → FIX → COMMIT → UPDATE DOCUMENTATION
+READ -> UNDERSTAND -> PLAN -> IMPLEMENT -> TEST -> REVIEW -> FIX -> COMMIT -> UPDATE DOCUMENTATION
 ```
 
-Do not invent missing project state. No production deployment without explicit user approval. Never commit secrets, credentials, private school documents, or unnecessary student/personally identifying data.
+## Safety
+
+- Keep write toggles off by default.
+- Never blindly retry POST requests after an ambiguous failure; fresh read-back comes first.
+- Do not invent student data, measurements, status meanings, or XI/XII portal contracts.
+- No production deployment or consequential bulk portal mutation without explicit user approval.
+- Never commit credentials, cookies, OTP/CAPTCHA material, student exports, screenshots, completed workbooks, or private student data.
