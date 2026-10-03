@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires_class:boolean;description:string;preview_enabled?:boolean};
-type Caps={classes:{id:string;label:string}[];stages:Stage[]};
+type SchoolPreset={internal_id:string;udise_code:string;name:string};
+type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
 type JobState={job:{id:string;status:string;stage:string;class_name?:string;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
@@ -46,7 +47,9 @@ export default function Page(){
     const r=await fetch("/api/capabilities",{cache:"no-store"});
     if(r.status===401){setAuthed(false);return}
     if(!r.ok){setMsg("Capabilities load failed");return}
-    setCaps(await r.json());setAuthed(true);
+    const data:Caps=await r.json();
+    setCaps(data);setAuthed(true);
+    if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
 
@@ -144,6 +147,10 @@ export default function Page(){
         <section className="card setup-card">
           <div className="section-title"><span className="step">1</span><div><h2>Connect school</h2><p>{LOGIN_REFERENCE}</p></div></div>
           <div className="setup-row">
+            {Boolean(caps?.school_presets?.length)&&<select className="school-preset" aria-label="Saved school" value={caps?.school_presets?.some(p=>p.internal_id===school)?school:""} onChange={e=>setSchool(e.target.value)}>
+              <option value="">Custom school</option>
+              {caps?.school_presets?.map(p=><option value={p.internal_id} key={p.internal_id}>{p.udise_code} · {p.name}</option>)}
+            </select>}
             <input aria-label="School URL or internal ID" value={school} onChange={e=>setSchool(e.target.value)} placeholder="School URL or 7-digit internal ID"/>
             <button onClick={connectSession}>{sessionId?"Reconnect":"Connect UDISE"}</button>
             {sessionId&&<span className="badge ok">● Ready</span>}
@@ -197,7 +204,7 @@ export default function Page(){
     {entryUrl&&!sessionId&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure UDISE session">
       <div className="session-modal">
         <div className="modal-head"><div><span className="eyebrow">SECURE SESSION</span><h2>Connect UDISE securely</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
-        <p>Paste the browser Cookie header below. It goes directly to protected Oracle runtime storage and is never shown in chat or job output.</p>
+        <p>Desktop Chrome/Edge can use the UDISE Hermes Session Bridge extension. Otherwise paste the browser Cookie header below. It goes directly to protected Oracle runtime storage and is never shown in chat or job output.</p>
         <iframe title="Secure UDISE Cookie entry" src={entryUrl}/>
       </div>
     </div>}

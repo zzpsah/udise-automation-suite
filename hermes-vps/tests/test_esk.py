@@ -113,8 +113,10 @@ def _():
 
     real_run = esk.subprocess.run
     real_find = esk.find_fetch_script
+    real_python = esk.find_fetch_python
     esk.subprocess.run = fake_run
     esk.find_fetch_script = lambda: Path("/fake/esk_otr_api.py")
+    esk.find_fetch_python = lambda _script: Path("/verified/venv/bin/python")
     try:
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "r.xlsx"
@@ -126,16 +128,33 @@ def _():
             assert "--udise" in cmd and "10160203806" in cmd
             assert "--year" in cmd and "2026-27" in cmd
             assert "--output" in cmd
+            assert cmd[0] == str(Path("/verified/venv/bin/python"))
     finally:
         esk.subprocess.run = real_run
         esk.find_fetch_script = real_find
+        esk.find_fetch_python = real_python
+
+
+@check("fetch_python_prefers_script_project_venv")
+def _():
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        script = root / "local-script" / "esk_otr_api.py"
+        python = root / ".venv" / "bin" / "python"
+        script.parent.mkdir(parents=True)
+        python.parent.mkdir(parents=True)
+        script.write_text("", encoding="utf-8")
+        python.write_text("", encoding="utf-8")
+        assert esk.find_fetch_python(script) == python
 
 
 @check("export_report_reports_script_failure")
 def _():
     real_run = esk.subprocess.run
     real_find = esk.find_fetch_script
+    real_python = esk.find_fetch_python
     esk.find_fetch_script = lambda: Path("/fake/esk_otr_api.py")
+    esk.find_fetch_python = lambda _script: Path("/verified/venv/bin/python")
 
     class R:
         returncode = 1
@@ -152,6 +171,7 @@ def _():
     finally:
         esk.subprocess.run = real_run
         esk.find_fetch_script = real_find
+        esk.find_fetch_python = real_python
 
 
 @check("export_report_without_script_raises")

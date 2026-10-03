@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:extension": "node ../tests/test_session_bridge.js"
   },
   "dependencies": {
     "next": "^16.0.0",

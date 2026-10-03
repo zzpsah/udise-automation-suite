@@ -7,7 +7,8 @@ cd hermes-vps
 ./run_tests.sh
 ```
 
-144 tests, **no network and no credentials required**. Runs in about two
+145 Python tests, **no network and no credentials required**. The desktop
+session bridge has one additional JavaScript test. Runs in about two
 seconds. Individual suites:
 
 ```bash

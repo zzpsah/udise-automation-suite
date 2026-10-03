@@ -8,7 +8,9 @@ Resume here. Read this before changing anything.
    `TESTS.md`, `TASKS.md` (all in this folder).
 2. Read `../../RULES.md` and `../../DEVOS.md` at the repo root.
 3. `git status --short` before any change.
-4. Run `../../hermes-vps/run_tests.sh` — 144 tests, no network, ~2 seconds.
+4. Run `../../hermes-vps/run_tests.sh` — 145 Python tests, no network, ~2 seconds.
+   Run `npm --prefix ../../hermes-vps/web run test:extension` for the desktop
+   session bridge test.
 5. Distinguish implemented / offline-tested / live-read / live-save evidence.
    Never upgrade one to another without a fresh read-back.
 

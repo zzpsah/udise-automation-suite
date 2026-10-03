@@ -121,6 +121,17 @@ domains. It must send the cookie only to a newly created short-lived Oracle
 session request and must never log or persist the value. Mobile Chrome does not
 support this extension path, so it does not replace the secure form on phones.
 
+The unpacked extension is implemented in
+`browser-extension/udise-session-bridge/`. It discovers only the one-time
+session iframe already created by the authenticated private console and accepts
+only the configured tailnet host, HTTPS, port 10000, and a valid session-token
+path.
+
+Saved schools are deployment configuration, not runner constants. Set
+`UDISE_SCHOOL_PRESETS_JSON` in the private web service environment. The UI uses
+the selected preset's internal portal ID while displaying its UDISE code and
+school name.
+
 ## Hermes
 
 Source skill: hermes-vps/hermes-skill/udise-control/SKILL.md

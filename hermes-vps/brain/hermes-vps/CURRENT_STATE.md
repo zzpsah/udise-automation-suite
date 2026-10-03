@@ -112,7 +112,7 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Public HTTPS reachability for the dedicated control API has been verified.
 - Vercel Next.js UI source builds successfully in production mode.
 - Hermes udise-control skill and local control client are installed.
-- Offline baseline is 144/144, including the synthetic control-plane preview
+- Offline Python baseline is 145/145, including the synthetic control-plane preview
   lifecycle and write-lock test.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
 
@@ -158,3 +158,10 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Class scope is selected before workflow selection. The selected class is
   preserved, and unsupported stages are disabled rather than silently changing
   the operator's class choice.
+- The eShikshaKosh export wrapper selects the maintained eShikshaKosh project's
+  own virtual environment so Playwright and its browser are available. Failures
+  are flattened into one actionable job error rather than losing the script's
+  diagnostic tail.
+- A desktop Chrome/Edge Manifest V3 session bridge can submit the current SDMS
+  cookies to an already-created one-time Oracle session request after a user
+  click. It does not display, log or persist cookie values.

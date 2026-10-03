@@ -61,3 +61,6 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
   using portal credentials or network access.
 - Class scope is selected before workflow selection; unsupported class/stage
   combinations are visibly unavailable and never rewrite the selected class.
+- The desktop UDISE session bridge is implemented as a user-clicked Chrome/Edge
+  extension, and eShikshaKosh export now selects its maintained Playwright
+  environment instead of the UDISE runner environment.

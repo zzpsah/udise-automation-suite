@@ -14,6 +14,7 @@ a student, the caller falls back to Roll No. and then to a generated number.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -44,6 +45,21 @@ def find_fetch_script() -> Path | None:
         if path.is_file():
             return path
     return None
+
+
+def find_fetch_python(script: Path) -> Path:
+    """Use the maintained eShikshaKosh project's environment when available."""
+    configured = os.environ.get("ESHIKSHAKOSH_PYTHON", "").strip()
+    candidates = [
+        Path(configured) if configured else None,
+        script.parent.parent / ".venv" / "bin" / "python",
+        script.parent / ".venv" / "bin" / "python",
+        Path(sys.executable),
+    ]
+    for candidate in candidates:
+        if candidate and candidate.is_file():
+            return candidate
+    return Path(sys.executable)
 
 
 def read_credentials(conf_path: str | os.PathLike | None = None) -> dict:
@@ -118,13 +134,15 @@ def export_report(
         DEFAULT_CACHE_DIR / f"Student_OTR_Report_{udise}_{year}.xlsx")
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [sys.executable, str(script),
+    python = find_fetch_python(script)
+    cmd = [str(python), str(script),
            "--udise", udise, "--password", password,
            "--year", year, "--output", str(out)]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if proc.returncode != 0 or not out.is_file():
-        tail = (proc.stderr or proc.stdout or "").strip()[-600:]
+        tail = re.sub(r"\s+", " ", (proc.stderr or proc.stdout or "").strip())[-600:]
         raise RuntimeError(
-            f"eShikshaKosh export failed (exit {proc.returncode}).\n{tail}"
+            f"eShikshaKosh export failed (exit {proc.returncode}). "
+            f"{tail or 'No diagnostic output was returned.'}"
         )
     return out

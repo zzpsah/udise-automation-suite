@@ -19,3 +19,4 @@
 - Professional English GUI aligned with the five-phase Hermes VPS flow, plus a
   synthetic preview-lifecycle and write-lock integration test.
 - Class-first operation scope with unsupported workflows disabled.
+- Desktop UDISE session bridge and corrected eShikshaKosh export interpreter.

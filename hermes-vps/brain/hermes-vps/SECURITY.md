@@ -16,6 +16,12 @@ Never commit it — `.gitignore` covers it.
 **If a credential is ever pasted into a chat, a log, or a commit, treat it as
 compromised and rotate it.** A cookie is a full session for the school's portal.
 
+The desktop session bridge requires an explicit user click and restricts host
+permissions to UDISE SDMS and the private Oracle tailnet host. It submits the
+cookie only to a valid, short-lived `/session/{token}` request already visible
+in the authenticated console. It must not add storage, logging, analytics,
+broader host permissions, or a background upload path.
+
 ## Never commit
 
 - Cookies, session IDs, CSRF tokens

@@ -17,7 +17,7 @@
 - [x] `None/Not Studying` auto rule for invalid exam results
 - [x] Facility blank-detection for the `0` and `9` sentinels
 - [x] Distance 4.3.6 randomised between 1–3 km and 3–5 km
-- [x] 144 offline tests
+- [x] 145 offline Python tests plus the session-bridge JavaScript test
 - [x] Flow diagram (`docs/flow.html`)
 - [x] **GP write verified** after fixing the payload shape
 - [x] DevOS + brain documentation
@@ -99,6 +99,8 @@
       and add a synthetic preview-lifecycle/write-lock integration test.
 - [x] Move class scope above workflow selection and disable unsupported stages
       without changing the selected class.
+- [x] Add the desktop Chrome/Edge one-click UDISE session bridge.
+- [x] Launch the eShikshaKosh export with its maintained Playwright environment.
 - [ ] Add the explicit approval endpoint and per-run write cap before enabling
       any GUI or WhatsApp save action.
 - [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
