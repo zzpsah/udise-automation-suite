@@ -41,7 +41,7 @@ export default function Page(){
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
   const [maxWrites,setMaxWrites]=useState("1");
-  const [approvalText,setApprovalText]=useState("");
+  const [customMaxWrites,setCustomMaxWrites]=useState("10");
   const [acknowledgeReadback,setAcknowledgeReadback]=useState(false);
   const [msg,setMsg]=useState("");
 
@@ -131,16 +131,17 @@ export default function Page(){
   const approvalPhrase=job?.job?`SAVE ${job.job.stage.toUpperCase()} ${job.job.class_name||"ALL"}`:"";
   const approvedStage=job?.job?caps?.stages.find(item=>item.id===job.job.stage):undefined;
   const canApprove=Boolean(job&&job.job.status==="completed"&&job.job.preview&&job.job.has_result&&approvedStage?.approval_enabled);
+  const requestedMax=maxWrites==="all"?500:maxWrites==="custom"?Math.max(1,Math.min(500,Number(customMaxWrites)||1)):Number(maxWrites);
 
   async function approveWrite(){
     if(!job||!canApprove) return;
     setMsg("Submitting the bounded approval…");
     const r=await fetch(`/api/jobs/${job.job.id}/approve`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-      confirmation:approvalText,acknowledge_readback:acknowledgeReadback,max_submissions:Number(maxWrites)
+      confirmation:approvalPhrase,acknowledge_readback:acknowledgeReadback,max_submissions:requestedMax
     })});
     const d=await r.json();
     if(!r.ok){setMsg(d.detail||d.error||"Approval was rejected");return}
-    setJob(null);setJobId(d.job_id);setApprovalText("");setAcknowledgeReadback(false);
+    setJob(null);setJobId(d.job_id);setAcknowledgeReadback(false);
     setMsg(`Approved save started for up to ${d.max_submissions} record(s).`);
   }
 
@@ -224,12 +225,12 @@ export default function Page(){
             <span>Review the workbook first. Saved values stay unchanged; processing stops on an unconfirmed read-back.</span>
             <label>Maximum records</label>
             <select value={maxWrites} onChange={e=>setMaxWrites(e.target.value)} aria-label="Maximum records to save">
-              <option value="1">1 record</option><option value="5">Up to 5 records</option><option value="20">Up to 20 records</option><option value="500">All eligible records</option>
+              <option value="1">1 record</option><option value="5">Up to 5 records</option><option value="20">Up to 20 records</option><option value="custom">Custom number</option><option value="all">All eligible records</option>
             </select>
-            <label>Type {approvalPhrase}</label>
-            <input value={approvalText} onChange={e=>setApprovalText(e.target.value)} aria-label="Write confirmation phrase" autoComplete="off"/>
+            {maxWrites==="custom"&&<input type="number" min="1" max="500" value={customMaxWrites} onChange={e=>setCustomMaxWrites(e.target.value)} aria-label="Custom maximum records" placeholder="Number of students"/>}
+            <span className="approval-note">The save confirmation is generated automatically for this selected stage and class.</span>
             <label className="approval-check"><input type="checkbox" checked={acknowledgeReadback} onChange={e=>setAcknowledgeReadback(e.target.checked)}/><span>I approve this bounded portal save and understand that a fresh read-back is required.</span></label>
-            <button className="approve-button" disabled={approvalText!==approvalPhrase||!acknowledgeReadback} onClick={approveWrite}>Approve and save</button>
+            <button className="approve-button" disabled={!acknowledgeReadback} onClick={approveWrite}>Approve and save</button>
           </div>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}
