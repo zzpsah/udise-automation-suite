@@ -33,7 +33,7 @@ echo "-- installing dependencies --"
 "$VENV/bin/python" -m pip install --quiet -r "$HERE/requirements.txt"
 
 echo "-- running offline tests --"
-"$VENV/bin/python" "$HERE/test_offline.py" | tail -1
+"$VENV/bin/python" "$HERE/tests/test_offline.py" | tail -1
 
 echo "-- installing launcher --"
 mkdir -p "$BIN"
