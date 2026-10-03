@@ -1,0 +1,14 @@
+# Generated outputs — never commit student data
+smoke-out/
+*.xlsx
+*.csv
+*.log
+xi_probe.json
+esk_fetch_test.xlsx
+
+# Runtime secrets
+.env
+.venv/
+__pycache__/
+*.py[cod]
+
