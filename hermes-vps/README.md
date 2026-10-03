@@ -233,9 +233,42 @@ they are guards, not corrections.
 | `udise_vps/esk.py` | eShikshaKosh OTR report — your export, or a live fetch |
 | `udise_vps/students.py` | Roster export |
 | `udise_vps/completion.py` | Completion overview workbook |
+| `udise_vps/snapshot.py` | **Read-only stage-wise workbook** — Students, GP, EP, Facility, Completion and Issues sheets. Masks Aadhaar-like values; never writes secret-like fields |
+| `udise_vps/preview_report.py` | Excel report for a read-only preview of a write stage |
 | `tests/` | Offline suites — 145 Python tests plus the session-bridge JavaScript test, no network |
 | `tools/` | One-off operational scripts |
 | `brain/` | Working context — handoff, architecture, decisions, security |
+
+---
+
+## 1f. Operational tools (`tools/`)
+
+Run deliberately, not routinely. Each names its scope and reports before acting.
+
+| Tool | Purpose |
+|---|---|
+| `write_batch.py` | Bounded EP writer for N students |
+| `write_facility.py` | Facility writer for a class |
+| `finalize_class.py` | Complete Data for a class. Dry run unless `FIN_ALLOW=1` |
+| `preview_rules.py` | Show which students the blank-fill rules would touch. Read-only |
+| `preview_batch.py` | Preview EP changes before writing. Read-only |
+| `probe_xi_codes.py` | Probe which subject codes a class actually holds. Read-only |
+| `verify_written.py` | Independent read-back of written students |
+| `trial_write_five.py` | Bounded write test — re-sends values unchanged to exercise the POST path |
+| `test_gp_ep_five.py` | Bounded GP + EP test on 5 students |
+| `control_client.py` | Client for the local control API |
+| `list_bad_exam_result.py` | List students whose exam result is invalid. Read-only |
+| `write_not_studying.py` | Write the `None/Not Studying` rule for specific students |
+| `write_xi_one.py` | Single-student Class XI write test |
+| `send_one_write.py`, `send_valid_write.py` | Early single-write probes, kept for reference |
+
+```bash
+FIN_CLASS=9 python3 tools/finalize_class.py            # dry run
+FIN_CLASS=9 FIN_ALLOW=1 python3 tools/finalize_class.py
+BATCH_SIZE=5 python3 tools/write_batch.py
+FP_CLASS=9 python3 tools/write_facility.py
+python3 tools/preview_rules.py
+```
 
 ---
 

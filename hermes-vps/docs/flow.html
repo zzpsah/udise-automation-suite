@@ -424,6 +424,8 @@
     <tr><td>Facility read + write</td><td class="g">LIVE_SAVE — Class IX 33/33</td></tr>
     <tr><td>Finalize</td><td class="g">LIVE_SAVE — Class IX 33/33 at formStatus=6</td></tr>
     <tr><td>eShikshaKosh report</td><td class="g">LIVE_READ — 220 rows</td></tr>
+    <tr><td>Snapshot workbook</td><td class="g">LIVE_READ — read-only, Aadhaar masked</td></tr>
+    <tr><td>Preview report</td><td class="g">Read-only; no writes</td></tr>
   </table>
   <p style="color:var(--muted);font-size:11.5px;margin:9px 0 0">
     <code>HTTP 200</code> is never proof of a save. Only a matching fresh
@@ -499,10 +501,12 @@
       <tr><td><code>udise_vps/facility.py</code></td><td><b>Facility Profile</b> — blank-only fill, the 0/9 sentinel handling, seeded value generation.</td></tr>
       <tr><td><code>udise_vps/finalize.py</code></td><td><b>Complete Data</b> — status gating, pre-POST re-read, read-back confirmation.</td></tr>
       <tr><td><code>udise_vps/esk.py</code></td><td>eShikshaKosh OTR report — your export, or a live fetch with the school credentials.</td></tr>
-      <tr><td><code>udise_vps/students.py</code></td><td>Roster export.</td></tr>
+      <tr><td><code>udise_vps/students.py</code></td><td>Roster export. Masks Aadhaar; reads APAAR ID when the portal supplies it.</td></tr>
       <tr><td><code>udise_vps/completion.py</code></td><td>Completion overview workbook.</td></tr>
+      <tr><td><code>udise_vps/snapshot.py</code></td><td><b>Read-only stage-wise workbook</b> — Students, GP, EP, Facility, Completion and Issues sheets in one file. Masks Aadhaar-like values and never writes secret-like fields.</td></tr>
+      <tr><td><code>udise_vps/preview_report.py</code></td><td>Excel report for a read-only <b>preview</b> of a write stage, so you can review before enabling <code>--submit</code>.</td></tr>
       <tr><td><code>tests/</code></td><td>Offline suites — 131 tests, no network.</td></tr>
-      <tr><td><code>tools/</code></td><td>One-off operational scripts: previews, batch writers, probes.</td></tr>
+      <tr><td><code>tools/</code></td><td>Operational scripts, run deliberately rather than routinely: <code>write_batch</code> and <code>write_facility</code> (bounded writers), <code>finalize_class</code> (Complete Data), <code>preview_rules</code> and <code>probe_xi_codes</code> (read-only probes), <code>trial_write_five</code> and <code>test_gp_ep_five</code> (bounded write tests), <code>verify_written</code> (independent read-back), <code>control_client</code> (local control API), <code>write_not_studying</code> and <code>write_xi_one</code> (rule and Class XI single writes), <code>list_bad_exam_result</code> (read-only).</td></tr>
       <tr><td><code>brain/</code></td><td>Working context — handoff, architecture, decisions, security.</td></tr>
     </table>
   </div>
