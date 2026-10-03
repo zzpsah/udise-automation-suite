@@ -16,6 +16,15 @@ const HERMES_FLOW_REFERENCE: Record<string,string> = {
   finalize: "Phase 5 · Fresh status read → status 3 eligibility → one approved submission → status 6 read-back",
 };
 const LOGIN_REFERENCE = "Phase 1 · Secure session and roster access";
+const WORKFLOW_INFO: Record<string,{title:string;steps:string[]}> = {
+  students:{title:"Student roster",steps:["Read current UDISE student roster","Mask Aadhaar in output","Generate downloadable Excel","No portal data is changed"]},
+  snapshot:{title:"Full read snapshot",steps:["Read Students, GP, EP, Facility and Completion","Collect issues in a separate sheet","Generate one audit workbook","No portal data is changed"]},
+  gp:{title:"General Profile",steps:["Read current GP values","Fill only eligible blank fields","Prepare changes","Save only after the normal approval flow"]},
+  ep:{title:"Enrollment Profile",steps:["Read current UDISE profile","Fetch required source from eShikshaKosh","Prepare eligible EP values","Save only after the normal approval flow"]},
+  facility:{title:"Facility Profile",steps:["Read current Facility values","Fill only eligible blank fields","Prepare changes","Save only after the normal approval flow"]},
+  completion:{title:"Completion overview",steps:["Read GP, EP and Facility completion state","Calculate current student status","Generate downloadable report","No portal data is changed"]},
+  finalize:{title:"Complete Data",steps:["Read fresh completion status","Use only currently eligible records","Prepare Complete Data action","Save only after the normal approval flow"]},
+};
 const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
   students: {icon:"P1",short:"Export the current masked roster",fills:["Read-only","Masked Aadhaar"]},
   snapshot: {icon:"RA",short:"Export a full read-only audit workbook",fills:["Students + GP + EP + Facility","Completion + Issues"]},
@@ -43,6 +52,7 @@ export default function Page(){
   const [approvalText,setApprovalText]=useState("");
   const [acknowledgeReadback,setAcknowledgeReadback]=useState(false);
   const [msg,setMsg]=useState("");
+  const [infoStage,setInfoStage]=useState<string|null>(null);
 
   async function loadCaps(){
     const r=await fetch("/api/capabilities",{cache:"no-store"});
@@ -178,6 +188,7 @@ export default function Page(){
               <span className="stage-icon" aria-hidden="true">{meta.icon}</span>
               <span className="stage-copy"><strong>{s.label}</strong><small>{meta.short}</small></span>
               <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Review + Save":"Ready"}</span>
+              <span className="badge" role="button" tabIndex={0} aria-label={"How "+s.label+" works"} onClick={e=>{e.stopPropagation();setInfoStage(s.id)}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();setInfoStage(s.id)}}}>ⓘ</span>
             </button>})}</div>
 
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
@@ -217,6 +228,13 @@ export default function Page(){
         </div>}
       </aside>
     </div>
+    {infoStage&&WORKFLOW_INFO[infoStage]&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Workflow information">
+      <div className="session-modal">
+        <div className="modal-head"><div><span className="eyebrow">WORKFLOW</span><h2>{WORKFLOW_INFO[infoStage].title}</h2></div><button className="modal-close" onClick={()=>setInfoStage(null)} aria-label="Close">×</button></div>
+        <ol>{WORKFLOW_INFO[infoStage].steps.map((step,i)=><li key={i} style={{marginBottom:10}}>{step}</li>)}</ol>
+        <button className="run-button" onClick={()=>setInfoStage(null)}>Close</button>
+      </div>
+    </div>}
     {entryUrl&&!sessionId&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure UDISE session">
       <div className="session-modal">
         <div className="modal-head"><div><span className="eyebrow">SECURE SESSION</span><h2>Connect UDISE securely</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
