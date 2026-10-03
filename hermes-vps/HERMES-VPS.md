@@ -14,7 +14,7 @@ no notebook, no browser UI. It runs on a server and is driven from the shell.
 | Path | What it is |
 |---|---|
 | `udise_vps/` | The package — all portal logic |
-| `tests/` | Offline test suites (145 Python tests plus the session-bridge JavaScript test, no network) |
+| `tests/` | Offline test suites — run `./run_tests.sh` |
 | `tools/` | One-off operational scripts (previews, batch writers, probes) |
 | `brain/` | Working notes — handoff, architecture, decisions, security |
 | `docs/flow.html` | Flow diagram |
@@ -29,7 +29,7 @@ no notebook, no browser UI. It runs on a server and is driven from the shell.
 
 ```bash
 ./install.sh                 # dependencies
-./run_tests.sh               # 110 offline tests, no credentials needed
+./run_tests.sh               # all offline tests, no credentials needed
 
 export UDISE_COOKIE_HEADER='JSESSIONID=...; XSRF-TOKEN=...; NSC_tent...'
 udise-vps students   --school <id>              # roster (read-only)

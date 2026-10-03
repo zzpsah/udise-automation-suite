@@ -33,7 +33,9 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 145 passing** (24 core + 68 EP/Facility + 10 eShikshaKosh + 10 FP + 28 GP + 2 snapshot + 2 preview-report + 1 synthetic control-plane), no network required. The desktop session bridge has a separate JavaScript test.
+**Test suite:** run `./run_tests.sh` for the current count. Every suite is
+offline — no network, no credentials. The script discovers `tests/test_*.py`,
+so a new suite cannot be silently skipped.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -235,7 +237,7 @@ they are guards, not corrections.
 | `udise_vps/completion.py` | Completion overview workbook |
 | `udise_vps/snapshot.py` | **Read-only stage-wise workbook** — Students, GP, EP, Facility, Completion and Issues sheets. Masks Aadhaar-like values; never writes secret-like fields |
 | `udise_vps/preview_report.py` | Excel report for a read-only preview of a write stage |
-| `tests/` | Offline suites — 145 Python tests plus the session-bridge JavaScript test, no network |
+| `tests/` | Offline suites — run `./run_tests.sh` for the count. No network |
 | `tools/` | One-off operational scripts |
 | `brain/` | Working context — handoff, architecture, decisions, security |
 

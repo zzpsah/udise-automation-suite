@@ -7,7 +7,9 @@ cd hermes-vps
 ./run_tests.sh
 ```
 
-145 Python tests, **no network and no credentials required**. The desktop
+Run `./run_tests.sh` for the current count. Every suite is offline — **no
+network and no credentials required**. The script discovers `tests/test_*.py`,
+so a new suite cannot be silently skipped.
 session bridge has one additional JavaScript test. Runs in about two
 seconds. Individual suites:
 

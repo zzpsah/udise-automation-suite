@@ -58,7 +58,7 @@ for this Board and Class). Admission numbers and streams for Class XI resolve
 **Already complete for all 208 students** — a live census found zero blank AUTO
 fields in any class, so nothing needed writing.
 
-The rules are implemented and covered by 21 tests regardless, because they must
+The rules are implemented and covered by tests regardless, because they must
 hold for any school:
 
 - blank blood group → Under Investigation (9); code 0 clamped to 9

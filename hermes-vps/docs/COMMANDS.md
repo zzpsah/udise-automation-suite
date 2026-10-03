@@ -5,7 +5,7 @@
 ```bash
 cd hermes-vps
 ./install.sh
-./run_tests.sh                 # 110 tests, no network
+./run_tests.sh                 # all offline tests, no network
 ```
 
 ## Session

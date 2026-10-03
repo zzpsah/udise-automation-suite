@@ -10,7 +10,7 @@ Read these before changing anything. Start with `HANDOFF.md`.
 | [`hermes-vps/ARCHITECTURE.md`](hermes-vps/ARCHITECTURE.md) | Layering, the write contract, module responsibilities |
 | [`hermes-vps/DECISIONS.md`](hermes-vps/DECISIONS.md) | Why things are the way they are — each a choice that was not obvious |
 | [`hermes-vps/SECURITY.md`](hermes-vps/SECURITY.md) | Credentials, write safety, sentinel traps, approval boundary |
-| [`hermes-vps/TESTS.md`](hermes-vps/TESTS.md) | What the 110 tests cover, and what they do not |
+| [`hermes-vps/TESTS.md`](hermes-vps/TESTS.md) | What the offline tests cover, and what they do not |
 | [`hermes-vps/TASKS.md`](hermes-vps/TASKS.md) | Done, next, blocked, backlog |
 
 ## The three things worth knowing first
