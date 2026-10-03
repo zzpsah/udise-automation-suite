@@ -7,7 +7,7 @@ Last verified: **2026-10-03**. Portal **v3.2.0**.
 | Component | Command | Status |
 |---|---|---|
 | Roster export | `students` | `LIVE_READ` — 208 students |
-| Full read snapshot | `snapshot` | `DEPLOYED` + `OFFLINE_TESTED`; fresh live session needed |
+| Full read snapshot | `snapshot` | **`LIVE_READ`** — 208/208 students, workbook verified |
 | Completion overview | `completion` | `LIVE_READ` |
 | General Profile | `gp` | **`LIVE_SAVE`** — payload fixed, write verified on 4 students |
 | Enrolment Profile | `ep` | `LIVE_SAVE` — Class IX 33/33 |
@@ -142,6 +142,17 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - The available runtime UDISE session was rejected by the portal with HTTP 302
   before roster loading. No student read and no write occurred. A fresh Cookie
   must be entered through the private one-time form before live snapshot proof.
+
+
+Live verification completed with a fresh runtime session:
+- roster: 208/208 students;
+- sheets: Students, GP, EP, Facility, Completion, Issues;
+- each student sheet: 208 data rows plus header;
+- Issues sheet: header only (no issues);
+- no secret-like text found;
+- Masked Aadhaar contains no full 12-digit Aadhaar values;
+- 204 twelve-digit identifiers in Students and the same 204 in GP are APAAR IDs, not Aadhaar;
+- no POST/write occurred.
 
 ## Compact preview UI — 2026-10-03
 

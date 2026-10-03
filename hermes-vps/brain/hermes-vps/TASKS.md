@@ -104,8 +104,6 @@
 - [x] Add the explicit approval endpoint and per-run write cap for GUI saves;
       typed confirmation and read-back acknowledgement are required, and a
       preview can be approved only once.
-- [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
-      inspect workbook sheet/row counts before marking it `LIVE_READ`. The
-      2026-10-03 attempt stopped safely at session check (HTTP 302).
+- [x] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and verify workbook sheet/row counts, masking, and zero writes. 208/208 students; marked `LIVE_READ`.
 - [ ] Replace Cookie-header entry with direct username/password/CAPTCHA login
       when the live portal login contract is implemented.
