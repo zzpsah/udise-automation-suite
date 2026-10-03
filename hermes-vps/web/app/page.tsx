@@ -27,8 +27,6 @@ const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
 };
 
 export default function Page(){
-  const [authed,setAuthed]=useState<boolean|null>(null);
-  const [code,setCode]=useState("");
   const [caps,setCaps]=useState<Caps|null>(null);
   const [school,setSchool]=useState("");
   const [klass,setKlass]=useState("IX");
@@ -48,20 +46,12 @@ export default function Page(){
 
   async function loadCaps(){
     const r=await fetch("/api/capabilities",{cache:"no-store"});
-    if(r.status===401){setAuthed(false);return}
     if(!r.ok){setMsg("Capabilities load failed");return}
     const data:Caps=await r.json();
-    setCaps(data);setAuthed(true);
+    setCaps(data);
     if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
-
-  async function login(){
-    setMsg("");
-    const r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code})});
-    if(!r.ok){setMsg("Access code incorrect");return}
-    setCode("");await loadCaps();
-  }
 
   const selected=useMemo(()=>caps?.stages.find(x=>x.id===stage),[caps,stage]);
   const selectedMeta=selected?STAGE_META[selected.id]:undefined;
@@ -152,11 +142,6 @@ export default function Page(){
     const timer=setInterval(poll,1800);poll();
     return ()=>clearInterval(timer);
   },[jobId]);
-
-  if(authed===null) return <main><div className="card">Loading…</div></main>;
-  if(!authed) return <main><div className="login card"><h1>UDISE Automation</h1><p className="muted">Authorized access only.</p>
-    <label>Access code</label><input value={code} onChange={e=>setCode(e.target.value)} type="password" onKeyDown={e=>e.key==="Enter"&&login()}/>
-    <div style={{height:12}}/><button onClick={login}>Sign in</button>{msg&&<p>{msg}</p>}</div></main>;
 
   const pct=job?.job.progress_total?Math.min(100,Math.round(job.job.progress_current*100/job.job.progress_total)):0;
   return <main>

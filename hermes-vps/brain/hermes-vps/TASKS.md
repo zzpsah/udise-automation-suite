@@ -107,3 +107,4 @@
 - [x] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and verify workbook sheet/row counts, masking, and zero writes. 208/208 students; marked `LIVE_READ`.
 - [ ] Replace Cookie-header entry with direct username/password/CAPTCHA login
       when the live portal login contract is implemented.
+- [x] Remove temporary web access-code gate; console opens directly while Oracle/session/write safeguards remain enforced.

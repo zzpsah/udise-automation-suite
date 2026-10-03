@@ -195,3 +195,12 @@ Live verification completed with a fresh runtime session:
   redeploy the existing project after account/Git authorization.
 - The missing Manifest V3 file for the desktop session bridge was restored and
   its JavaScript contract test passes.
+
+## Public console access — 2026-10-03
+
+- The temporary application access-code gate has been removed.
+- The Vercel/local console now opens directly.
+- Oracle control authority remains server-side: bearer token is never exposed to the browser.
+- UDISE session creation still uses short-lived opaque runtime session requests.
+- Write stages remain preview-bound, explicitly approved, bounded, and read-back verified.
+- Direct portal-write bypasses remain blocked.
