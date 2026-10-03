@@ -12,6 +12,8 @@ Ported from the notebook's AUTO GP cell. Behaviour preserved exactly:
 
 from __future__ import annotations
 
+import hashlib
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -27,6 +29,8 @@ from .constants import (
     CWSN_UNEXPECTED_SKIP,
     EWS_EXCLUDED_CATEGORIES,
     EWS_NO,
+    MOTHER_TONGUE_CHOICES,
+    MOTHER_TONGUE_DEFAULT,
     class_scope,
 )
 
@@ -54,6 +58,29 @@ def as_code(value) -> int | None:
         return int(float(str(value).strip()))
     except (TypeError, ValueError):
         return None
+
+
+def student_rng(pen: str, seed: int = 20261003) -> random.Random:
+    """A per-student RNG seeded from the PEN.
+
+    Values must be reproducible: a re-run has to generate the same numbers, or
+    every read-back looks like a mismatch.
+    """
+    digest = hashlib.sha256(f"{seed}:{pen}".encode()).hexdigest()
+    return random.Random(int(digest[:12], 16))
+
+
+def pick_mother_tongue(rng: random.Random | None = None) -> int:
+    """Field 4.1.12 Mother Tongue, for a blank value.
+
+    Chooses between the generic default (42 - HINDI - Hindi) and the Bihar-
+    region option (28 - HINDI - Bhojpuri). 42 is the general default because it
+    is safe for any school; 28 is offered because schools in this region use it.
+    Pass a seeded RNG for a reproducible choice.
+    """
+    if rng is None:
+        return MOTHER_TONGUE_DEFAULT
+    return rng.choice(MOTHER_TONGUE_CHOICES)
 
 
 def apply_gp_rules(fresh: dict, updates: dict) -> dict:
@@ -273,6 +300,11 @@ def run_auto_gp(
             for field_name, default in AUTO_GP_DEFAULTS.items()
             if is_blank(fresh.get(field_name))
         }
+
+        # 4.1.12 Mother Tongue: a blank gets a randomised choice between the
+        # generic default and the region option. Only ever set when blank.
+        if "motherTongue" in updates:
+            updates["motherTongue"] = pick_mother_tongue(student_rng(pen))
 
         # Then enforce the portal's cross-field rules on what we are writing.
         # A rule only adjusts a field already in `updates`; it never invents an

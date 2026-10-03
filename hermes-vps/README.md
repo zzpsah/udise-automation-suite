@@ -32,7 +32,7 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 131 passing** (24 core + 68 EP/Facility + 8 eShikshaKosh + 10 FP + 21 GP), no network required.
+**Test suite: 137 passing** (24 core + 68 EP/Facility + 8 eShikshaKosh + 10 FP + 21 GP), no network required.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -173,7 +173,7 @@ groups (A+, B+, B-) — the three are left alone.
 | 4.1.17 CWSN | No (2) |
 | 4.1.18 Indian National | **Yes** (1) |
 | 4.1.19 Out-of-School-Child | No (2) |
-| Mother Tongue | HINDI - Hindi (42) |
+| Mother Tongue (4.1.12) | randomised: **42 HINDI - Hindi** or **28 HINDI - Bhojpuri** |
 
 ### Cross-field rules
 
@@ -187,6 +187,12 @@ already being written** — a saved value is left alone, same as everywhere else
 | Blood group | Code 0 ("Unknown") is offered by the UI but **rejected by the API**, so it is clamped to 9. |
 
 **CWSN = Yes skips the student entirely** for manual review — never auto-filled.
+
+**Mother Tongue (4.1.12)** — a blank gets a randomised pick between the generic
+default `42 - HINDI - Hindi` and the region option `28 - HINDI - Bhojpuri`.
+Values are seeded per student (`sha256(seed:pen)`) so a re-run reproduces the
+same choice. Live data shows the school already uses 28 (189 students), 42 (9),
+144 - Urdu (3) and 20 - Awadh (7) — **all four are left untouched.**
 
 These rules were verified against all 208 live records: **zero violations**, so
 they are guards, not corrections.
@@ -208,7 +214,7 @@ they are guards, not corrections.
 | `udise_vps/esk.py` | eShikshaKosh OTR report — your export, or a live fetch |
 | `udise_vps/students.py` | Roster export |
 | `udise_vps/completion.py` | Completion overview workbook |
-| `tests/` | Offline suites — 131 tests, no network |
+| `tests/` | Offline suites — 137 tests, no network |
 | `tools/` | One-off operational scripts |
 | `brain/` | Working context — handoff, architecture, decisions, security |
 

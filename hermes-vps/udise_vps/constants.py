@@ -30,8 +30,15 @@ STATUS_ORDER = {0: 0, 1: 1, 2: 2, 3: 3, 6: 4}
 
 # ---------------------------------------------------------- AUTO GP blank-only
 # Applied only where the fresh portal value is genuinely blank.
+# Field 4.1.12 Mother Tongue. Values come from official Census 2011 data.
+# The generic auto-fill default is 42 - HINDI - Hindi: safe for any school.
+# 28 - HINDI - Bhojpuri is kept alongside it because schools in Bihar commonly
+# use it, but it is region-specific and must not be the general default.
+MOTHER_TONGUE_DEFAULT = 42          # HINDI - Hindi
+MOTHER_TONGUE_CHOICES = (42, 28)    # 42 = Hindi, 28 = Bhojpuri
+
 AUTO_GP_DEFAULTS = {
-    "motherTongue": 42,   # HINDI - Hindi
+    "motherTongue": MOTHER_TONGUE_DEFAULT,
     "isBplYN": 2,         # No
     "ewsYN": 2,           # No
     "cwsnYN": 2,          # No

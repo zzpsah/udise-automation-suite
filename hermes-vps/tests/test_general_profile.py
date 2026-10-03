@@ -181,6 +181,71 @@ def _():
     assert d["bloodGroup"] == "9"       # Under Investigation
 
 
+# ------------------------------------------------------- mother tongue 4.1.12
+
+@check("mother_tongue_default_is_hindi")
+def _():
+    """42 - HINDI - Hindi is the generic default, safe for any school."""
+    from udise_vps.constants import MOTHER_TONGUE_DEFAULT
+    assert MOTHER_TONGUE_DEFAULT == 42
+    assert gp.pick_mother_tongue() == 42
+
+
+@check("mother_tongue_choices_are_both_kept")
+def _():
+    """42 (Hindi) and 28 (Bhojpuri) are both offered for a blank value."""
+    from udise_vps.constants import MOTHER_TONGUE_CHOICES
+    assert MOTHER_TONGUE_CHOICES == (42, 28), MOTHER_TONGUE_CHOICES
+
+
+@check("mother_tongue_randomises_between_the_two")
+def _():
+    import random as _r
+    seen = {gp.pick_mother_tongue(_r.Random(s)) for s in range(60)}
+    assert seen == {42, 28}, seen
+
+
+@check("mother_tongue_choice_is_reproducible")
+def _():
+    """REGRESSION: the same PEN must always yield the same value.
+
+    Unseeded randomness would make every read-back look like a mismatch.
+    """
+    a = gp.pick_mother_tongue(gp.student_rng("22269254443"))
+    b = gp.pick_mother_tongue(gp.student_rng("22269254443"))
+    assert a == b, (a, b)
+    # a different student may differ, but must be stable
+    c = gp.pick_mother_tongue(gp.student_rng("22426748555"))
+    d = gp.pick_mother_tongue(gp.student_rng("22426748555"))
+    assert c == d, (c, d)
+
+
+@check("mother_tongue_filled_but_not_blank_is_skipped")
+def _():
+    """REGRESSION: a filled mother tongue must never be included in updates.
+
+    Live data: 189 students carry 28 (Bhojpuri), 9 carry 42, 3 carry 144
+    (Urdu), 7 carry 20 (Awadh). All are left untouched.
+    """
+    for saved in (28, 42, 144, 20):
+        fresh = {"motherTongue": saved}
+        updates = {
+            k: v for k, v in gp.AUTO_GP_DEFAULTS.items()
+            if gp.is_blank(fresh.get(k))
+        }
+        assert "motherTongue" not in updates, (saved, updates)
+
+
+@check("mother_tongue_blank_is_proposed")
+def _():
+    fresh = {"motherTongue": 0}
+    updates = {
+        k: v for k, v in gp.AUTO_GP_DEFAULTS.items()
+        if gp.is_blank(fresh.get(k))
+    }
+    assert "motherTongue" in updates, updates
+
+
 @check("only_blank_fields_are_proposed")
 def _():
     """A filled GP record must produce no updates at all."""

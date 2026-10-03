@@ -83,6 +83,10 @@ Per student:
    | 4.1.16 EWS | SC/ST/OBC → EWS = No (2) |
    | Blood group | code 0 is clamped to 9; the API rejects 0 |
 
+   Mother Tongue (4.1.12) is a special case: a blank gets a **seeded random**
+   pick between 42 (Hindi, the generic default) and 28 (Bhojpuri, the region
+   option). Seeded per student so a re-run is reproducible.
+
 5. **POST the full record**, then read-back every submitted field.
 
 Verified against all 208 live records: **zero violations**, so the rules are

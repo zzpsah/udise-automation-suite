@@ -7,7 +7,7 @@ cd hermes-vps
 ./run_tests.sh
 ```
 
-131 tests, **no network and no credentials required**. Runs in about two
+137 tests, **no network and no credentials required**. Runs in about two
 seconds. Individual suites:
 
 ```bash
@@ -15,7 +15,7 @@ python3 tests/test_offline.py          # 24 — core: session, constants, studen
 python3 tests/test_ep_facility.py      # 68 — Enrolment Profile + Facility rules
 python3 tests/test_esk.py              #  8 — eShikshaKosh report source
 python3 tests/test_facility.py         # 10 — Facility blank-detection, sentinels
-python3 tests/test_general_profile.py  # 21 — GP blank-fill and cross-field rules
+python3 tests/test_general_profile.py  # 27 — GP blank-fill, cross-field rules, mother tongue
 ```
 
 ## What is covered
@@ -86,6 +86,8 @@ python3 tests/test_general_profile.py  # 21 — GP blank-fill and cross-field ru
 - **the AAY and EWS rules skip a field the portal already holds** — the
   blank-only rule applies to cross-field rules too
 - a fully filled GP record proposes no updates at all
+- mother tongue: default is 42, both 42 and 28 are offered, the pick is seeded
+  and reproducible, and a filled value (28/42/144/20) is always skipped
 - the payload carries every untouched field, so nothing is silently dropped
 
 ### eShikshaKosh report source
