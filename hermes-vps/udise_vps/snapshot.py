@@ -18,7 +18,7 @@ from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from .constants import CLASS_LABEL, STATUS_STAGE
+from .constants import CLASS_LABEL, CLASS_SCOPES, STATUS_STAGE
 from .students import get_apaar_id, mask_aadhaar
 
 _SECRET_PARTS = ("password", "token", "cookie", "secret", "authorization", "jsession", "xsrf")
@@ -87,7 +87,7 @@ def _student_summary(identity: dict[str, Any], roster: Mapping[str, Any], gp: Ma
     }
 
 
-def collect_snapshot(session) -> dict[str, list[dict[str, Any]]]:
+def collect_snapshot(session, class_scope_name: str | None = None) -> dict[str, list[dict[str, Any]]]:
     """Read all stage records for the loaded roster. Performs no writes."""
     if not session.students:
         raise RuntimeError("Roster is not loaded. Run login first.")
@@ -96,10 +96,14 @@ def collect_snapshot(session) -> dict[str, list[dict[str, Any]]]:
         "Students": [], "GP": [], "EP": [], "Facility": [],
         "Completion": [], "Issues": [],
     }
-    total = len(session.students)
-    print(f"[SNAPSHOT] Reading GP, EP and Facility for {total} students.", flush=True)
+    selected_classes = CLASS_SCOPES.get(class_scope_name) if class_scope_name else None
+    students = [s for s in session.students if selected_classes is None or int(s.get("classId", -1)) in selected_classes]
+    if not students:
+        raise RuntimeError(f"No students found for snapshot scope: {class_scope_name or 'all'}")
+    total = len(students)
+    print(f"[SNAPSHOT] Scope Class {class_scope_name or 'all'}: reading GP, EP and Facility for {total} students.", flush=True)
 
-    for position, student in enumerate(session.students, 1):
+    for position, student in enumerate(students, 1):
         identity = _identity(student, position)
         sid = str(identity["Student ID (system)"])
         gp: dict[str, Any] | None = None
@@ -138,6 +142,17 @@ def collect_snapshot(session) -> dict[str, list[dict[str, Any]]]:
         })
         print(f"[SNAPSHOT] {position}/{total} students checked", flush=True)
 
+    if class_scope_name:
+        statuses = [row.get("formStatus") for row in result["Completion"]]
+        as_int = [value for value in statuses if isinstance(value, int)]
+        print(
+            f"[SUMMARY] Class {class_scope_name}: students={total} "
+            f"GP pending={sum(value == 0 for value in as_int)} "
+            f"EP pending={sum(value in (0, 1) for value in as_int)} "
+            f"Facility pending={sum(value in (0, 1, 2) for value in as_int)} "
+            f"completed={sum(value == 6 for value in as_int)} issues={len(result['Issues'])}",
+            flush=True,
+        )
     return result
 
 
@@ -188,6 +203,7 @@ def write_snapshot_workbook(snapshot: dict[str, list[dict[str, Any]]], path: str
     return str(target)
 
 
-def default_filename(school_id: str) -> str:
+def default_filename(school_id: str, class_scope_name: str | None = None) -> str:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"UDISE_Full_Read_Snapshot_{school_id}_{stamp}.xlsx"
+    suffix = f"_{class_scope_name.replace(' ', '-') }" if class_scope_name else ""
+    return f"UDISE_Full_Read_Snapshot_{school_id}{suffix}_{stamp}.xlsx"

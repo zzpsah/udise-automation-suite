@@ -88,9 +88,9 @@ def cmd_completion(args) -> int:
 
 def cmd_snapshot(args) -> int:
     session = _login(args)
-    snapshot = snapshot_mod.collect_snapshot(session)
+    snapshot = snapshot_mod.collect_snapshot(session, class_scope_name=args.klass)
     out = _output_dir(args)
-    path = out / snapshot_mod.default_filename(session.school_id)
+    path = out / snapshot_mod.default_filename(session.school_id, args.klass)
     snapshot_mod.write_snapshot_workbook(snapshot, str(path))
     print(f"REPORT_READY={path.resolve()}")
     return 0
@@ -256,6 +256,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("snapshot", help="Full GP/EP/Facility read snapshot workbook")
     _add_common(p)
+    p.add_argument("--class", "-c", dest="klass", default="IX",
+                   choices=list(snapshot_mod.CLASS_SCOPES))
     p.set_defaults(func=cmd_snapshot)
 
     p = sub.add_parser("gp", help="AUTO General Profile blank defaults")

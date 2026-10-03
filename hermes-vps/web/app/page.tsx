@@ -29,6 +29,7 @@ const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
 export default function Page(){
   const [caps,setCaps]=useState<Caps|null>(null);
   const [school,setSchool]=useState("");
+  const [savedSchools,setSavedSchools]=useState<Array<{id:string;label:string}>>([]);
   const [klass,setKlass]=useState("IX");
   const [stage,setStage]=useState("completion");
   const [sessionToken,setSessionToken]=useState("");
@@ -52,6 +53,18 @@ export default function Page(){
     if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
+  useEffect(()=>{
+    try { const raw=window.localStorage.getItem("udise_saved_schools"); if(raw) setSavedSchools(JSON.parse(raw)); } catch {}
+  },[]);
+
+  function saveSchool(){
+    const id=school.trim();
+    if(!id) return;
+    const next=[{id,label:id},...savedSchools.filter(item=>item.id!==id)].slice(0,12);
+    setSavedSchools(next);
+    window.localStorage.setItem("udise_saved_schools",JSON.stringify(next));
+    setMsg("School saved in this browser's dropdown.");
+  }
 
   const selected=useMemo(()=>caps?.stages.find(x=>x.id===stage),[caps,stage]);
   const selectedMeta=selected?STAGE_META[selected.id]:undefined;
@@ -155,7 +168,12 @@ export default function Page(){
               <option value="">Custom school</option>
               {caps?.school_presets?.map(p=><option value={p.internal_id} key={p.internal_id}>{p.udise_code} · {p.name}</option>)}
             </select>}
+            {savedSchools.length>0&&<select className="school-preset" aria-label="My saved schools" value={savedSchools.some(item=>item.id===school)?school:""} onChange={e=>setSchool(e.target.value)}>
+              <option value="">My saved schools</option>
+              {savedSchools.map(item=><option value={item.id} key={item.id}>{item.label}</option>)}
+            </select>}
             <input aria-label="School URL or internal ID" value={school} onChange={e=>setSchool(e.target.value)} placeholder="School URL or 7-digit internal ID"/>
+            <button type="button" onClick={saveSchool}>Save school</button>
             <button onClick={connectSession}>{sessionId?"Reconnect":"Connect UDISE"}</button>
             {sessionId&&<span className="badge ok">● Ready</span>}
             {!sessionId&&sessionToken&&<span className="badge">Waiting…</span>}
@@ -199,7 +217,7 @@ export default function Page(){
         {job&&<div className="job-output">
           <div className="friendly-message">{job.job.message||msg}</div>
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
-          <ul className="events">{job.events.slice(-6).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
+          <ul className="events">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
           {canApprove&&<div className="approval-box">
             <strong>Approve portal save</strong>

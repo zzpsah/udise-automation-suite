@@ -16,8 +16,8 @@ CAPABILITIES = {
         },
         {
             "id": "snapshot", "label": "Full Read Snapshot", "mode": "read",
-            "classes": ["IX", "X", "XI", "XII"], "requires_class": False,
-            "description": "Read all available profiles and export Students, GP, EP, Facility, Completion and Issues in one workbook. No portal data is changed.",
+            "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
+            "description": "Read the selected class only and export class-wise GP, EP, Facility, Completion and Issues counts. No portal data is changed.",
         },
         {
             "id": "gp", "label": "General Profile", "mode": "write",
