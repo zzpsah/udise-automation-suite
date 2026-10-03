@@ -68,6 +68,8 @@
 - [x] Add verified GitHub candidate-test-and-promote workflow.
 - [x] Run a private Oracle/Tailscale production GUI trial with Hermes VPS
       runner references and all write stages locked.
+- [x] Align the Hermes WhatsApp skill with the same five-phase flow and dynamic
+      capability-driven polls.
 - [ ] Connect/deploy the Vercel project and set encrypted environment values.
 - [ ] Add proactive WhatsApp progress push from job events.
 - [ ] Add dedicated preview/approval workflow before enabling each write stage.

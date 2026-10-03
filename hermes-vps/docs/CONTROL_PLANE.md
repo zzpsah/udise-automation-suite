@@ -104,6 +104,12 @@ The skill maps natural-language requests to the same API. Missing finite choices
 use the existing structured poll behavior. Cookies and API tokens must never be
 requested or displayed in chat.
 
+WhatsApp follows the same five phases as the web UI and `docs/flow.html`.
+Capabilities are fetched before presenting stage/class polls. A clear request
+such as `Class X completion dekho` skips redundant questions; ambiguous requests
+poll only for missing finite inputs. Phase 3, Phase 4, and Finalize remain
+locked by the API.
+
 ## Automatic promotion
 
 hermes-vps/tools/promote_from_github.sh checks remote main in a temporary Git
