@@ -2,6 +2,9 @@
 *.xls
 *.csv
 *.json
+!hermes-vps/web/package.json
+!hermes-vps/web/package-lock.json
+!hermes-vps/web/tsconfig.json
 .ipynb_checkpoints/
 __pycache__/
 .env
