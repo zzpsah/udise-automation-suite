@@ -7,7 +7,7 @@ Last verified: **2026-10-03**. Portal **v3.2.0**.
 | Component | Command | Status |
 |---|---|---|
 | Roster export | `students` | `LIVE_READ` — 208 students |
-| Full read snapshot | `snapshot` | `OFFLINE_TESTED` — deployment/live read pending |
+| Full read snapshot | `snapshot` | `DEPLOYED` + `OFFLINE_TESTED`; fresh live session needed |
 | Completion overview | `completion` | `LIVE_READ` |
 | General Profile | `gp` | `LIVE_READ` — **complete for all 208**, rules implemented + tested |
 | Enrolment Profile | `ep` | `LIVE_SAVE` — Class IX 33/33 |
@@ -120,3 +120,9 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - The control API and WhatsApp capability flow expose the stage as read-only.
 - Live Oracle deployment and authenticated portal execution remain to be
   verified; do not promote this line to `LIVE_READ` without that evidence.
+- The Oracle deployment passed 140/140, production Next.js build, service
+  restart, private login, dynamic capability, secure-link, and HTTP 409
+  write-lock checks.
+- The available runtime UDISE session was rejected by the portal with HTTP 302
+  before roster loading. No student read and no write occurred. A fresh Cookie
+  must be entered through the private one-time form before live snapshot proof.

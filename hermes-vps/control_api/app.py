@@ -295,17 +295,20 @@ def _run_job(job_id: str) -> None:
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 bufsize=1)
         report_path = None
+        runner_error = None
         assert proc.stdout is not None
         for raw in proc.stdout:
             if raw.startswith("REPORT_READY="):
                 report_path = raw.split("=", 1)[1].strip()
+            if raw.strip().startswith("ERROR:"):
+                runner_error = raw.strip().removeprefix("ERROR:").strip()
             msg, cur, total = _progress_line(raw)
             if msg:
                 _event(job_id, msg)
                 _update_progress(job_id, cur, total)
         code = proc.wait()
         if code != 0:
-            raise RuntimeError(f"Runner exited with code {code}")
+            raise RuntimeError(runner_error or f"Runner exited with code {code}")
         if report_path and Path(report_path).is_file():
             rp = str(Path(report_path).resolve())
         else:

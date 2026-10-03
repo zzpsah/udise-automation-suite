@@ -29,6 +29,7 @@ cd "$TMP/hermes-vps"
 "$VENV/bin/python" tests/test_esk.py >/dev/null
 "$VENV/bin/python" tests/test_facility.py >/dev/null
 "$VENV/bin/python" tests/test_general_profile.py >/dev/null
+"$VENV/bin/python" tests/test_snapshot.py >/dev/null
 "$VENV/bin/python" -m py_compile udise_vps/*.py control_api/*.py 2>/dev/null || "$VENV/bin/python" -m py_compile udise_vps/*.py
 bash -n install.sh run_tests.sh smoke_readonly.sh
 
