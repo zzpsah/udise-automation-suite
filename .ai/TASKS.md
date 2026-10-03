@@ -11,3 +11,8 @@
 - XI/XII Enrollment writes.
 - XI/XII Facility writes.
 - Bulk writes without explicit approval and fresh read-back.
+
+## Completed
+- Private Oracle/Tailscale GUI trial: production build, user service,
+  notebook-reference metadata, secure session-link smoke check, and locked
+  write-stage check.

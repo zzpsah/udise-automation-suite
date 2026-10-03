@@ -83,6 +83,19 @@ protected result downloads.
 
 Required Vercel environment values are documented in web/.env.example.
 
+## Private Oracle trial
+
+The same source runs without Vercel as user-level `udise-web.service`, binding
+Next.js to `127.0.0.1:3010`. Tailscale Serve publishes only
+`https://oracle-server.tail2b7fe2.ts.net:3010/`. The one-time session form
+stays on the separately tailnet-only control API path at port `10000`; no public
+Funnel is used.
+
+The GUI labels maintained-notebook references for Login (cell 2), Student
+details (cell 3), GP (cells 4–11), EP (starting cell 13), Facility (cells
+18–22), Completion (cell 23), and Finalize (cell 24). These labels are
+operator guidance only and do not make a write stage executable.
+
 ## Hermes
 
 Source skill: hermes-vps/hermes-skill/udise-control/SKILL.md

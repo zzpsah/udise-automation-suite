@@ -118,3 +118,11 @@ enhancements do not require parallel hard-coded UI changes.
 
 Decision: automatic GitHub synchronization is test-gated promotion only. It may
 update server code after offline verification; it never authorizes UDISE writes.
+
+## 2026-10-03 — Private GUI trial stays tailnet-only
+
+**Decision.** The Next.js GUI binds to loopback and is published with Tailscale
+Serve on its own tailnet port. The control API Funnel is disabled.
+
+**Why.** This gives a real trial surface without exposing session entry or
+control endpoints publicly. GP, EP, Facility, and Finalize remain API-locked.

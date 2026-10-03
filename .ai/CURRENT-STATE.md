@@ -45,3 +45,14 @@ configuration gap, not a client defect.
 
 See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 `hermes-vps/docs/flow.html` for the flow diagram.
+
+## Private web trial — 2026-10-03
+
+- The production Next.js GUI runs as user-level `udise-web.service` on Oracle,
+  bound to loopback and exposed only through Tailscale Serve.
+- GUI: `https://oracle-server.tail2b7fe2.ts.net:3010/`; the one-time secure
+  session form is separately tailnet-only on port `10000`.
+- The former public Funnel was removed. No UDISE portal write stage is enabled.
+- GUI metadata references the maintained notebook: Login cell 2, Student
+  details cell 3, GP cells 4–11, EP starting cell 13, Facility cells 18–22,
+  Completion cell 23, and Finalize cell 24.

@@ -99,3 +99,12 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Hermes udise-control skill and local control client are installed.
 - Offline baseline is 137/137.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
+
+## Private GUI trial — 2026-10-03
+
+- `udise-web.service` is a production Next.js user service bound to
+  `127.0.0.1:3010` and published only through Tailscale Serve.
+- The control API/session form is tailnet-only at port 10000; Funnel is off.
+- Smoke evidence: UI login 200, dynamic capabilities, one-time secure session
+  link/form, and a GP job request rejected with `409`.
+- No Cookie was entered and no portal job or write ran.
