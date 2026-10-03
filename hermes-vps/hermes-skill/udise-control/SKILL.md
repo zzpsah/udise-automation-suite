@@ -100,22 +100,34 @@ Write-stage previews (no POST):
 ~/.local/bin/udise-control-client run --session SESSION --school SCHOOL --stage facility --class CLASS
 ~/.local/bin/udise-control-client run --session SESSION --school SCHOOL --stage finalize --class CLASS
 
-Then:
-~/.local/bin/udise-control-client status JOB
+Then use a sparse background watcher for messaging sessions:
 
-Use human progress such as:
-- UDISE session connected.
-- Roster loaded: 208 students.
-- Completion status: 12/38 students checked.
-- Full snapshot: 80/208 students checked.
-- Report ready.
+~/.local/bin/udise-control-client watch JOB --milestone-step 25 --out /tmp/udise-JOB.xlsx
 
-Do not repeat PEN/name-level raw progress in chat.
+In WhatsApp/Telegram, launch that watcher as a background terminal process with
+completion notification enabled. The Hermes process watcher already preserves
+the originating platform/chat/thread routing, so do not create another WhatsApp
+client and do not pass raw chat IDs through UDISE scripts.
 
-When complete:
-~/.local/bin/udise-control-client result JOB --out /tmp/udise-result.xlsx
+Use only meaningful progress updates:
+- session authenticated;
+- roster loaded;
+- roughly 25%, 50%, 75%, and 100%;
+- report ready;
+- final success/failure.
 
-Send the actual file in the same chat.
+Do not repeat PEN/name-level raw progress or every-student counters in chat.
+
+When the background watcher completes successfully it prints:
+- FINAL_STATUS=completed
+- RESULT_FILE=/tmp/...xlsx
+
+Attach that actual XLSX to the same requesting chat using the normal Hermes
+media/document delivery path. Delete the temporary chat-delivery copy after a
+successful send; the protected API job result remains subject to its normal
+retention policy.
+
+For a foreground/admin check, status JOB remains available.
 
 ## Write-stage previews
 
