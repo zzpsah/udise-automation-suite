@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "UDISE Hermes Session Bridge",
+  "version": "0.1.0",
+  "description": "Connect the current UDISE SDMS browser session to the private UDISE Operations Console after an explicit user click.",
+  "permissions": [
+    "activeTab",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://oracle-server.tail2b7fe2.ts.net/*",
+    "https://sdms.udiseplus.gov.in/*",
+    "https://udise.vercel.app/*"
+  ],
+  "action": {
+    "default_title": "Connect UDISE session",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://oracle-server.tail2b7fe2.ts.net/*",
+        "https://udise.vercel.app/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

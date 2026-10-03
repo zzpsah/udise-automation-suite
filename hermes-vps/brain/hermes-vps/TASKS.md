@@ -88,7 +88,7 @@
       runner references and all write stages locked.
 - [x] Align the Hermes WhatsApp skill with the same five-phase flow and dynamic
       capability-driven polls.
-- [ ] Connect/deploy the Vercel project and set encrypted environment values.
+- [ ] Redeploy the existing zzpsah/udise-automation-suite Vercel project from the latest hermes-vps/web build; current public deployment is functional but its frontend fingerprint is older. Keep existing encrypted environment values.
 - [ ] Add proactive WhatsApp progress push from job events.
 - [x] Add dedicated preview/approval workflow before enabling each write stage.
 - [x] Enable no-POST preview Excel for GP, EP, Facility, and Finalize.

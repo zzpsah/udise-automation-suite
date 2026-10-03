@@ -8,3 +8,4 @@
 __pycache__/
 .env
 *.log
+!hermes-vps/browser-extension/udise-session-bridge/manifest.json

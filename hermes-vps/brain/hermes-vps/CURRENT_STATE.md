@@ -168,3 +168,19 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - A desktop Chrome/Edge Manifest V3 session bridge can submit the current SDMS
   cookies to an already-created one-time Oracle session request after a user
   click. It does not display, log or persist cookie values.
+
+## Existing Vercel project verification — 2026-10-03
+
+- Existing project: zzpsah/udise-automation-suite.
+- Current production alias: https://udise-automation-suite.vercel.app/.
+- Public home returns HTTP 200 and renders UDISE Operations Console.
+- Authenticated smoke passed: login 200, capabilities 200, IX/X/XI/XII present,
+  and one-time secure UDISE session-link creation 200.
+- The current public frontend chunk fingerprints do not match the latest local
+  production build, so a redeploy is still required.
+- Desired canonical alias remains https://udise.vercel.app/.
+- Vercel CLI on Oracle is currently logged out and the browser automation
+  profile is also unauthenticated. Do not create a duplicate Vercel project;
+  redeploy the existing project after account/Git authorization.
+- The missing Manifest V3 file for the desktop session bridge was restored and
+  its JavaScript contract test passes.
