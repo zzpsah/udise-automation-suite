@@ -5,15 +5,15 @@ type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires
 type Caps={classes:{id:string;label:string}[];stages:Stage[]};
 type JobState={job:{id:string;status:string;stage:string;class_name?:string;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
 
-const HERMES_REFERENCE: Record<string,string> = {
-  students: "Hermes VPS · udise-vps students · udise_vps/students.py",
-  gp: "Hermes VPS · udise-vps gp · udise_vps/general_profile.py",
-  ep: "Hermes VPS · udise-vps ep · udise_vps/ep.py",
-  facility: "Hermes VPS · udise-vps facility · udise_vps/facility.py",
-  completion: "Hermes VPS · udise-vps completion · udise_vps/completion.py",
-  finalize: "Hermes VPS · udise-vps finalize · udise_vps/finalize.py",
+const HERMES_FLOW_REFERENCE: Record<string,string> = {
+  students: "Phase 1 · Session · Fetch the roster",
+  gp: "Phase 3 · General Profile · fresh read → blank-only preview → read-back",
+  ep: "Phase 4 · Enrolment & Facility · per-student loop",
+  facility: "Phase 4 · Enrolment & Facility · blank-only fill and read-back",
+  completion: "Phase 5 · Complete Data · fresh status overview",
+  finalize: "Phase 5 · Complete Data · eligible status 3 only",
 };
-const LOGIN_REFERENCE = "Hermes VPS · secure runtime session · control_api/app.py";
+const LOGIN_REFERENCE = "Hermes VPS flow · Phase 1 · Secure session";
 
 export default function Page(){
   const [authed,setAuthed]=useState<boolean|null>(null);
@@ -122,12 +122,12 @@ export default function Page(){
       <div className="grid">{caps?.stages.map(s=><button key={s.id} className={"choice "+(stage===s.id?"active":"")} onClick={()=>setStage(s.id)}>
         <div className="stage-title"><strong>{s.label}</strong><span className={"badge "+(s.mode==="write"?"warn":"ok")}>{s.mode==="write"?"Write":"Read"}</span></div>
         <div className="muted" style={{marginTop:7,fontSize:13}}>{s.description}</div>
-        {HERMES_REFERENCE[s.id]&&<div className="muted" style={{marginTop:7,fontSize:12}}>Runner reference: {HERMES_REFERENCE[s.id]}</div>}
+        {HERMES_FLOW_REFERENCE[s.id]&&<div className="muted" style={{marginTop:7,fontSize:12}}>Flow reference: {HERMES_FLOW_REFERENCE[s.id]}</div>}
       </button>)}</div>
 
       {selected?.requires_class&&<><label>Class</label><select value={klass} onChange={e=>setKlass(e.target.value)}>
         {selected.classes.map(c=><option value={c} key={c}>{caps?.classes.find(x=>x.id===c)?.label||c}</option>)}
-      </select></>}
+      </select><p className="muted">Hermes VPS flow · Phase 2 · Process one class scope at a time.</p></>}
 
       {selected?.mode==="write"&&<p className="badge warn">Write stage visible hai, lekin read-only MVP me execution disabled hai. Preview/approval workflow next layer me enable hoga.</p>}
       <div style={{height:14}}/>

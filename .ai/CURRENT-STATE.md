@@ -53,5 +53,4 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 - GUI: `https://oracle-server.tail2b7fe2.ts.net:3010/`; the one-time secure
   session form is separately tailnet-only on port `10000`.
 - The former public Funnel was removed. No UDISE portal write stage is enabled.
-- GUI metadata references the actual Hermes VPS session flow, CLI commands, and
-  `udise_vps` modules used by each stage.
+- GUI metadata follows the five phases in `hermes-vps/docs/flow.html`.
