@@ -26,13 +26,14 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | Component | Command | Status |
 |---|---|---|
 | Student roster export | `students` | `LIVE_READ` — 208 students |
+| Full read snapshot | `snapshot` | `OFFLINE_TESTED` — combined stage workbook |
 | Completion Overview | `completion` | `LIVE_READ` — 33 Class IX read |
 | General Profile | `gp` | `LIVE_READ` preview only (see §6) |
 | **Enrollment Profile** | `ep` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 137 passing** (24 core + 68 EP/Facility + 8 eShikshaKosh + 10 FP + 21 GP), no network required.
+**Test suite: 140 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 27 GP + 2 snapshot), no network required.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -486,6 +487,7 @@ export UDISE_COOKIE_HEADER='JSESSIONID=...; XSRF-TOKEN=...'
 
 # Read-only
 udise-vps students   --school <URL-or-7-digit-ID>
+udise-vps snapshot   --school <id>
 udise-vps completion --school <id> --class IX
 
 # Preview (writes nothing)
@@ -562,6 +564,7 @@ udise-hermes-version/
 │   ├── completion.py        Completion Overview status scan
 │   ├── finalize.py          Finalize / Complete Data with all guards
 │   ├── students.py          masked-Aadhaar student export
+│   ├── snapshot.py          combined stage-wise read-only workbook
 │   └── cli.py               command line
 ├── test_offline.py          24 core safety tests
 ├── test_ep_facility.py      39 EP/Facility tests
@@ -604,7 +607,7 @@ The verified CLI remains the execution engine. A control-plane layer under
 control_api exposes dynamic class/stage capabilities, secure runtime UDISE
 session entry, read-only jobs, aggregate progress events and protected results.
 
-The first executable API stages are students and completion. GP, EP, Facility
+The executable read-only API stages are students, snapshot, and completion. GP, EP, Facility
 and Finalize are visible in capabilities but intentionally locked until their
 dedicated preview/approval write workflows are added.
 

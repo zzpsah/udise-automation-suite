@@ -28,6 +28,15 @@ def check(name):
     return deco
 
 
+@check("maintained_vps_script_path_is_first")
+def _():
+    expected = (
+        Path.home() / "projects" / "eshikshakosh-automation" /
+        "local-script" / "esk_otr_api.py"
+    )
+    assert esk._SCRIPT_CANDIDATES[0] == expected
+
+
 @check("read_credentials_parses_conf")
 def _():
     with tempfile.TemporaryDirectory() as d:

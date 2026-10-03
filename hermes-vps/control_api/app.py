@@ -240,6 +240,10 @@ def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
     if m:
         a, b = int(m.group(1)), int(m.group(2))
         return f"Completion status: {a}/{b} students checked", a, b
+    m = re.search(r"\[SNAPSHOT\]\s+(\d+)/(\d+)\s+", line)
+    if m:
+        a, b = int(m.group(1)), int(m.group(2))
+        return f"Full snapshot: {a}/{b} students checked", a, b
     m = re.search(r"Loaded\s+(\d+)\s+students", line, re.I)
     if m:
         n = int(m.group(1))
@@ -277,7 +281,7 @@ def _run_job(job_id: str) -> None:
         cmd = [str(RUNNER), stage, "--school", row["school"], "--out", str(out_dir)]
         if stage == "completion":
             cmd += ["--class", row["class_name"]]
-        elif stage not in {"students"}:
+        elif stage not in {"students", "snapshot"}:
             raise RuntimeError("This stage is not enabled in the read-only MVP")
 
         env = os.environ.copy()

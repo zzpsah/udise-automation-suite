@@ -7,6 +7,7 @@ type JobState={job:{id:string;status:string;stage:string;class_name?:string;prog
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
   students: "Phase 1 · Session · Fetch the roster",
+  snapshot: "Read-only audit · Students + GP + EP + Facility + Completion + Issues",
   gp: "Phase 3 · General Profile · fresh read → blank-only preview → read-back",
   ep: "Phase 4 · Enrolment & Facility · per-student loop",
   facility: "Phase 4 · Enrolment & Facility · blank-only fill and read-back",

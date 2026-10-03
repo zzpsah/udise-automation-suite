@@ -23,6 +23,7 @@ DEFAULT_CACHE_DIR = Path.home() / "Eshikshakosh_OTR_Report" / "local-script"
 
 # Candidate locations of the bundled fetch script, most specific first.
 _SCRIPT_CANDIDATES = (
+    Path.home() / "projects" / "eshikshakosh-automation" / "local-script" / "esk_otr_api.py",
     Path.home() / "Eshikshakosh_OTR_Report" / "local-script" / "esk_otr_api.py",
     Path.home() / "Eshikshakosh_OTR_Report" / "esk_otr_api.py",
     Path.home() / "esk_otr_api.py",
@@ -30,6 +31,7 @@ _SCRIPT_CANDIDATES = (
 
 # Candidate credential files, same order.
 _CONF_CANDIDATES = (
+    Path.home() / "projects" / "eshikshakosh-automation" / "local-script" / "eshikshakosh.conf",
     Path.home() / "Eshikshakosh_OTR_Report" / "local-script" / "eshikshakosh.conf",
     Path.home() / "Eshikshakosh_OTR_Report" / "eshikshakosh.conf",
     Path.home() / "eshikshakosh.conf",

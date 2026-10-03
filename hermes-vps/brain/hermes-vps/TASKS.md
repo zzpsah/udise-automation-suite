@@ -5,6 +5,7 @@
 - [x] Package skeleton and CLI (`udise_vps/`)
 - [x] Session layer — reads retry, writes do not
 - [x] Roster export
+- [x] Combined stage-wise read snapshot workbook (offline verified)
 - [x] Completion overview workbook
 - [x] **Enrolment Profile** — Class IX live-saved and confirmed
 - [x] **Facility Profile** — Class IX live-saved and confirmed
@@ -16,7 +17,7 @@
 - [x] `None/Not Studying` auto rule for invalid exam results
 - [x] Facility blank-detection for the `0` and `9` sentinels
 - [x] Distance 4.3.6 randomised between 1–3 km and 3–5 km
-- [x] 110 offline tests
+- [x] 140 offline tests
 - [x] Flow diagram (`docs/flow.html`)
 - [x] DevOS + brain documentation
 
@@ -79,6 +80,7 @@
 - [x] Mirror the repository on Oracle.
 - [x] Add dynamic class/stage capability registry.
 - [x] Add protected read-only job API and aggregate progress events.
+- [x] Add Full Read Snapshot capability and all-stage Excel export.
 - [x] Add one-time secure runtime UDISE session entry.
 - [x] Keep all write stages locked in the control API.
 - [x] Add Vercel Next.js GUI source and pass a production build.
@@ -91,5 +93,7 @@
 - [ ] Connect/deploy the Vercel project and set encrypted environment values.
 - [ ] Add proactive WhatsApp progress push from job events.
 - [ ] Add dedicated preview/approval workflow before enabling each write stage.
+- [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
+      inspect workbook sheet/row counts before marking it `LIVE_READ`.
 - [ ] Replace Cookie-header entry with direct username/password/CAPTCHA login
       when the live portal login contract is implemented.

@@ -15,9 +15,9 @@ CAPABILITIES = {
             "description": "Export current student roster.",
         },
         {
-            "id": "completion", "label": "Completion Overview", "mode": "read",
-            "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
-            "description": "Read GP/EP/FP/final completion status.",
+            "id": "snapshot", "label": "Full Read Snapshot", "mode": "read",
+            "classes": ["IX", "X", "XI", "XII"], "requires_class": False,
+            "description": "Download Students, GP, EP, Facility, Completion and Issues in one Excel workbook.",
         },
         {
             "id": "gp", "label": "General Profile", "mode": "write",
@@ -33,6 +33,11 @@ CAPABILITIES = {
             "id": "facility", "label": "Facility Profile", "mode": "write",
             "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
             "description": "Preview blank-only Facility Profile changes.",
+        },
+        {
+            "id": "completion", "label": "Completion Overview", "mode": "read",
+            "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
+            "description": "Read GP/EP/FP/final completion status.",
         },
         {
             "id": "finalize", "label": "Complete Data", "mode": "write",

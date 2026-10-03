@@ -7,6 +7,7 @@ Last verified: **2026-10-03**. Portal **v3.2.0**.
 | Component | Command | Status |
 |---|---|---|
 | Roster export | `students` | `LIVE_READ` — 208 students |
+| Full read snapshot | `snapshot` | `OFFLINE_TESTED` — deployment/live read pending |
 | Completion overview | `completion` | `LIVE_READ` |
 | General Profile | `gp` | `LIVE_READ` — **complete for all 208**, rules implemented + tested |
 | Enrolment Profile | `ep` | `LIVE_SAVE` — Class IX 33/33 |
@@ -90,14 +91,15 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 
 - Oracle control API is implemented and running from the mirrored repository.
 - Dynamic capabilities expose IX/X/XI/XII and all known stages.
-- Read-only API execution is enabled only for Student Roster and Completion.
+- Read-only API execution is enabled for Student Roster, Full Read Snapshot,
+  and Completion.
 - GP/EP/Facility/Finalize job creation is rejected until write approval exists.
 - Secure one-time UDISE session entry is implemented; Cookie material is kept
   in the user runtime directory rather than durable project state.
 - Public HTTPS reachability for the dedicated control API has been verified.
 - Vercel Next.js UI source builds successfully in production mode.
 - Hermes udise-control skill and local control client are installed.
-- Offline baseline is 137/137.
+- Offline baseline is 140/140.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
 
 ## Private GUI trial — 2026-10-03
@@ -108,3 +110,13 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Smoke evidence: UI login 200, dynamic capabilities, one-time secure session
   link/form, and a GP job request rejected with `409`.
 - No Cookie was entered and no portal job or write ran.
+
+## Full read snapshot — 2026-10-03
+
+- `snapshot` performs GP, EP, and Facility GETs for every roster student and
+  derives the Completion sheet from the fresh GP read.
+- The workbook contains Students, GP, EP, Facility, Completion, and Issues
+  sheets. Aadhaar-like values are masked; secret-like fields are redacted.
+- The control API and WhatsApp capability flow expose the stage as read-only.
+- Live Oracle deployment and authenticated portal execution remain to be
+  verified; do not promote this line to `LIVE_READ` without that evidence.

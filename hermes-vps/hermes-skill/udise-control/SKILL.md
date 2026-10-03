@@ -21,7 +21,7 @@ Use this skill for natural-language UDISE requests on WhatsApp or Telegram.
   class choices. The API response is authoritative; do not maintain a second
   support matrix in chat instructions.
 - Treat a clear request as approval for read-only work.
-- Current executable MVP stages are students and completion.
+- Current executable read-only stages are students, snapshot, and completion.
 - Show GP, EP, Facility, and Finalize as known stages, but do not execute writes yet.
 - If a finite input is missing, use the normal structured-input/poll behavior.
 - Do not ask for values already present in the request.
@@ -50,6 +50,7 @@ Examples:
 - `Class X completion dekho` → use Phase 5 completion for Class X; do not ask
   for stage or class again.
 - `UDISE roster bhejo` → use Phase 1 roster; do not ask for class.
+- `Sabhi stages ka Excel bhejo` → run the read-only snapshot; do not ask for class.
 - `Facility Class IX chalao` → report that Phase 4 Facility is locked; do not
   bypass the API.
 - `UDISE ka kaam karo` → fetch capabilities, then poll for the available stage;
@@ -76,6 +77,9 @@ Student roster:
 Completion:
 ~/.local/bin/udise-control-client run --session SESSION --school SCHOOL --stage completion --class CLASS
 
+Full read snapshot (all roster students, no class prompt):
+~/.local/bin/udise-control-client run --session SESSION --school SCHOOL --stage snapshot
+
 Then:
 ~/.local/bin/udise-control-client status JOB
 
@@ -83,6 +87,7 @@ Use human progress such as:
 - UDISE session connected.
 - Roster loaded: 208 students.
 - Completion status: 12/38 students checked.
+- Full snapshot: 80/208 students checked.
 - Report ready.
 
 Do not repeat PEN/name-level raw progress in chat.

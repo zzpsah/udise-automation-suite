@@ -215,6 +215,18 @@ class UdiseSession:
             raise RuntimeError(f"No usable student data for id {student_id}")
         return data
 
+    def enrolment_detail(self, student_id: str) -> dict:
+        """Fresh read of one student's Enrollment Profile record."""
+        body = self.get_json(f"/p0/api/v2/students/enrolment/{student_id}")
+        data = body.get("data")
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Enrollment record unavailable for {student_id}")
+        if data.get("schoolId") is not None and str(data.get("schoolId")) != str(self.school_id):
+            raise ValueError("Enrollment record school identity mismatch")
+        if data.get("studentId") is not None and str(data.get("studentId")) != str(student_id):
+            raise ValueError("Enrollment record student identity mismatch")
+        return data
+
     def facility_detail(self, student_id: str) -> dict:
         """Fresh read of one student's Facility record."""
         body = self.get_json(f"/p0/api/v2/students/facility/{student_id}")

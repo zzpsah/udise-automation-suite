@@ -27,6 +27,9 @@ udise-vps students --school <id>
 # completion overview workbook
 udise-vps completion --school <id> --class IX
 
+# all students: Students, GP, EP, Facility, Completion and Issues sheets
+udise-vps snapshot --school <id>
+
 # preview EP changes — sends nothing
 udise-vps ep --school <id> --class IX
 

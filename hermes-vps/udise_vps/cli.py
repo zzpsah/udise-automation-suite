@@ -6,6 +6,7 @@ no browser and no Colab runtime.
 
     export UDISE_COOKIE_HEADER='JSESSIONID=...; XSRF-TOKEN=...'
     udise-vps students    --school <URL-or-7-digit-ID>
+    udise-vps snapshot    --school <id>                     # all-stage read Excel
     udise-vps completion  --school <id> --class IX
     udise-vps gp          --school <id> --class IX            # preview
     udise-vps gp          --school <id> --class IX --submit   # one write
@@ -26,7 +27,7 @@ from . import completion as completion_mod
 from . import ep as ep_mod
 from . import facility as facility_mod
 from . import finalize as finalize_mod
-from . import general_profile, students
+from . import general_profile, snapshot as snapshot_mod, students
 from .constants import CLASS_SCOPES
 from .session import AuthError, UdiseSession, connect, cookie_from_environment
 
@@ -81,6 +82,16 @@ def cmd_completion(args) -> int:
     out = _output_dir(args)
     path = out / completion_mod.default_filename(session.school_id, args.klass)
     completion_mod.write_completion_workbook(report, str(path))
+    print(f"REPORT_READY={path.resolve()}")
+    return 0
+
+
+def cmd_snapshot(args) -> int:
+    session = _login(args)
+    snapshot = snapshot_mod.collect_snapshot(session)
+    out = _output_dir(args)
+    path = out / snapshot_mod.default_filename(session.school_id)
+    snapshot_mod.write_snapshot_workbook(snapshot, str(path))
     print(f"REPORT_READY={path.resolve()}")
     return 0
 
@@ -213,6 +224,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--class", "-c", dest="klass", default="IX",
                    choices=list(CLASS_SCOPES))
     p.set_defaults(func=cmd_completion)
+
+    p = sub.add_parser("snapshot", help="Full GP/EP/Facility read snapshot workbook")
+    _add_common(p)
+    p.set_defaults(func=cmd_snapshot)
 
     p = sub.add_parser("gp", help="AUTO General Profile blank defaults")
     _add_common(p)

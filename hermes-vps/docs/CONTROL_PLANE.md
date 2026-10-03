@@ -26,6 +26,7 @@ GET /api/v1/capabilities is the source of truth for GUI and messaging choices.
 Current stage registry:
 
 - students: read-only, executable in MVP
+- snapshot: read-only, executable; combined all-student stage workbook
 - completion: read-only, executable in MVP
 - gp: known write stage, visible but execution locked
 - ep: known write stage, visible but execution locked
