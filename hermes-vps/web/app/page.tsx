@@ -232,10 +232,10 @@ export default function Page(){
               <span className="stage-copy"><strong>{s.label}</strong><small>{meta.short}</small></span>
               <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Review + Save":"Ready"}</span>
             </button>})}
-            <button type="button" className="choice ready source-choice" onClick={()=>setStage("ep")}>
+            <button type="button" aria-pressed={stage==="ep"} className={"choice ready source-choice "+(stage==="ep"?"active":"")} onClick={()=>setStage("ep")}>
               <span className="stage-icon" aria-hidden="true">SRC</span>
-              <span className="stage-copy"><strong>eShikshaKosh Report</strong><small>Download, upload, or connect the read-only source for EP</small></span>
-              <span className="badge ok">Source</span>
+              <span className="stage-copy"><strong>eShikshaKosh Report</strong><small>Open download, upload, or secure connection controls</small></span>
+              <span className="badge ok">Open</span>
             </button>
           </div>
 
@@ -266,7 +266,6 @@ export default function Page(){
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           <ul className="events">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
-          {job.job.has_result&&job.job.stage==="ep"&&<a className="download source-download" href={"/api/jobs/"+job.job.id+"/eshiksha-report"}>Download eShikshaKosh source report</a>}
           {canApprove&&<div className="approval-box">
             <strong>Approve portal save</strong>
             <span>Review the workbook first. Saved values stay unchanged; processing stops on an unconfirmed read-back.</span>
