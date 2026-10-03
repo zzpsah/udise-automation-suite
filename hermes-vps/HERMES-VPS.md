@@ -14,7 +14,7 @@ no notebook, no browser UI. It runs on a server and is driven from the shell.
 | Path | What it is |
 |---|---|
 | `udise_vps/` | The package — all portal logic |
-| `tests/` | Offline test suites (138 tests, no network) |
+| `tests/` | Offline test suites (144 tests, no network) |
 | `tools/` | One-off operational scripts (previews, batch writers, probes) |
 | `brain/` | Working notes — handoff, architecture, decisions, security |
 | `docs/flow.html` | Flow diagram |

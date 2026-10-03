@@ -59,3 +59,5 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 - A synthetic control-plane test verifies preview job creation, progress,
   workbook output, and rejection of non-preview write-stage requests without
   using portal credentials or network access.
+- Class scope is selected before workflow selection; unsupported class/stage
+  combinations are visibly unavailable and never rewrite the selected class.

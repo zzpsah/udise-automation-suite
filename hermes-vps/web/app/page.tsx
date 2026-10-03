@@ -62,7 +62,7 @@ export default function Page(){
   const readyCount=caps?.stages.filter(x=>x.mode==="read").length||0;
   const previewCount=caps?.stages.filter(x=>x.mode==="write"&&x.preview_enabled).length||0;
   useEffect(()=>{
-    if(selected?.requires_class && !selected.classes.includes(klass)) setKlass(selected.classes[0]||"");
+    if(selected?.requires_class && !selected.classes.includes(klass)) setStage("completion");
   },[selected,klass]);
 
   async function connectSession(){
@@ -108,6 +108,7 @@ export default function Page(){
   async function startJob(){
     if(!sessionId){setMsg("Connect a secure UDISE session first.");return}
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
+    if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
     if(selected?.id==="ep"&&!eshikshaReady){await connectEshiksha();return}
     setMsg("Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
@@ -150,14 +151,22 @@ export default function Page(){
           </div>
         </section>
 
+        <section className="card scope-card">
+          <div className="section-heading"><div className="section-title"><span className="step">2</span><div><h2>Select class</h2><p>Phase 2 · Class scope for all profile operations</p></div></div><span className="stage-count">Class {klass}</span></div>
+          <div className="class-grid" role="group" aria-label="Operation class">
+            {caps?.classes.map(c=><button type="button" aria-pressed={klass===c.id} key={c.id} className={"class-choice "+(klass===c.id?"active":"")} onClick={()=>setKlass(c.id)}>{c.label}</button>)}
+          </div>
+        </section>
+
         <section className="card stage-card">
-          <div className="section-heading"><div className="section-title"><span className="step">2</span><div><h2>Choose workflow</h2><p>Phases 1–5 · Preview before any change</p></div></div><span className="stage-count">{readyCount+previewCount} workflows</span></div>
+          <div className="section-heading"><div className="section-title"><span className="step">3</span><div><h2>Choose workflow</h2><p>Available operations for Class {klass}</p></div></div><span className="stage-count">{readyCount+previewCount} workflows</span></div>
           <div className="grid">{caps?.stages.map(s=>{
             const meta=STAGE_META[s.id]||{icon:"--",short:s.description,fills:[]};
-            return <button type="button" aria-pressed={stage===s.id} key={s.id} className={"choice "+(stage===s.id?"active ":"")+(s.mode==="write"?"previewable":"ready")} onClick={()=>setStage(s.id)}>
+            const unavailable=s.requires_class&&!s.classes.includes(klass);
+            return <button type="button" aria-pressed={stage===s.id} disabled={unavailable} key={s.id} className={"choice "+(stage===s.id?"active ":"")+(s.mode==="write"?"previewable":"ready")} onClick={()=>setStage(s.id)}>
               <span className="stage-icon" aria-hidden="true">{meta.icon}</span>
               <span className="stage-copy"><strong>{s.label}</strong><small>{meta.short}</small></span>
-              <span className={"badge "+(s.mode==="write"?"preview":"ok")}>{s.mode==="write"?"Preview":"Ready"}</span>
+              <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Preview":"Ready"}</span>
             </button>})}</div>
 
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
@@ -168,10 +177,7 @@ export default function Page(){
           </div>}
 
           <div className="run-row">
-            {selected?.requires_class&&<div className="class-picker"><label>Class</label><select value={klass} onChange={e=>setKlass(e.target.value)}>
-              {selected.classes.map(c=><option value={c} key={c}>{caps?.classes.find(x=>x.id===c)?.label||c}</option>)}
-            </select></div>}
-            <button className="run-button" disabled={selected?.mode==="write"&&!selected.preview_enabled} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady?"Connect eShikshaKosh":selected?.mode==="write"?"Generate preview":"Run report"}</button>
+            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady?"Connect eShikshaKosh":selected?.mode==="write"?"Generate preview":"Run report"}</button>
           </div>
         </section>
       </div>

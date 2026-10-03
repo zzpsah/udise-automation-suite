@@ -17,7 +17,7 @@
 - [x] `None/Not Studying` auto rule for invalid exam results
 - [x] Facility blank-detection for the `0` and `9` sentinels
 - [x] Distance 4.3.6 randomised between 1–3 km and 3–5 km
-- [x] 142 offline tests
+- [x] 144 offline tests
 - [x] Flow diagram (`docs/flow.html`)
 - [x] **GP write verified** after fixing the payload shape
 - [x] DevOS + brain documentation
@@ -97,6 +97,8 @@
 - [x] Expire preview/source files after 24 hours.
 - [x] Align the private GUI's formal English labels with the Hermes VPS flow
       and add a synthetic preview-lifecycle/write-lock integration test.
+- [x] Move class scope above workflow selection and disable unsupported stages
+      without changing the selected class.
 - [ ] Add the explicit approval endpoint and per-run write cap before enabling
       any GUI or WhatsApp save action.
 - [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and

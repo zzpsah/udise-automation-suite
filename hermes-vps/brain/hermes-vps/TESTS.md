@@ -7,7 +7,7 @@ cd hermes-vps
 ./run_tests.sh
 ```
 
-138 tests, **no network and no credentials required**. Runs in about two
+144 tests, **no network and no credentials required**. Runs in about two
 seconds. Individual suites:
 
 ```bash

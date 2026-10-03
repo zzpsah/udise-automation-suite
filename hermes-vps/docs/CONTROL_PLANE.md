@@ -104,6 +104,23 @@ The GUI follows `docs/flow.html`: Phase 1 session/roster, Phase 2 class scope,
 Phase 3 GP, Phase 4 EP/Facility, and Phase 5 completion/finalize. These labels
 are operator guidance only and do not make a write stage executable.
 
+Class scope is selected before the workflow. A stage that does not support the
+selected class is shown as unavailable; the GUI never changes the operator's
+class selection to make a stage fit.
+
+## Browser session bridge
+
+A bookmarklet is not a reliable session bridge. Page JavaScript cannot read an
+`HttpOnly` session cookie and cannot forward another origin's authenticated
+cookie automatically. The current one-time secure Cookie-header form remains
+the cross-device fallback.
+
+A future desktop Chrome/Edge extension may use the browser Cookies API after a
+user click and explicit host permission for the UDISE and private Oracle
+domains. It must send the cookie only to a newly created short-lived Oracle
+session request and must never log or persist the value. Mobile Chrome does not
+support this extension path, so it does not replace the secure form on phones.
+
 ## Hermes
 
 Source skill: hermes-vps/hermes-skill/udise-control/SKILL.md

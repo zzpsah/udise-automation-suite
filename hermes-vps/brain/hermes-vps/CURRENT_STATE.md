@@ -112,7 +112,7 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Public HTTPS reachability for the dedicated control API has been verified.
 - Vercel Next.js UI source builds successfully in production mode.
 - Hermes udise-control skill and local control client are installed.
-- Offline baseline is 143/143, including the synthetic control-plane preview
+- Offline baseline is 144/144, including the synthetic control-plane preview
   lifecycle and write-lock test.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
 
@@ -155,3 +155,6 @@ python3 -m udise_vps.cli completion --school <id> --class IX
   the secure link and never the password.
 - Web copy is formal English and follows the same Phase 1–5 descriptions and
   stage restrictions as `docs/flow.html`, capabilities, and the Hermes skill.
+- Class scope is selected before workflow selection. The selected class is
+  preserved, and unsupported stages are disabled rather than silently changing
+  the operator's class choice.

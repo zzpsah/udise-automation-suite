@@ -33,7 +33,7 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 143 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 28 GP + 2 snapshot + 2 preview-report), no network required.
+**Test suite: 144 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 28 GP + 2 snapshot + 2 preview-report + 1 synthetic control-plane), no network required.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -233,7 +233,7 @@ they are guards, not corrections.
 | `udise_vps/esk.py` | eShikshaKosh OTR report — your export, or a live fetch |
 | `udise_vps/students.py` | Roster export |
 | `udise_vps/completion.py` | Completion overview workbook |
-| `tests/` | Offline suites — 138 tests, no network |
+| `tests/` | Offline suites — 144 tests, no network |
 | `tools/` | One-off operational scripts |
 | `brain/` | Working context — handoff, architecture, decisions, security |
 
