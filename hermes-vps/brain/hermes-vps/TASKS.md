@@ -35,6 +35,24 @@
       this Board and Class. Admission numbers and streams are resolved (62/62)
       and will apply once it is enabled. **Re-check periodically; do not loop.**
 
+## Found 3 Oct 2026 — needs a decision
+
+- [ ] **GP POST returns INTERNAL_SERVER_ERROR.** A trial write re-sending
+      unchanged values failed on all 5 students with
+      `{"type":"INTERNAL_SERVER_ERROR","errorId":"..."}` at HTTP 200. The
+      payload carries 14 fields; the record has ~70. Some omitted field is
+      likely required. Diagnose by diffing the record against the payload and
+      posting the full record. **GP write is therefore NOT live-verified** —
+      only the read path and payload construction are.
+- [ ] **The portal's own "download all students" export.** The SPA exposes a
+      Download button that returns every UDISE field including APAAR ID.
+      Candidate routes all return a 200 with an INTERNAL_SERVER_ERROR body, so
+      the real endpoint has not been found yet. Needs discovery from the
+      browser Network tab while clicking Download.
+- [ ] **APAAR ID is not in our roster export.** `students.py` has a
+      `get_apaar_id()` helper but the field never appears in the GP record we
+      read, so it always writes N/A. Find where the portal stores it.
+
 ## Backlog
 
 - [ ] General Profile write path — port AUTO GP, but only after live discovery.
