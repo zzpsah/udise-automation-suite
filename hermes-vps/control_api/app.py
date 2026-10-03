@@ -22,7 +22,8 @@ from .capabilities import get_capabilities
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE = Path(os.environ.get("UDISE_CONTROL_STATE", Path.home() / ".hermes/state/udise-control"))
-RUNTIME = Path(os.environ.get("UDISE_CONTROL_RUNTIME", Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "udise-control"))
+_runtime_uid = getattr(os, "getuid", os.getpid)()
+RUNTIME = Path(os.environ.get("UDISE_CONTROL_RUNTIME", Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{_runtime_uid}")) / "udise-control"))
 JOBS = STATE / "jobs"
 SESSIONS = RUNTIME / "sessions"
 REQUESTS = RUNTIME / "session-requests"
@@ -77,8 +78,8 @@ def _db() -> sqlite3.Connection:
     return conn
 
 
-with _db():
-    pass
+_startup_connection = _db()
+_startup_connection.close()
 
 
 def _control_token() -> str:
@@ -204,11 +205,11 @@ textarea{{width:100%;box-sizing:border-box;min-height:150px;padding:12px;border:
 button{{width:100%;padding:13px;margin-top:14px;border:0;border-radius:10px;background:#111;color:white;font-size:16px}}
 small{{color:#666}}</style></head><body><div class="card">
 <h2>UDISE Secure Session</h2>
-<p>Browser Network tab se UDISE Cookie header yahan paste karein. Ye Vercel/WhatsApp chat me nahi jayega.</p>
+<p>Paste the UDISE Cookie header from your browser's Network panel. It is stored only in protected Oracle runtime storage and is never sent through chat.</p>
 <form method="post" action="/session/{html.escape(token)}">
 <textarea name="cookie" autocomplete="off" required placeholder="JSESSIONID=...; XSRF-TOKEN=..."></textarea>
 <button type="submit">Save temporary session</button></form>
-<p><small>Session server par protected temporary storage me rahega aur expire ho jayega.</small></p>
+<p><small>The temporary session is protected on the server and expires automatically.</small></p>
 </div></body></html>""")
 
 
@@ -233,7 +234,7 @@ async def session_submit(token: str, request: Request):
     _json_write(p, data)
     return HTMLResponse("""<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="font-family:system-ui;max-width:560px;margin:50px auto;padding:20px">
-<h2>✅ Session saved</h2><p>Ab UDISE automation screen/WhatsApp par wapas ja sakte hain.</p></body></html>""")
+<h2>Session connected</h2><p>You may now return to the UDISE console or WhatsApp workflow.</p></body></html>""")
 
 
 @app.post("/api/v1/eshiksha-requests")
@@ -279,13 +280,13 @@ body{{font-family:system-ui;max-width:620px;margin:24px auto;padding:0 18px;back
 input{{width:100%;box-sizing:border-box;padding:12px;margin:5px 0 11px;border:1px solid #bbb;border-radius:10px;font-size:16px}}
 label{{font-weight:650;font-size:13px}}button{{width:100%;padding:13px;border:0;border-radius:10px;background:#111;color:white;font-size:16px}}
 small{{color:#666}}</style></head><body><div class="card"><h2>eShikshaKosh Secure Login</h2>
-<p>Read-only OTR report fetch ke liye details enter karein.</p>
+<p>Enter the details required to fetch the read-only OTR source report.</p>
 <form method="post" action="/eshiksha/{html.escape(token)}">
 <label>UDISE code / username</label><input name="udise" autocomplete="username" required>
 <label>Password</label><input name="password" type="password" autocomplete="current-password" required>
 <label>Academic year</label><input name="year" value="2026-27" required>
 <button type="submit">Use once for preview</button></form>
-<p><small>Password EP preview start hote hi temporary storage se delete ho jayega.</small></p>
+<p><small>The password is deleted from temporary storage as soon as the EP preview starts.</small></p>
 </div></body></html>""")
 
 
@@ -312,7 +313,7 @@ async def eshiksha_submit(token: str, request: Request):
     _json_write(p, data)
     return HTMLResponse("""<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="font-family:system-ui;max-width:560px;margin:50px auto;padding:20px;text-align:center">
-<h2>✅ eShikshaKosh ready</h2><p>Is box ko band karke EP Preview Excel chala sakte hain.</p></body></html>""")
+<h2>eShikshaKosh connected</h2><p>Close this panel and generate the EP preview workbook.</p></body></html>""")
 
 
 def _load_eshiksha_credentials() -> dict:

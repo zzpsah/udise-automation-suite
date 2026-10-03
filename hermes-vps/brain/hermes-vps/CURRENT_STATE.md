@@ -99,7 +99,8 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Public HTTPS reachability for the dedicated control API has been verified.
 - Vercel Next.js UI source builds successfully in production mode.
 - Hermes udise-control skill and local control client are installed.
-- Offline baseline is 142/142.
+- Offline baseline is 143/143, including the synthetic control-plane preview
+  lifecycle and write-lock test.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
 
 ## Private GUI trial — 2026-10-03
@@ -139,3 +140,5 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - eShikshaKosh credentials use a separate inline one-time Oracle form. The
   password file is consumed/deleted when EP preview starts; WhatsApp gets only
   the secure link and never the password.
+- Web copy is formal English and follows the same Phase 1–5 descriptions and
+  stage restrictions as `docs/flow.html`, capabilities, and the Hermes skill.

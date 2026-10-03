@@ -97,6 +97,8 @@
 - [x] Embed masked eShikshaKosh source data in the EP preview workbook.
 - [x] Add one-time inline eShikshaKosh credential entry for GUI and WhatsApp.
 - [x] Expire preview/source files after 24 hours.
+- [x] Align the private GUI's formal English labels with the Hermes VPS flow
+      and add a synthetic preview-lifecycle/write-lock integration test.
 - [ ] Add the explicit approval endpoint and per-run write cap before enabling
       any GUI or WhatsApp save action.
 - [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and

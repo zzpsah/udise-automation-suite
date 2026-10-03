@@ -54,3 +54,8 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
   session form is separately tailnet-only on port `10000`.
 - The former public Funnel was removed. No UDISE portal write stage is enabled.
 - GUI metadata follows the five phases in `hermes-vps/docs/flow.html`.
+- The GUI uses formal English operational copy derived from the Hermes VPS flow
+  and capability matrix; decorative labels and notebook references are absent.
+- A synthetic control-plane test verifies preview job creation, progress,
+  workbook output, and rejection of non-preview write-stage requests without
+  using portal credentials or network access.

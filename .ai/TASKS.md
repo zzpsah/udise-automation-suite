@@ -16,3 +16,5 @@
 - Private Oracle/Tailscale GUI trial: production build, user service, Hermes
   VPS runner-reference metadata, secure session-link smoke check, and locked
   write-stage check.
+- Professional English GUI aligned with the five-phase Hermes VPS flow, plus a
+  synthetic preview-lifecycle and write-lock integration test.

@@ -19,12 +19,16 @@ Never promote one to another. `HTTP 200` is not `LIVE_SAVE`.
 
 ## Layer 1 — offline (automated, always run)
 
-`./run_tests.sh` — 137 tests, no network, no credentials, ~2s.
+`./run_tests.sh` — offline suites, no network and no real credentials.
 
 Covers: cross-portal matching and its scoring, admission-number priority and
 parsing, language plans, exam-result validity, the status-4 null rule, sentinel
 normalisation, stream direction, Facility blank-detection and ranges,
 eShikshaKosh credential and export handling.
+
+The synthetic control-plane suite also exercises the complete preview job
+lifecycle with a mocked runner: capabilities, session use, progress polling,
+Excel result creation, and rejection of a non-preview write-stage request.
 
 A bug fixed here gets a named regression test whose docstring says what it cost.
 That comment is what stops it coming back.
