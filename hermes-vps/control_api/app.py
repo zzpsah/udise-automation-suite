@@ -677,24 +677,49 @@ def eshiksha_report_result(job_id: str, authorization: str | None = Header(defau
     return FileResponse(reports[-1], filename=reports[-1].name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 @app.get("/api/v1/ep-template")
-def ep_template(class_name: str = "IX", authorization: str | None = Header(default=None)):
+def ep_template(class_name: str = "IX", session_id: str | None = None, school: str = "school", authorization: str | None = Header(default=None)):
     """Return a blank, human-editable EP workbook for an offline source upload."""
     require_api(authorization)
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
     from openpyxl.styles import Font, PatternFill
     from tempfile import NamedTemporaryFile
     safe_class = re.sub(r"[^A-Za-z0-9_-]", "", class_name.upper()) or "IX"
+    # If a live UDISE session is supplied, seed the template with the selected
+    # class roster. Without it, retain the useful blank template fallback.
+    roster = []
+    if session_id:
+        session = _load_session(session_id)
+        import tempfile, subprocess
+        with tempfile.TemporaryDirectory() as td:
+            env = os.environ.copy(); env["UDISE_COOKIE_HEADER"] = session["cookie"]
+            proc = subprocess.run([str(RUNNER), "students", "--school", school, "--out", td], cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=900)
+            if proc.returncode != 0:
+                raise HTTPException(502, "Could not load the current UDISE roster for the template")
+            files = sorted(Path(td).glob("*.xlsx"))
+            if files:
+                source = load_workbook(files[-1], read_only=True, data_only=True)
+                sheet = source.active
+                headers = [str(c.value or "") for c in next(sheet.iter_rows(min_row=1, max_row=1))]
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    item = dict(zip(headers, row))
+                    if str(item.get("Class", "")).strip().upper() in {safe_class, {"IX":"9","X":"10","XI":"11","XII":"12"}.get(safe_class, safe_class)}:
+                        roster.append(item)
+                source.close()
     wb = Workbook()
     ws = wb.active
     ws.title = "Enrollment Profile"
     headers = ["Student Name", "PEN", "Roll No.", "Admission No.", "Stream", "Subject 1", "Subject 2", "Subject 3", "Subject 4", "Subject 5", "Subject 6"]
     ws.append(headers)
-    ws.append(["", "", "", "", "", "", "", "", "", "", ""])
+    if roster:
+        for item in roster:
+            ws.append([item.get("Student Name", ""), item.get("PEN Number", ""), "", "", "", "", "", "", "", "", ""])
+    else:
+        ws.append(["", "", "", "", "", "", "", "", "", "", ""])
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="1E3A8A")
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = "A1:K2"
+    ws.auto_filter.ref = f"A1:K{max(2, len(roster) + 1)}"
     widths = [28, 16, 12, 16, 16, 18, 18, 18, 18, 18, 18]
     for i, width in enumerate(widths, 1):
         ws.column_dimensions[chr(64 + i)].width = width
