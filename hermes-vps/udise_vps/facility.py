@@ -105,6 +105,7 @@ class FacilityResult:
     status: str
     detail: str = ""
     changes: list = field(default_factory=list)
+    proposed: dict = field(default_factory=dict)
 
     @property
     def confirmed(self) -> bool:
@@ -266,6 +267,7 @@ def run_facility(
             continue
 
         result.changes = sorted(updates)
+        result.proposed = dict(updates)
         payload = build_facility_payload(session.school_id, current, updates, cwsn)
 
         if not allow_submit:

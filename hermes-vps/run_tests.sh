@@ -8,7 +8,7 @@ PY="${PY:-python3}"
 command -v "$PY" >/dev/null 2>&1 || PY=python
 
 fail=0
-for suite in tests/test_offline.py tests/test_ep_facility.py tests/test_esk.py tests/test_facility.py tests/test_general_profile.py tests/test_snapshot.py; do
+for suite in tests/test_offline.py tests/test_ep_facility.py tests/test_esk.py tests/test_facility.py tests/test_general_profile.py tests/test_snapshot.py tests/test_preview_report.py; do
     printf '%-30s ' "$suite"
     if out=$("$PY" "$suite" 2>&1); then
         echo "$out" | tail -1

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import subprocess
 import threading
@@ -30,6 +31,7 @@ CONTROL_TOKEN_FILE = Path(os.environ.get("UDISE_CONTROL_TOKEN_FILE", Path.home()
 RUNNER = Path(os.environ.get("UDISE_VPS_RUNNER", Path.home() / ".local/bin/udise-vps"))
 SESSION_TTL = 8 * 60 * 60
 REQUEST_TTL = 10 * 60
+RESULT_TTL = 24 * 60 * 60
 
 for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS):
     p.mkdir(parents=True, exist_ok=True)
@@ -267,6 +269,29 @@ def _update_progress(job_id: str, current: int | None, total: int | None) -> Non
                      (current, total, int(time.time()), job_id))
 
 
+def _cleanup_expired_results() -> None:
+    """Remove private job files after 24 hours while retaining job audit rows."""
+    cutoff = int(time.time()) - RESULT_TTL
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT id FROM jobs WHERE updated_at<? AND status IN ('completed','failed')",
+            (cutoff,),
+        ).fetchall()
+        for row in rows:
+            job_id = str(row["id"])
+            if not re.fullmatch(r"[a-f0-9]{32}", job_id):
+                continue
+            directory = (JOBS / job_id).resolve()
+            if directory.parent != JOBS.resolve():
+                continue
+            if directory.is_dir():
+                shutil.rmtree(directory)
+            conn.execute(
+                "UPDATE jobs SET result_path=NULL,message=? WHERE id=?",
+                ("Temporary result expired after 24 hours", job_id),
+            )
+
+
 def _run_job(job_id: str) -> None:
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -281,6 +306,14 @@ def _run_job(job_id: str) -> None:
         cmd = [str(RUNNER), stage, "--school", row["school"], "--out", str(out_dir)]
         if stage == "completion":
             cmd += ["--class", row["class_name"]]
+        elif stage == "gp":
+            cmd += ["--class", row["class_name"], "--run-mode", "All students"]
+        elif stage == "ep":
+            cmd += ["--class", row["class_name"], "--fetch-report"]
+        elif stage == "facility":
+            cmd += ["--class", row["class_name"]]
+        elif stage == "finalize":
+            cmd += ["--class", row["class_name"], "--from-completion"]
         elif stage not in {"students", "snapshot"}:
             raise RuntimeError("This stage is not enabled in the read-only MVP")
 
@@ -329,13 +362,14 @@ def _run_job(job_id: str) -> None:
 @app.post("/api/v1/jobs")
 def create_job(body: JobIn, authorization: str | None = Header(default=None)) -> dict:
     require_api(authorization)
+    _cleanup_expired_results()
     caps = get_capabilities()
     stages = {x["id"]: x for x in caps["stages"]}
     stage = stages.get(body.stage)
     if not stage:
         raise HTTPException(400, "Unsupported stage")
-    if stage["mode"] != "read":
-        raise HTTPException(409, "Write stages are visible but disabled in the read-only MVP")
+    if stage["mode"] != "read" and not (stage.get("preview_enabled") and body.preview):
+        raise HTTPException(409, "Actual saves require a separately approved write workflow")
     if stage.get("requires_class"):
         if not body.class_name or body.class_name not in stage["classes"]:
             raise HTTPException(400, "Select a supported class")
@@ -361,6 +395,7 @@ def _job_dict(row: sqlite3.Row) -> dict:
 @app.get("/api/v1/jobs/{job_id}")
 def get_job(job_id: str, authorization: str | None = Header(default=None)) -> dict:
     require_api(authorization)
+    _cleanup_expired_results()
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
         if not row:
@@ -372,6 +407,7 @@ def get_job(job_id: str, authorization: str | None = Header(default=None)) -> di
 @app.get("/api/v1/jobs/{job_id}/result")
 def job_result(job_id: str, authorization: str | None = Header(default=None)):
     require_api(authorization)
+    _cleanup_expired_results()
     with _db() as conn:
         row = conn.execute("SELECT result_path,status FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not row or row["status"] != "completed" or not row["result_path"]:

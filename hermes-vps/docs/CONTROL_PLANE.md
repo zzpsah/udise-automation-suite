@@ -28,12 +28,12 @@ Current stage registry:
 - students: read-only, executable in MVP
 - snapshot: read-only, executable; combined all-student stage workbook
 - completion: read-only, executable in MVP
-- gp: known write stage, visible but execution locked
-- ep: known write stage, visible but execution locked
-- facility: known write stage, visible but execution locked
-- finalize: known write stage, visible but execution locked
+- gp: preview Excel enabled; actual save locked
+- ep: preview Excel enabled with masked eShikshaKosh source; actual save locked
+- facility: preview Excel enabled; actual save locked
+- finalize: eligibility preview Excel enabled; actual finalize locked
 
-The UI must not maintain a second hard-coded class/stage matrix. Future runner
+The UI must not maintain a second hard-coded class/stage availability matrix. Future runner
 enhancements should update the capability registry and both control surfaces
 should render that result.
 
@@ -55,6 +55,10 @@ the job API.
 
 Each job has an opaque id, stage, optional class, school reference, status,
 aggregate progress counters, human-readable events, and an optional workbook.
+
+Preview workbooks and any fetched eShikshaKosh source stay in the private job
+directory for 24 hours, then the control API removes the files. Job metadata is
+retained for audit without the expired result path.
 
 Raw per-student CLI lines are not returned to the web UI. Progress is converted
 to aggregate messages such as: Completion status: 12/38 students checked.

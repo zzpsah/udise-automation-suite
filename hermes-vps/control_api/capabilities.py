@@ -22,16 +22,19 @@ CAPABILITIES = {
         {
             "id": "gp", "label": "General Profile", "mode": "write",
             "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
+            "preview_enabled": True,
             "description": "Preview blank-only GP defaults; writes remain approval-gated.",
         },
         {
             "id": "ep", "label": "Enrollment Profile", "mode": "write",
             "classes": ["IX", "X"], "requires_class": True,
+            "preview_enabled": True,
             "description": "Preview/fill Enrollment Profile. XI/XII remain blocked until portal support is verified.",
         },
         {
             "id": "facility", "label": "Facility Profile", "mode": "write",
             "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
+            "preview_enabled": True,
             "description": "Preview blank-only Facility Profile changes.",
         },
         {
@@ -42,6 +45,7 @@ CAPABILITIES = {
         {
             "id": "finalize", "label": "Complete Data", "mode": "write",
             "classes": ["IX", "X", "XI", "XII"], "requires_class": True,
+            "preview_enabled": True,
             "description": "Finalize only freshly verified eligible records.",
         },
     ],

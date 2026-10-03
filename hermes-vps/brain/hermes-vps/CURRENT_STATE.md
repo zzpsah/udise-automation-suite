@@ -99,7 +99,7 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Public HTTPS reachability for the dedicated control API has been verified.
 - Vercel Next.js UI source builds successfully in production mode.
 - Hermes udise-control skill and local control client are installed.
-- Offline baseline is 140/140.
+- Offline baseline is 142/142.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
 
 ## Private GUI trial — 2026-10-03
@@ -126,3 +126,13 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - The available runtime UDISE session was rejected by the portal with HTTP 302
   before roster loading. No student read and no write occurred. A fresh Cookie
   must be entered through the private one-time form before live snapshot proof.
+
+## Compact preview UI — 2026-10-03
+
+- The private GUI is a compact control/output workspace rather than stacked
+  cards. Session entry opens inline in a secure modal; no separate tab needed.
+- GP, EP, Facility, and Finalize tiles can run no-POST previews. Each returns
+  an Excel listing proposed values and reasons. EP also embeds a masked
+  eShikshaKosh source sheet.
+- Preview files are private and expire after 24 hours. Actual saves remain
+  locked behind a future explicit approval endpoint.

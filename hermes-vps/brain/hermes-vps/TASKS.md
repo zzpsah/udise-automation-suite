@@ -17,7 +17,7 @@
 - [x] `None/Not Studying` auto rule for invalid exam results
 - [x] Facility blank-detection for the `0` and `9` sentinels
 - [x] Distance 4.3.6 randomised between 1–3 km and 3–5 km
-- [x] 140 offline tests
+- [x] 142 offline tests
 - [x] Flow diagram (`docs/flow.html`)
 - [x] DevOS + brain documentation
 
@@ -93,6 +93,11 @@
 - [ ] Connect/deploy the Vercel project and set encrypted environment values.
 - [ ] Add proactive WhatsApp progress push from job events.
 - [ ] Add dedicated preview/approval workflow before enabling each write stage.
+- [x] Enable no-POST preview Excel for GP, EP, Facility, and Finalize.
+- [x] Embed masked eShikshaKosh source data in the EP preview workbook.
+- [x] Expire preview/source files after 24 hours.
+- [ ] Add the explicit approval endpoint and per-run write cap before enabling
+      any GUI or WhatsApp save action.
 - [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
       inspect workbook sheet/row counts before marking it `LIVE_READ`. The
       2026-10-03 attempt stopped safely at session check (HTTP 302).

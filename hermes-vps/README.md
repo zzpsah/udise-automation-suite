@@ -33,7 +33,7 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 140 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 27 GP + 2 snapshot), no network required.
+**Test suite: 142 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 27 GP + 2 snapshot + 2 preview-report), no network required.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -607,9 +607,10 @@ The verified CLI remains the execution engine. A control-plane layer under
 control_api exposes dynamic class/stage capabilities, secure runtime UDISE
 session entry, read-only jobs, aggregate progress events and protected results.
 
-The executable read-only API stages are students, snapshot, and completion. GP, EP, Facility
-and Finalize are visible in capabilities but intentionally locked until their
-dedicated preview/approval write workflows are added.
+Students, snapshot, and completion execute as read-only API stages. GP, EP,
+Facility, and Finalize execute only as no-POST preview jobs and return a
+proposed-change Excel. Actual saves remain locked until separate approval.
+Preview workbooks and temporary eShikshaKosh source files expire after 24 hours.
 
 The Vercel source is in web/. The Hermes natural-language skill and local client
 are in hermes-skill/udise-control/ and tools/control_client.py.

@@ -27,7 +27,7 @@ from . import completion as completion_mod
 from . import ep as ep_mod
 from . import facility as facility_mod
 from . import finalize as finalize_mod
-from . import general_profile, snapshot as snapshot_mod, students
+from . import general_profile, preview_report, snapshot as snapshot_mod, students
 from .constants import CLASS_SCOPES
 from .session import AuthError, UdiseSession, connect, cookie_from_environment
 
@@ -98,7 +98,7 @@ def cmd_snapshot(args) -> int:
 
 def cmd_gp(args) -> int:
     session = _login(args)
-    general_profile.run_auto_gp(
+    results = general_profile.run_auto_gp(
         session,
         class_scope_name=args.klass,
         run_mode=args.run_mode,
@@ -106,11 +106,17 @@ def cmd_gp(args) -> int:
         allow_submit=args.submit,
         max_submissions=args.max,
     )
+    if not args.submit:
+        out = _output_dir(args)
+        path = out / preview_report.default_filename("gp", session.school_id, args.klass)
+        preview_report.write_preview_workbook("gp", results, str(path))
+        print(f"REPORT_READY={path.resolve()}")
     return 0
 
 
 def cmd_ep(args) -> int:
     session = _login(args)
+    out = _output_dir(args)
 
     report_rows = None
     if args.report:
@@ -119,7 +125,8 @@ def cmd_ep(args) -> int:
     elif args.fetch_report:
         from . import esk as esk_mod
         print("🔐 Fetching eShikshaKosh OTR report ...", flush=True)
-        path = esk_mod.export_report(year=args.year)
+        source_path = out / f"eShikshaKosh_OTR_{session.school_id}_{args.year}.xlsx"
+        path = esk_mod.export_report(year=args.year, output=source_path)
         report_rows = ep_mod.read_esk_report(str(path))
         print(f"📄 Fetched and loaded {len(report_rows)} rows from {path}",
               flush=True)
@@ -147,7 +154,7 @@ def cmd_ep(args) -> int:
                         return opt
                 print("  Please enter 1, 2, 3 or s.")
 
-    ep_mod.run_ep(
+    results = ep_mod.run_ep(
         session,
         class_scope_name=args.klass,
         report_rows=report_rows,
@@ -163,12 +170,18 @@ def cmd_ep(args) -> int:
         auto_not_studying=not args.no_auto_not_studying,
         ask_stream=ask_stream,
     )
+    if not args.submit:
+        path = out / preview_report.default_filename("ep", session.school_id, args.klass)
+        preview_report.write_preview_workbook(
+            "ep", results, str(path), eshiksha_rows=report_rows,
+        )
+        print(f"REPORT_READY={path.resolve()}")
     return 0
 
 
 def cmd_facility(args) -> int:
     session = _login(args)
-    facility_mod.run_facility(
+    results = facility_mod.run_facility(
         session,
         class_scope_name=args.klass,
         limit=args.limit,
@@ -176,6 +189,11 @@ def cmd_facility(args) -> int:
         max_submissions=args.max,
         seed=args.seed,
     )
+    if not args.submit:
+        out = _output_dir(args)
+        path = out / preview_report.default_filename("facility", session.school_id, args.klass)
+        preview_report.write_preview_workbook("facility", results, str(path))
+        print(f"REPORT_READY={path.resolve()}")
     return 0
 
 
@@ -188,6 +206,12 @@ def cmd_finalize(args) -> int:
         pens = report.ready_pens
         if not pens:
             print("ℹ️ No formStatus=3 students; nothing to finalize.")
+            results = []
+            if not args.submit:
+                out = _output_dir(args)
+                path = out / preview_report.default_filename("finalize", session.school_id, args.klass)
+                preview_report.write_preview_workbook("finalize", results, str(path))
+                print(f"REPORT_READY={path.resolve()}")
             return 0
         print(f"→ Using {len(pens)} PEN(s) from Completion Overview (status 3).")
     elif args.pen:
@@ -196,11 +220,16 @@ def cmd_finalize(args) -> int:
         print("ERROR: supply --pen or --from-completion", file=sys.stderr)
         return 2
 
-    finalize_mod.finalize(
+    results = finalize_mod.finalize(
         session, pens,
         allow_finalize=args.submit,
         max_submissions=args.max,
     )
+    if not args.submit:
+        out = _output_dir(args)
+        path = out / preview_report.default_filename("finalize", session.school_id, args.klass)
+        preview_report.write_preview_workbook("finalize", results, str(path))
+        print(f"REPORT_READY={path.resolve()}")
     return 0
 
 
