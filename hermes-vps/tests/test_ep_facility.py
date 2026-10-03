@@ -536,7 +536,7 @@ def test_admission_fallback_zero_pad():
     print("PASS test_admission_fallback_zero_pad")
 
 
-def test_admission_ambiguous_match_is_manual_review():
+def test_admission_ambiguous_match_gets_temporary_review_number():
     """Two report rows matching one student must never auto-fill."""
     students = [_student(9, "AAKASH KUMAR", "PRAHLAD KUMAR RAM", "2012-03-02")]
     report = [
@@ -546,9 +546,9 @@ def test_admission_ambiguous_match_is_manual_review():
          "aadhaar": "", "admission": "11/2026"},
     ]
     decisions = ep.assign_admission_numbers(students, report)
-    assert decisions[0]["admission"] == "", decisions[0]
-    assert decisions[0]["source"] == "manual_review"
-    print("PASS test_admission_ambiguous_match_is_manual_review")
+    assert decisions[0]["source"] == "temporary_review"
+    assert decisions[0]["admission"]
+    print("PASS test_admission_ambiguous_match_gets_temporary_review_number")
 
 
 def test_admission_dob_conflict_does_not_block_exact_name_and_father():

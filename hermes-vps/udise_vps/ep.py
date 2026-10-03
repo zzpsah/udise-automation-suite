@@ -765,6 +765,7 @@ def assign_admission_numbers(
 
     results: list[dict] = []
     pending: list[int] = []
+    temporary_review: set[int] = set()
     used = {clean_text(r.get("admission")).upper() for r in usable}
 
     # Seed the per-class sequences from SAVED UDISE numbers as well as report
@@ -808,7 +809,9 @@ def assign_admission_numbers(
             continue
 
         if problem == "ambiguous":
-            results.append({"admission": "", "source": "manual_review"})
+            results.append({"admission": "", "source": "temporary_review"})
+            pending.append(index)
+            temporary_review.add(index)
             continue
 
         # No report match: fall back to the roster's roll number when present.
@@ -839,7 +842,7 @@ def assign_admission_numbers(
         used.add(admission.upper())
         grouped[class_id].append(number)
         years[class_id].append(year)
-        results[index] = {"admission": admission, "source": "next_number"}
+        results[index] = {"admission": admission, "source": "temporary_review" if index in temporary_review else "next_number"}
 
     return results
 
@@ -1018,11 +1021,12 @@ def run_ep(
         f"already filled={source_counts.get('kept_saved', 0)} | "
         f"roll-number fallback={source_counts.get('roll_number', 0)} | "
         f"not found/pending={source_counts.get('pending', 0)} | "
+        f"temporary 0001+ fallback={source_counts.get('temporary_review', 0) + source_counts.get('next_number', 0)} | "
         f"manual review={source_counts.get('manual_review', 0)}",
         flush=True,
     )
-    if source_counts.get("pending", 0) or source_counts.get("manual_review", 0):
-        print("ℹ️ Not-found or ambiguous students are left without a guessed admission number and remain in the preview workbook for manual review.", flush=True)
+    if source_counts.get("temporary_review", 0) or source_counts.get("next_number", 0):
+        print("ℹ️ Unmatched or ambiguous students receive sequential temporary numbers in the preview. Review them in Excel before approving the portal save.", flush=True)
 
     results: list[EpResult] = []
     submissions = 0

@@ -20,7 +20,7 @@ const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
   students: {icon:"P1",short:"Export the current masked roster",fills:["Read-only","Masked Aadhaar"]},
   snapshot: {icon:"RA",short:"Export a full read-only audit workbook with class-wise pending counts",fills:["Class IX / X / XI / XII student totals","GP pending: blank eligible fields by class","EP pending: admission, language and subject gaps by class","Facility pending: blank measurements and Yes/No fields by class","Completion status and Issues sheets; read-only, no portal changes"]},
   gp: {icon:"P3",short:"Blank fields only; existing values are never overwritten",fills:["4.1.12 Mother Tongue → Hindi (42) or Bhojpuri (28)","Blood Group → Under Investigation (9)","4.1.14 BPL → No (2)","4.1.15 AAY → Not Applicable (9) when BPL is No","4.1.16 EWS → No (2)","4.1.17 CWSN → No (2); existing Yes is manual review","4.1.18 Indian National → Yes (1)","4.1.19 Out-of-School-Child → No (2)"]},
-  ep: {icon:"P4",short:"Blank EP fields only; existing values are never overwritten",fills:["4.2.1 Admission No. → matched eShikshaKosh value, then Roll No. fallback","4.2.9 language pair → Urdu/HIN or Hindi/Sanskrit by minority status","Subjects 3–6 → Mathematics 401, Science 402, Social Science 404, English 612","Invalid previous-year result → None / Not Studying with null dependent fields","Class XI stream → eShikshaKosh stream when the portal permits it"]},
+  ep: {icon:"P4",short:"Blank EP fields only; existing values are never overwritten",fills:["4.2.1 Admission No. → matched eShikshaKosh value, then Roll No. fallback","No match/ambiguous → temporary 0001, 0002… sequence shown for Excel review","4.2.9 language pair → Urdu/HIN or Hindi/Sanskrit by minority status","Subjects 3–6 → Mathematics 401, Science 402, Social Science 404, English 612","Invalid previous-year result → None / Not Studying with null dependent fields","Class XI stream → eShikshaKosh stream when the portal permits it"]},
   facility: {icon:"P4",short:"Blank facility fields only; existing values are never overwritten",fills:["Height → seeded value 146–160 cm","Weight → seeded value 42–52 kg","4.3.6 Distance → seeded 1–3 km or 3–5 km","Parent education → Secondary","Blank Yes/No facility fields → No"]},
   completion: {icon:"P5",short:"Export the current stage status",fills:["GP / EP / Facility status","Pending and completed records"]},
   finalize: {icon:"P5",short:"Review records eligible for Complete Data",fills:["Fresh status 3 only","Proposed transition to status 6"]},
@@ -221,7 +221,13 @@ export default function Page(){
               <span className="stage-icon" aria-hidden="true">{meta.icon}</span>
               <span className="stage-copy"><strong>{s.label}</strong><small>{meta.short}</small></span>
               <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Review + Save":"Ready"}</span>
-            </button>})}</div>
+            </button>})}
+            <button type="button" className="choice ready source-choice" onClick={()=>setStage("ep")}>
+              <span className="stage-icon" aria-hidden="true">SRC</span>
+              <span className="stage-copy"><strong>eShikshaKosh Report</strong><small>Download, upload, or connect the read-only source for EP</small></span>
+              <span className="badge ok">Source</span>
+            </button>
+          </div>
 
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
             <div className="selected-stage-head"><span aria-hidden="true">{selectedMeta?.icon||"--"}</span><div><strong>{selected.label}</strong><small>{HERMES_FLOW_REFERENCE[selected.id]}</small></div></div>
