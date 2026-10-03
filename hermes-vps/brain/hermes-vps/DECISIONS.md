@@ -142,3 +142,15 @@ Serve on its own tailnet port. The control API Funnel is disabled.
 
 **Why.** This gives a real trial surface without exposing session entry or
 control endpoints publicly. GP, EP, Facility, and Finalize remain API-locked.
+
+## 2026-10-03 — Vercel production uses a dedicated API path
+
+**Decision.** Publish the production Vercel control surface at
+`udise-automation-suite.vercel.app` and expose only the bearer-protected Oracle
+control API through port 10000 Funnel. Keep the Oracle Next.js GUI on the
+tailnet-only port 3010.
+
+**Why.** Vercel server functions need a reachable Oracle API, while the GUI and
+session workflow should remain private. The requested `udise.vercel.app`
+hostname is already owned by another deployment and is not modified without
+access to that owning account.

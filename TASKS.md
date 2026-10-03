@@ -28,6 +28,9 @@
 - [x] Add Vercel UI source and production-build verification.
 - [x] Add Hermes messaging skill/client.
 - [x] Add test-gated future GitHub promotion timer.
-- [ ] Deploy/connect the Vercel project with encrypted environment values.
+- [x] Deploy `zzpsah/udise-automation-suite` with encrypted environment values;
+      production is `https://udise-automation-suite.vercel.app`. The requested
+      `udise.vercel.app` alias is already owned by another Vercel deployment and
+      remains a manual operator handoff.
 - [x] Add explicit preview/approval flows with typed confirmation, acknowledgement,
       a per-run write cap, one approval per preview, and fresh read-back.

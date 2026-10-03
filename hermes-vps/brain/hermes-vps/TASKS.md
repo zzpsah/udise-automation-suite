@@ -88,7 +88,9 @@
       runner references and all write stages locked.
 - [x] Align the Hermes WhatsApp skill with the same five-phase flow and dynamic
       capability-driven polls.
-- [ ] Redeploy the existing zzpsah/udise-automation-suite Vercel project from the latest hermes-vps/web build; current public deployment is functional but its frontend fingerprint is older. Keep existing encrypted environment values.
+- [x] Connect/deploy `zzpsah/udise-automation-suite` and set encrypted
+      environment values; verify production control flow. The legacy
+      `udise.vercel.app` alias remains an operator handoff.
 - [ ] Add proactive WhatsApp progress push from job events.
 - [x] Add dedicated preview/approval workflow before enabling each write stage.
 - [x] Enable no-POST preview Excel for GP, EP, Facility, and Finalize.
@@ -104,7 +106,8 @@
 - [x] Add the explicit approval endpoint and per-run write cap for GUI saves;
       typed confirmation and read-back acknowledgement are required, and a
       preview can be approved only once.
-- [x] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and verify workbook sheet/row counts, masking, and zero writes. 208/208 students; marked `LIVE_READ`.
+- [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
+      inspect workbook sheet/row counts before marking it `LIVE_READ`. The
+      2026-10-03 attempt stopped safely at session check (HTTP 302).
 - [ ] Replace Cookie-header entry with direct username/password/CAPTCHA login
       when the live portal login contract is implemented.
-- [x] Remove temporary web access-code gate; console opens directly while Oracle/session/write safeguards remain enforced.

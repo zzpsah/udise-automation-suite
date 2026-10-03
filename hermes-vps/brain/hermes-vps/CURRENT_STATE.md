@@ -122,10 +122,23 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 
 - `udise-web.service` is a production Next.js user service bound to
   `127.0.0.1:3010` and published only through Tailscale Serve.
-- The control API/session form is tailnet-only at port 10000; Funnel is off.
+- The control API is exposed through dedicated HTTPS Funnel port 10000 for the
+  Vercel server; the Oracle GUI remains tailnet-only on port 3010.
 - Smoke evidence: UI login 200, dynamic capabilities, one-time secure session
   link/form, and a GP job request rejected with `409`.
 - No Cookie was entered and no portal job or write ran.
+
+## Vercel production deployment — 2026-10-03
+
+- Project: `zzpsah/udise-automation-suite`.
+- Production URL: `https://udise-automation-suite.vercel.app/`.
+- Verified access-code login, capabilities, the predefined Tetahali school,
+  secure Oracle session-link creation, and API health. Encrypted environment
+  values are configured in Vercel.
+- `udise.vercel.app` remains assigned to an older deployment outside the current
+  account; alias reassignment is intentionally left to the operator.
+- No live UDISE write was performed. GP, EP, Facility, and Finalize still need a
+  completed preview, exact typed confirmation, bounded cap, and read-back.
 
 ## Full read snapshot — 2026-10-03
 

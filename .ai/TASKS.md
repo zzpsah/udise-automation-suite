@@ -23,3 +23,9 @@
 - Preview-bound write approval for GP, EP, Facility, and Complete Data with a
   typed phrase, explicit read-back acknowledgement, bounded writes, and no
   automatic live execution during deployment.
+
+## Deployment
+
+- [x] Deploy the production Vercel control surface with encrypted Oracle/API
+  configuration and verify login, capabilities, secure session-link creation,
+  and the preview-bound write lock.

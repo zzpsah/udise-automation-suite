@@ -1,6 +1,6 @@
 # Current State
 
-Last documented: 2026-09-27
+Last documented: 2026-10-03
 
 ## Baseline
 - Maintained notebook: `UDISE_Automation_v2.7.3_2026-09-23.ipynb`.
@@ -67,3 +67,15 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 - The desktop UDISE session bridge is implemented as a user-clicked Chrome/Edge
   extension, and eShikshaKosh export now selects its maintained Playwright
   environment instead of the UDISE runner environment.
+
+## Vercel production deployment — 2026-10-03
+
+- Project: `zzpsah/udise-automation-suite` (manual CLI deployment).
+- Production URL: `https://udise-automation-suite.vercel.app/`.
+- Verified from production: access-code login, dynamic capabilities, Tetahali
+  preset, secure one-time Oracle session-link creation, and API health.
+- Oracle control API reaches Vercel through dedicated HTTPS Funnel port `10000`;
+  the Oracle GUI on port `3010` remains tailnet-only.
+- `https://udise.vercel.app/` is assigned to another Vercel deployment and was
+  not changed or deleted; the operator can reassign it from that account later.
+- No live UDISE portal write ran during deployment; writes remain preview-bound.
