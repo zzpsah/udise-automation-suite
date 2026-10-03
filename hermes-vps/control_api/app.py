@@ -675,3 +675,52 @@ def eshiksha_report_result(job_id: str, authorization: str | None = Header(defau
     if not reports:
         raise HTTPException(404, "This EP run used an uploaded report or no source report was retained")
     return FileResponse(reports[-1], filename=reports[-1].name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+@app.get("/api/v1/ep-template")
+def ep_template(class_name: str = "IX", authorization: str | None = Header(default=None)):
+    """Return a blank, human-editable EP workbook for an offline source upload."""
+    require_api(authorization)
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from tempfile import NamedTemporaryFile
+    safe_class = re.sub(r"[^A-Za-z0-9_-]", "", class_name.upper()) or "IX"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Enrollment Profile"
+    headers = ["Student Name", "PEN", "Roll No.", "Admission No.", "Stream", "Subject 1", "Subject 2", "Subject 3", "Subject 4", "Subject 5", "Subject 6"]
+    ws.append(headers)
+    ws.append(["", "", "", "", "", "", "", "", "", "", ""])
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1E3A8A")
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = "A1:K2"
+    widths = [28, 16, 12, 16, 16, 18, 18, 18, 18, 18, 18]
+    for i, width in enumerate(widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = width
+    notes = wb.create_sheet("Instructions")
+    notes.append(["Manual Enrollment Profile template"])
+    notes.append([f"Class: {safe_class}"])
+    notes.append(["Fill only the fields you know: Roll No., Admission No., Stream and Subject 1–6."])
+    notes.append(["Existing values in UDISE remain untouched; blank fields are the only proposed updates."])
+    notes.append(["Upload this workbook in the eShikshaKosh Report tile, then review the preview before approval."])
+    notes.column_dimensions["A"].width = 110
+    for cell in notes[1]: cell.font = Font(bold=True, size=14)
+    with NamedTemporaryFile(suffix=f"-ep-{safe_class}-template.xlsx", delete=False) as tmp:
+        wb.save(tmp.name)
+        path = Path(tmp.name)
+    return FileResponse(path, filename=f"Enrollment_Profile_{safe_class}_template.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+@app.get("/api/v1/eshiksha-export")
+def eshiksha_export(class_name: str = "ALL", authorization: str | None = Header(default=None)):
+    """Run the maintained eShikshaKosh exporter without starting a UDISE job."""
+    require_api(authorization)
+    from udise_vps.esk import export_report
+    try:
+        creds = _load_eshiksha_credentials()
+        out = JOBS / f"eshiksha-download-{uuid.uuid4().hex}"
+        out.mkdir(parents=True, exist_ok=True)
+        report = export_report(udise=creds["udise"], password=creds["password"], year=creds.get("year", "2026-27"), output=out / f"eShikshaKosh_OTR_{class_name.upper()}.xlsx")
+    except Exception as exc:
+        raise HTTPException(502, str(exc)[:1200]) from exc
+    return FileResponse(report, filename=f"eShikshaKosh_OTR_{class_name.upper()}.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
