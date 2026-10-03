@@ -283,7 +283,9 @@ def eshiksha_request_status(token: str, authorization: str | None = Header(defau
     data = _json_read(p)
     if int(time.time()) > int(data.get("expires_at", 0)):
         raise HTTPException(410, "Expired")
-    return {"ready": bool(data.get("ready"))}
+    credential_available = ESK_CREDENTIAL.exists()
+    return {"ready": bool(data.get("ready")) and credential_available,
+            "credential_available": credential_available}
 
 
 @app.get("/eshiksha/{token}", response_class=HTMLResponse)
@@ -514,6 +516,11 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
         raise HTTPException(400, "Unsupported stage")
     if stage["mode"] != "read" and not (stage.get("preview_enabled") and body.preview):
         raise HTTPException(409, "Actual saves require a separately approved write workflow")
+    if body.stage == "ep" and body.preview:
+        try:
+            _load_eshiksha_credentials()
+        except RuntimeError as exc:
+            raise HTTPException(409, str(exc)) from exc
     if stage.get("requires_class"):
         if not body.class_name or body.class_name not in stage["classes"]:
             raise HTTPException(400, "Select a supported class")

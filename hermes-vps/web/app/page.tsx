@@ -96,6 +96,7 @@ export default function Page(){
 
   async function connectEshiksha(){
     setMsg("Preparing secure eShikshaKosh sign-in…");
+    setEshikshaReady(false);
     const r=await fetch("/api/eshiksha-request",{method:"POST"});
     const d=await r.json();
     if(!r.ok){setMsg(d.error||"Could not create the secure eShikshaKosh sign-in");return}
@@ -110,6 +111,7 @@ export default function Page(){
       if(!r.ok) return;
       const d=await r.json();
       if(d.ready){setEshikshaReady(true);setEshikshaUrl("");setMsg("eShikshaKosh is connected. The EP preview is ready to run.");clearInterval(t)}
+      else if(eshikshaReady){setEshikshaReady(false);setMsg("The temporary eShikshaKosh connection is no longer available. Connect again before EP preview.");clearInterval(t)}
     },2000);
     return ()=>clearInterval(t);
   },[eshikshaToken,eshikshaReady]);
@@ -151,6 +153,7 @@ export default function Page(){
       const r=await fetch("/api/jobs/"+jobId,{cache:"no-store"});
       if(!r.ok) return;
       const d=await r.json();setJob(d);
+      if(d.job.stage==="ep"&&d.job.status==="failed") setEshikshaReady(false);
       if(["completed","failed"].includes(d.job.status)) clearInterval(timer);
     };
     const timer=setInterval(poll,1800);poll();
