@@ -13,6 +13,6 @@
 - Bulk writes without explicit approval and fresh read-back.
 
 ## Completed
-- Private Oracle/Tailscale GUI trial: production build, user service,
-  notebook-reference metadata, secure session-link smoke check, and locked
+- Private Oracle/Tailscale GUI trial: production build, user service, Hermes
+  VPS runner-reference metadata, secure session-link smoke check, and locked
   write-stage check.

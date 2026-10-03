@@ -91,10 +91,10 @@ Next.js to `127.0.0.1:3010`. Tailscale Serve publishes only
 stays on the separately tailnet-only control API path at port `10000`; no public
 Funnel is used.
 
-The GUI labels maintained-notebook references for Login (cell 2), Student
-details (cell 3), GP (cells 4–11), EP (starting cell 13), Facility (cells
-18–22), Completion (cell 23), and Finalize (cell 24). These labels are
-operator guidance only and do not make a write stage executable.
+The GUI labels the actual Hermes VPS command and `udise_vps` module behind each
+stage. Login/session guidance points to the secure runtime session flow in the
+control API. These labels are operator guidance only and do not make a write
+stage executable.
 
 ## Hermes
 

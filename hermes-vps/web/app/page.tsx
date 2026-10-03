@@ -5,16 +5,15 @@ type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires
 type Caps={classes:{id:string;label:string}[];stages:Stage[]};
 type JobState={job:{id:string;status:string;stage:string;class_name?:string;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
 
-// The maintained notebook is a reference aid, not an executable path from the web UI.
-const NOTEBOOK_REFERENCE: Record<string,string> = {
-  students: "Student details · UDISE_Automation_v2.7.3_2026-09-23.ipynb · cell 3",
-  gp: "General Profile (GP) · maintained notebook · cells 4–11",
-  ep: "Enrollment Profile (EP) · maintained notebook · starting cell 13",
-  facility: "Facility Profile · maintained notebook · cells 18–22",
-  completion: "Completion Overview · maintained notebook · cell 23",
-  finalize: "Finalize / Complete Data · maintained notebook · cell 24",
+const HERMES_REFERENCE: Record<string,string> = {
+  students: "Hermes VPS · udise-vps students · udise_vps/students.py",
+  gp: "Hermes VPS · udise-vps gp · udise_vps/general_profile.py",
+  ep: "Hermes VPS · udise-vps ep · udise_vps/ep.py",
+  facility: "Hermes VPS · udise-vps facility · udise_vps/facility.py",
+  completion: "Hermes VPS · udise-vps completion · udise_vps/completion.py",
+  finalize: "Hermes VPS · udise-vps finalize · udise_vps/finalize.py",
 };
-const LOGIN_REFERENCE = "Login · UDISE_Automation_v2.7.3_2026-09-23.ipynb · cell 2";
+const LOGIN_REFERENCE = "Hermes VPS · secure runtime session · control_api/app.py";
 
 export default function Page(){
   const [authed,setAuthed]=useState<boolean|null>(null);
@@ -123,7 +122,7 @@ export default function Page(){
       <div className="grid">{caps?.stages.map(s=><button key={s.id} className={"choice "+(stage===s.id?"active":"")} onClick={()=>setStage(s.id)}>
         <div className="stage-title"><strong>{s.label}</strong><span className={"badge "+(s.mode==="write"?"warn":"ok")}>{s.mode==="write"?"Write":"Read"}</span></div>
         <div className="muted" style={{marginTop:7,fontSize:13}}>{s.description}</div>
-        {NOTEBOOK_REFERENCE[s.id]&&<div className="muted" style={{marginTop:7,fontSize:12}}>Notebook reference: {NOTEBOOK_REFERENCE[s.id]}</div>}
+        {HERMES_REFERENCE[s.id]&&<div className="muted" style={{marginTop:7,fontSize:12}}>Runner reference: {HERMES_REFERENCE[s.id]}</div>}
       </button>)}</div>
 
       {selected?.requires_class&&<><label>Class</label><select value={klass} onChange={e=>setKlass(e.target.value)}>

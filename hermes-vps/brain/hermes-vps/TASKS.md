@@ -66,8 +66,8 @@
 - [x] Add Vercel Next.js GUI source and pass a production build.
 - [x] Add Hermes natural-language skill and local control client.
 - [x] Add verified GitHub candidate-test-and-promote workflow.
-- [x] Run a private Oracle/Tailscale production GUI trial with maintained
-      notebook references and all write stages locked.
+- [x] Run a private Oracle/Tailscale production GUI trial with Hermes VPS
+      runner references and all write stages locked.
 - [ ] Connect/deploy the Vercel project and set encrypted environment values.
 - [ ] Add proactive WhatsApp progress push from job events.
 - [ ] Add dedicated preview/approval workflow before enabling each write stage.
