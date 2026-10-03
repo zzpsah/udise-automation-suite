@@ -660,3 +660,15 @@ def job_result(job_id: str, authorization: str | None = Header(default=None)):
     if not p.is_file() or JOBS not in p.parents:
         raise HTTPException(404, "Result unavailable")
     return FileResponse(p, filename=p.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+@app.get("/api/v1/jobs/{job_id}/eshiksha-report")
+def eshiksha_report_result(job_id: str, authorization: str | None = Header(default=None)):
+    require_api(authorization)
+    with _db() as conn:
+        row = conn.execute("SELECT stage,status FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row or row["stage"] != "ep" or row["status"] != "completed":
+        raise HTTPException(404, "eShikshaKosh report not ready")
+    reports = sorted((JOBS / job_id).glob("eShikshaKosh_OTR_*.xlsx"))
+    if not reports:
+        raise HTTPException(404, "This EP run used an uploaded report or no source report was retained")
+    return FileResponse(reports[-1], filename=reports[-1].name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

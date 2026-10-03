@@ -229,7 +229,8 @@ export default function Page(){
             {selected.mode!=="read"&&<div className="blank-only-note"><strong>Blank-only rule:</strong> values already saved in UDISE are untouched. Only eligible blank fields are proposed; skipped and already-complete students are listed in the Excel result.</div>}
             {selected.id==="ep"&&<div className="source-panel">
               <div className={"source-status "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"● Uploaded eShikshaKosh report ready":eshikshaReady?"● eShikshaKosh credentials ready for this page":"○ eShikshaKosh report or credentials required"}</div>
-              <div className="source-actions"><button type="button" onClick={connectEshiksha}>Use credentials</button><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
+              <div className="source-actions"><button type="button" onClick={connectEshiksha}>Prepare credential fields</button><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
+              {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="inline-form compact"><label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label><label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label><button type="button" className="run-button" onClick={saveEshikshaCredentials}>Save credentials temporarily</button></div>}
               <small>Credentials remain available for up to 8 hours, or until replaced. The uploaded report is stored temporarily on Oracle.</small>
             </div>}
             {selected.mode==="write"?<div className="lock-reason"><div><strong>Preview first · Explicit approval required</strong><span>Review the Excel proposal, choose a maximum write count, and type the confirmation phrase. Every save uses a fresh pre-write read and matching post-write read-back.{selected.id==="ep"?" The preview also retains the masked eShikshaKosh source for the approved run.":""}</span></div></div>:<p>{selected.description}</p>}
@@ -249,6 +250,7 @@ export default function Page(){
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           <ul className="events">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
+          {job.job.has_result&&job.job.stage==="ep"&&<a className="download source-download" href={"/api/jobs/"+job.job.id+"/eshiksha-report"}>Download eShikshaKosh source report</a>}
           {canApprove&&<div className="approval-box">
             <strong>Approve portal save</strong>
             <span>Review the workbook first. Saved values stay unchanged; processing stops on an unconfirmed read-back.</span>
@@ -270,13 +272,6 @@ export default function Page(){
         <div className="modal-head"><div><span className="eyebrow">SECURE SESSION</span><h2>Connect UDISE securely</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
         <p>Desktop Chrome/Edge can use the UDISE Hermes Session Bridge extension. Otherwise paste the browser Cookie header below. It goes directly to protected Oracle runtime storage and is never shown in chat or job output.</p>
         <iframe title="Secure UDISE Cookie entry" src={entryUrl}/>
-      </div>
-    </div>}
-    {eshikshaUrl&&!eshikshaReady&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure eShikshaKosh login">
-      <div className="session-modal">
-        <div className="modal-head"><div><span className="eyebrow">READ-ONLY SOURCE</span><h2>Connect eShikshaKosh</h2></div><button className="modal-close" onClick={()=>setEshikshaUrl("")} aria-label="Close">×</button></div>
-        <p>Enter credentials here or upload the Excel report. Credentials stay temporarily available for this page session and expire automatically.</p>
-        <div className="inline-form"><label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label><label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label><button className="run-button" onClick={saveEshikshaCredentials}>Save temporarily</button></div>
       </div>
     </div>}
   </main>
