@@ -418,7 +418,7 @@ def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
         return "UDISE session authenticated", None, None
     if line.startswith("[") and "WAIT " in line:
         return "Portal is responding slowly; still working…", None, None
-    if any(k in line for k in ("Completed", "Ready to Complete", "Need FP", "Need EP + FP", "Need GP + EP + FP", "Read failures", "Saved + confirmed", "No change needed", "Preview only", "Skipped / other", "scope:", "pending=", "students=")):
+    if any(k in line for k in ("Completed", "Ready to Complete", "Need FP", "Need EP + FP", "Need GP + EP + FP", "Read failures", "Saved + confirmed", "No change needed", "Nothing to fill", "Preview only", "Skipped / other", "Other", "scope:", "pending=", "students=")):
         return re.sub(r"\s+", " ", line), None, None
     return None, None, None
 
@@ -532,9 +532,12 @@ def _run_job(job_id: str) -> None:
             files = sorted(out_dir.glob("*.xlsx"))
             rp = str(files[-1].resolve()) if files else None
         with _db() as conn:
+            scoped_total = conn.execute("SELECT progress_total FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
             conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=?,result_path=? WHERE id=?",
-                         (int(time.time()), "Completed successfully", rp, job_id))
-        _event(job_id, "Completed successfully")
+                         (int(time.time()), "Completed successfully — review saved, skipped/already-filled, and other counts above.", rp, job_id))
+        if scoped_total:
+            _update_progress(job_id, scoped_total, scoped_total)
+        _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
     except Exception as exc:
         safe = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(exc))[:500]
         with _db() as conn:
