@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>UDISE+ SDMS — Hermes VPS flow</title>
+<style>
+  :root{
+    --fg:#0f172a; --muted:#64748b; --line:#cbd5e1; --card:#ffffff;
+    --ro:#0891b2; --dec:#d97706; --wr:#7c3aed; --ok:#16a34a; --bad:#dc2626;
+    --ghost:#94a3b8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:22px 26px 34px;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--fg); background:#f8fafc;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+  header{border-bottom:2px solid var(--fg);padding-bottom:12px;margin-bottom:20px}
+  h1{margin:0 0 4px;font-size:19px;font-weight:700;letter-spacing:-.2px}
+  .sub{color:var(--muted);font-size:12.5px}
+  .meta{color:var(--muted);font-size:11.5px;margin-top:6px}
+  .meta b{color:var(--fg)}
+
+  .phase{
+    font-size:10.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;
+    color:var(--muted);border-bottom:1px solid var(--line);
+    padding-bottom:5px;margin:26px 0 12px;
+  }
+  .phase:first-of-type{margin-top:6px}
+
+  .step{display:flex;gap:11px;align-items:flex-start}
+  .n{
+    flex:0 0 24px;height:24px;line-height:22px;text-align:center;
+    font-size:11px;font-weight:800;border:1.5px solid var(--line);
+    border-radius:50%;background:var(--card);color:var(--muted);margin-top:7px;
+    font-variant-numeric:tabular-nums;
+  }
+  .box{
+    flex:1;background:var(--card);border:1px solid var(--line);
+    border-left-width:4px;border-radius:7px;padding:9px 13px;
+  }
+  .box h3{margin:0 0 3px;font-size:13px;font-weight:650}
+  .box p{margin:0;color:var(--muted);font-size:12px}
+  code{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:11.5px;
+    background:#f1f5f9;border:1px solid var(--line);border-radius:3px;
+    padding:1px 4px;word-break:break-all;color:#0e7490;
+  }
+  .ro{border-left-color:var(--ro)}
+  .dec{border-left-color:var(--dec)}
+  .wr{border-left-color:var(--wr)}
+  .ok{border-left-color:var(--ok)}
+  .bad{border-left-color:var(--bad)}
+
+  .conn{width:2px;height:13px;background:var(--line);margin-left:11px}
+
+  .br{margin:8px 0 0 35px;display:flex;flex-direction:column;gap:6px}
+  .row{display:flex;gap:9px;align-items:flex-start}
+  .tag{
+    flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.5px;
+    padding:2.5px 8px;border-radius:4px;border:1.5px solid var(--line);
+    background:var(--card);color:var(--muted);margin-top:6px;white-space:nowrap;
+  }
+  .tag.y{border-color:var(--ok);color:var(--ok)}
+  .tag.n{border-color:var(--bad);color:var(--bad)}
+  .row .box{padding:6px 11px;font-size:12px}
+  .row .box b{font-weight:650}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:13px 15px}
+  .panel h4{margin:0 0 9px;font-size:12px;font-weight:750;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;font-weight:650;color:var(--muted);font-size:10.5px;
+     text-transform:uppercase;letter-spacing:.4px;padding:0 8px 5px 0;border-bottom:1px solid var(--line)}
+  td{padding:4px 8px 4px 0;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  td:last-child,th:last-child{padding-right:0;text-align:right}
+  .num{font-variant-numeric:tabular-nums;font-weight:650}
+  .g{color:var(--ok);font-weight:700}
+  .r{color:var(--bad);font-weight:700}
+  .a{color:var(--dec);font-weight:700}
+
+  .stats{display:flex;gap:11px;flex-wrap:wrap;margin-top:8px}
+  .stat{flex:1 1 130px;background:var(--card);border:1px solid var(--line);
+        border-radius:7px;padding:11px 14px;border-top-width:3px}
+  .stat .v{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums;line-height:1.15}
+  .stat .k{color:var(--muted);font-size:11px;margin-top:2px}
+  .stat.ix{border-top-color:var(--ok)}
+  .stat.x{border-top-color:var(--ro)}
+  .stat.xi{border-top-color:var(--bad)}
+  .stat.tot{border-top-color:var(--fg)}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:22px;padding-top:12px;
+          border-top:1px solid var(--line);color:var(--muted);font-size:11px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:4px;height:12px;border-radius:2px;display:inline-block}
+  .foot{margin-top:20px;color:var(--ghost);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>UDISE+ SDMS — Hermes VPS runner</h1>
+  <div class="sub">Headless command-line automation for school data completion</div>
+  <div class="meta">
+    School <b>2497128</b> · UMV Tetahali, Siwan Bihar · <b>208</b> students ·
+    portal v3.2.0 · updated <b>3 Oct 2026</b>
+  </div>
+</header>
+
+<div class="phase">1 · Session</div>
+
+<div class="step">
+  <div class="n">1</div>
+  <div class="box ro">
+    <h3>Paste the cookie header</h3>
+    <p><code>JSESSIONID</code> + <code>XSRF-TOKEN</code> + <code>NSC_tent</code>
+       load-balancer token, copied from the browser's Network tab.
+       Verify with <code>GET /p0/check-session</code>.</p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">2</div>
+  <div class="box ro">
+    <h3>Fetch the roster</h3>
+    <p><code>GET /p0/api/cy/students/all/{schoolId}</code> → 208 students with
+       <code>classId</code>, <code>studentId</code>, PEN, roll no, and
+       <code>formStatus</code>.</p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">3</div>
+  <div class="box ro">
+    <h3>Load the eShikshaKosh OTR report</h3>
+    <p>Supplies the <b>Admission No.</b> UDISE leaves blank, plus the
+       <b>Stream</b> for Class XI. Either your export
+       (<code>--report file.xlsx</code>) or a live fetch
+       (<code>--fetch-report</code>, logs in with the school UDISE + password).</p>
+  </div>
+</div>
+
+<div class="phase">2 · Scope</div>
+
+<div class="step">
+  <div class="n">4</div>
+  <div class="box dec">
+    <h3>Which class?</h3>
+    <p>Processed class by class, one at a time.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row">
+    <div class="tag y">IX · X</div>
+    <div class="box ok"><b>Fully writable.</b> EP carries subjects; FP carries
+      measurements and facilities.</div>
+  </div>
+  <div class="row">
+    <div class="tag n">XI · XII</div>
+    <div class="box bad"><b>EP blocked by the portal.</b> Error <code>1002</code>
+      — no subject mapping configured for this Board and Class. Admission numbers
+      and streams still resolve; they apply once UDISE enables it.
+      Fail fast, never loop.</div>
+  </div>
+</div>
+
+<div class="phase">3 · Per student — the completion loop</div>
+
+<div class="step">
+  <div class="n">5</div>
+  <div class="box ro">
+    <h3>Read all three profiles</h3>
+    <p>GP <code>/p0/api/cy/students/{sid}</code> ·
+       EP <code>/p0/api/v2/students/enrolment/{sid}</code> ·
+       FP <code>/p0/api/v2/students/facility/{sid}</code></p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">6</div>
+  <div class="box dec">
+    <h3>Admission number blank?</h3>
+    <p>Field 4.2.1. Priority chain, highest first.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag n">NO</div>
+    <div class="box"><b>Keep it.</b> A saved value is never overwritten
+      <code>kept_saved</code></div></div>
+  <div class="row"><div class="tag y">YES</div>
+    <div class="box">
+      <b>Match the eShikshaKosh report</b> — by Aadhaar last-4, name, father, DOB.
+      <br>match → that row's Admission No. <code>eshikshakosh</code>
+      <br>no match → roster <b>Roll No</b> <code>roll_number</code>
+      <br>no roll → generate, continuing after the class's highest
+      <code>next_number</code>
+    </div></div>
+</div>
+
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">7</div>
+  <div class="box dec">
+    <h3>Language pair — <code>minorityId = 1</code>?</h3>
+    <p>Field 4.2.9. Resolved by <b>name</b> against the live catalogue, never a
+       hardcoded code.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag y">YES</div>
+    <div class="box">Subject 1 = <b>638 URDU</b> · Subject 2 = <b>1102 HIN (NLH)</b></div></div>
+  <div class="row"><div class="tag n">NO</div>
+    <div class="box">Subject 1 = <b>629 HINDI</b> · Subject 2 = <b>637 SANSKRIT</b></div></div>
+</div>
+
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">8</div>
+  <div class="box wr">
+    <h3>Fill mandatory subjects 3–6</h3>
+    <p><b>401</b> Mathematics · <b>402</b> Science · <b>404</b> Social Science ·
+       <b>612</b> English. The portal rejects a write that leaves these at 0.</p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">9</div>
+  <div class="box dec">
+    <h3>Exam result valid? (1, 3, 4 only)</h3>
+    <p>Field 4.2.7(a). Anything else cannot satisfy the requirement.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag y">VALID</div>
+    <div class="box">Write normally; previous-year values carried as saved.</div></div>
+  <div class="row"><div class="tag n">INVALID</div>
+    <div class="box bad">
+      <b>Auto rule → 4.2.5(a) = None / Not Studying</b>
+      <br>The portal then disables 4.2.6(b), 4.2.7(a)/(b), 4.2.8.
+      <br>Transmit <b>null</b> for <code>classPY</code>, <code>examResultPy</code>,
+      <code>examMarksPy</code>, <code>attendancePy</code> — sending 0/0/4/0 is
+      rejected.
+      <br>The portal stores sentinels <b>99 / 0 / 999 / 0</b>; read-back must
+      normalise them.
+    </div></div>
+</div>
+
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">10</div>
+  <div class="box wr">
+    <h3>Facility Profile — blank-only fill</h3>
+    <p>height 146–160 cm · weight 42–52 kg · distance <b>randomly 1–3 or 3–5 km</b>
+       (field 4.3.6) · parent education Secondary · blank Yes/No → No.
+       Seeded per student so re-runs are identical.</p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">11</div>
+  <div class="box wr">
+    <h3>Build payload and POST</h3>
+    <p>EP <code>POST /p0/api/v2/students/enrolment/{sid}</code><br>
+       FP <code>POST /p0/api/v2/AY/students/facility/{sid}</code>
+       — note the <code>AY</code> segment, GET and POST differ.</p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">12</div>
+  <div class="box ok">
+    <h3>Read-back verify — the stop condition</h3>
+    <p>Fresh GET, normalise sentinels, compare every written field.
+       <br><b>match → CONFIRMED</b> · <b>mismatch → STOP THE BATCH.</b>
+       <br>Never continue on an unconfirmed write. <code>HTTP 200</code> is not proof.</p>
+  </div>
+</div>
+
+<div class="phase">4 · Finalize — Complete Data</div>
+
+<div class="step">
+  <div class="n">13</div>
+  <div class="box dec">
+    <h3>Fresh status read</h3>
+    <p><code>formStatus</code> gates everything. <b>Only 3 is eligible.</b></p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag n">6</div>
+    <div class="box">Already complete — never POST.</div></div>
+  <div class="row"><div class="tag n">1 · 2</div>
+    <div class="box bad">GP/EP/FP not finished — blocked.</div></div>
+  <div class="row"><div class="tag y">3</div>
+    <div class="box ok">Re-read, then one POST to
+      <code>/p0/api/v2/students/submit/{sid}</code> with the id as
+      <code>text/plain</code>. Read-back must show <b>6</b>.</div></div>
+</div>
+
+<div class="phase">Where it stands</div>
+<div class="stats">
+  <div class="stat ix"><div class="v">33/33</div><div class="k">Class IX complete</div></div>
+  <div class="stat x"><div class="v">4/38</div><div class="k">Class X complete</div></div>
+  <div class="stat xi"><div class="v">0/137</div><div class="k">XI + XII (EP blocked)</div></div>
+  <div class="stat tot"><div class="v">37/208</div><div class="k">School total</div></div>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h4>Class IX — closed out</h4>
+    <table>
+      <tr><th>Profile</th><th>State</th></tr>
+      <tr><td>General Profile</td><td class="g">complete</td></tr>
+      <tr><td>Enrolment Profile</td><td class="g">33/33</td></tr>
+      <tr><td>Facility Profile</td><td class="g">33/33</td></tr>
+      <tr><td>Complete Data</td><td class="g">33/33</td></tr>
+    </table>
+    <p style="color:var(--muted);font-size:11.5px;margin:9px 0 0">
+      Verified by fresh per-student read of all 33, not the script's own report.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h4>Portal status codes</h4>
+    <table>
+      <tr><th>Code</th><th>Meaning</th></tr>
+      <tr><td class="num">1</td><td>draft</td></tr>
+      <tr><td class="num">2</td><td>submitted</td></tr>
+      <tr><td class="num">3</td><td class="a">eligible to finalize</td></tr>
+      <tr><td class="num">6</td><td class="g">complete (green)</td></tr>
+    </table>
+    <p style="color:var(--muted);font-size:11.5px;margin:9px 0 0">
+      Observed project behaviour, not an official published enum.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h4>Cross-portal matching</h4>
+    <p style="color:var(--muted);font-size:11.5px;margin:0 0 9px">
+      Class and DOB are <b>not</b> hard filters — requiring them lost all 62
+      Class XI matches. One hard rule: Aadhaar last-4 on both sides and
+      different = different person.
+    </p>
+    <table>
+      <tr><th>Signal</th><th>Pts</th></tr>
+      <tr><td>Aadhaar last-4 agrees</td><td class="num">+5</td></tr>
+      <tr><td>Name exact</td><td class="num">+3</td></tr>
+      <tr><td>Father exact</td><td class="num">+2</td></tr>
+      <tr><td>Name / father partial</td><td class="num">+1</td></tr>
+      <tr><td>DOB agrees</td><td class="num">+1</td></tr>
+      <tr><td>DOB conflicts, no Aadhaar</td><td class="num r">−1</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h4>Sentinel values to know</h4>
+    <table>
+      <tr><th>Field</th><th>Unset is</th></tr>
+      <tr><td><code>heightInCm</code> / <code>weightInKg</code></td><td class="r">0, not null</td></tr>
+      <tr><td><code>nccYn</code>/<code>nssYn</code>/<code>scoutsYn</code></td><td class="r">9</td></tr>
+      <tr><td><code>distanceFrmSchool</code></td><td class="r">0 or 9</td></tr>
+      <tr><td><code>classPY</code> (status 4)</td><td>99</td></tr>
+      <tr><td><code>examMarksPy</code> (status 4)</td><td>999</td></tr>
+    </table>
+    <p style="color:var(--muted);font-size:11.5px;margin:9px 0 0">
+      A blank check testing only for <code>''</code> returns False for 0 — that
+      silently skipped every blank height and weight.
+    </p>
+  </div>
+</div>
+
+<div class="legend">
+  <span><i class="sw" style="background:var(--ro)"></i> read-only</span>
+  <span><i class="sw" style="background:var(--dec)"></i> decision</span>
+  <span><i class="sw" style="background:var(--wr)"></i> write</span>
+  <span><i class="sw" style="background:var(--ok)"></i> verified / eligible</span>
+  <span><i class="sw" style="background:var(--bad)"></i> blocked / stop</span>
+</div>
+
+<div class="foot">
+  Generic by design — no school ID is hardcoded in <code>udise_vps/</code>.
+  &nbsp;·&nbsp; 110 offline tests passing
+</div>
+
+</div>
+</body>
+</html>
