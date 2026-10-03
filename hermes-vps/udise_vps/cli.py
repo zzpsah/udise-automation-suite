@@ -34,7 +34,8 @@ from .session import AuthError, UdiseSession, connect, cookie_from_environment
 def _add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--school", "-s", required=True,
-        help="UDISE school URL or 7-digit internal school ID (e.g. 2497128)",
+        help="UDISE school URL, or the internal school ID from the portal "
+             "(the number in the school URL)",
     )
     parser.add_argument(
         "--out", "-o", default=".", help="Output directory (default: .)",

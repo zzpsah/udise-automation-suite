@@ -7,6 +7,7 @@ no notebook, no browser UI. It runs on a server and is driven from the shell.
 
 - **Full documentation:** [`README.md`](README.md)
 - **Flow diagram:** [`docs/flow.html`](docs/flow.html) — open in a browser
+- **Working context for contributors:** [`brain/`](brain/README.md)
 
 ## Layout
 
@@ -15,7 +16,11 @@ no notebook, no browser UI. It runs on a server and is driven from the shell.
 | `udise_vps/` | The package — all portal logic |
 | `tests/` | Offline test suites (110 tests, no network) |
 | `tools/` | One-off operational scripts (previews, batch writers, probes) |
+| `brain/` | Working notes — handoff, architecture, decisions, security |
 | `docs/flow.html` | Flow diagram |
+| `docs/COMMANDS.md` | Command reference |
+| `docs/DESIGN.md` | Design principles |
+| `docs/TEST_PLAN.md` | Layered test plan |
 | `run_tests.sh` | Runs every offline suite |
 | `install.sh` | Dependency setup |
 | `smoke_readonly.sh` | Read-only smoke test against the live portal |
@@ -27,13 +32,33 @@ no notebook, no browser UI. It runs on a server and is driven from the shell.
 ./run_tests.sh               # 110 offline tests, no credentials needed
 
 export UDISE_COOKIE_HEADER='JSESSIONID=...; XSRF-TOKEN=...; NSC_tent...'
-udise-vps students   --school 2497128              # roster (read-only)
-udise-vps completion --school 2497128 --class IX   # completion overview
-udise-vps ep         --school 2497128 --class IX --fetch-report   # preview
+udise-vps students   --school <id>              # roster (read-only)
+udise-vps completion --school <id> --class IX   # completion overview
+udise-vps ep         --school <id> --class IX --fetch-report   # preview
 ```
 
 Writes are **off by default**. `--submit` enables them, one student at a time,
 each followed by a fresh read-back. See `README.md` §5.
+
+## New here?
+
+Read [`brain/hermes-vps/HANDOFF.md`](brain/hermes-vps/HANDOFF.md) first. Then
+[`brain/hermes-vps/ARCHITECTURE.md`](brain/hermes-vps/ARCHITECTURE.md) and
+[`brain/hermes-vps/DECISIONS.md`](brain/hermes-vps/DECISIONS.md).
+
+Three things worth knowing before you touch anything:
+
+1. **Read-back is the only proof of a write.** `HTTP 200` and `status:true` are
+   returned even for writes the portal silently rejects.
+2. **A mismatch stops the batch.** Never continue past an unconfirmed write.
+3. **Class XI/XII Enrolment is blocked by the portal** (error `1002`). Not a bug
+   here — do not retry in a loop.
+
+## Generic, not school-specific
+
+This runs against **any** UDISE+ school. No school ID, name, or code is
+hardcoded in `udise_vps/` — identity comes from the portal at runtime. The
+examples above take `--school <id>` for that reason.
 
 ## Design rules
 

@@ -8,6 +8,18 @@ This private repository is the **single source of truth** for the UDISE+ school 
 
 [▶ Open current baseline in Google Colab](https://colab.research.google.com/github/zzpsah/udise-automation-suite/blob/main/UDISE_Automation_v2.7.3_2026-09-23.ipynb)
 
+**Headless runner:** [`hermes-vps/`](hermes-vps/HERMES-VPS.md) — the same portal
+operations from the command line, for servers and repeatable runs. 110 offline
+tests. Start at [`hermes-vps/brain/hermes-vps/HANDOFF.md`](hermes-vps/brain/hermes-vps/HANDOFF.md).
+
+| | Interface | Best for |
+|---|---|---|
+| `UDISE_Automation_v2.7.3_*.ipynb` | Colab notebook | Interactive, guided work |
+| `hermes-vps/` | Command line | Repeatable runs on a server |
+
+Both follow the same safety rules. Neither is school-specific — school identity
+comes from the portal at runtime.
+
 For another AI or developer taking over this project, read **[docs/AI_HANDOFF.md](docs/AI_HANDOFF.md) first**.
 
 ### Baseline status — 23 September 2026

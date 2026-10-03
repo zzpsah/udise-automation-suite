@@ -11,6 +11,18 @@ Before substantial work:
 5. Inspect the maintained notebook, current source, and Git history before changing behavior.
 6. Distinguish implemented, offline-tested, live-read, and live-save evidence.
 
+## Two implementations
+
+| | Path | Interface |
+|---|---|---|
+| Colab notebook | `UDISE_Automation_v2.7.3_*.ipynb` | Interactive |
+| Headless runner | `hermes-vps/` | Command line |
+
+The runner has its own context layer under `hermes-vps/brain/`. Read
+`hermes-vps/brain/hermes-vps/HANDOFF.md` before changing it. Neither
+implementation is school-specific — school identity comes from the portal at
+runtime, so do not hardcode a school ID, name, or code.
+
 ## DevOS Vibe Coding baseline
 
 ```text
