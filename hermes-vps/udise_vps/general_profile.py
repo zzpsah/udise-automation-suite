@@ -17,10 +17,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .constants import (
+    AAY_NOT_APPLICABLE,
+    AAY_NO,
     AUTO_GP_DEFAULTS,
+    BLOOD_GROUP_API_ACCEPTED,
+    BLOOD_GROUP_UNDER_INVESTIGATION,
     CLASS_LABEL,
     CWSN_SKIP_CODES,
     CWSN_UNEXPECTED_SKIP,
+    EWS_EXCLUDED_CATEGORIES,
+    EWS_NO,
     class_scope,
 )
 
@@ -28,12 +34,89 @@ BLANK_VALUES = {None, "", "0", 0, "null", "None"}
 
 
 def is_blank(value: Any) -> bool:
-    """True when the portal value is genuinely unset."""
+    """True when the portal value is genuinely unset.
+
+    The portal reports an unset code field as numeric 0, not null, so a check
+    that only tests for '' would treat 0 as a saved value.
+    """
     if value is None:
         return True
     if isinstance(value, str):
         return value.strip() in {"", "0", "null", "None"}
     return value == 0
+
+
+def as_code(value) -> int | None:
+    """Coerce a portal code to int, or None when unset/unparseable."""
+    if is_blank(value):
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+
+
+def apply_gp_rules(fresh: dict, updates: dict) -> dict:
+    """Enforce the portal's cross-field rules on the fields being written.
+
+    Rules (from the notebook's build_payload, verified against all 208 live
+    records where zero violations were found — guards, not corrections):
+
+      BPL/AAY  (4.1.15) if isBplYN == No (2)          -> aayBplYN = 9 (NA)
+                        elif aayBplYN not in (Yes,No) -> aayBplYN = 2 (No)
+      EWS      (4.1.16) socCatId in (SC 2, ST 3, OBC 4) -> ewsYN = 2 (No).
+                        A student in a reserved category cannot also claim EWS.
+      Blood group      clamped to the codes the API accepts (1-9). Code 0
+                        ("Unknown") is offered by the UI but rejected on write,
+                        so it becomes the Under Investigation placeholder (9).
+
+    A rule applies to a field only when it is BLANK on the portal or already in
+    `updates`. A value the portal already holds is never overridden — the same
+    blank-only rule that governs every other field.
+    """
+    out = dict(updates)
+
+    def writable(field_name: str) -> bool:
+        """May this rule set the field?
+
+        Yes when we are already writing it, or when the portal has it blank.
+        A value the portal already holds is NEVER overridden — the same
+        blank-only rule that governs every other field.
+        """
+        return field_name in out or is_blank(fresh.get(field_name))
+
+    # ------------------------------------------------------------ BPL / AAY
+    # 4.1.15 AAY. The portal pairs these: a student who is not BPL cannot be an
+    # AAY beneficiary.
+    bpl = as_code(out.get("isBplYN"))
+    if bpl is None:
+        bpl = as_code(fresh.get("isBplYN"))
+    if bpl is not None and writable("aayBplYN"):
+        if bpl == 2:
+            out["aayBplYN"] = AAY_NOT_APPLICABLE
+        else:
+            aay = as_code(out.get("aayBplYN"))
+            if aay is None:
+                aay = as_code(fresh.get("aayBplYN"))
+            if aay not in (1, 2):
+                out["aayBplYN"] = AAY_NO
+
+    # ------------------------------------------------------------------ EWS
+    # 4.1.16 EWS. A student in a reserved category (SC/ST/OBC) cannot also
+    # claim EWS / Disadvantaged Group.
+    cat = as_code(out.get("socCatId"))
+    if cat is None:
+        cat = as_code(fresh.get("socCatId"))
+    if cat in EWS_EXCLUDED_CATEGORIES and writable("ewsYN"):
+        out["ewsYN"] = EWS_NO
+
+    # ----------------------------------------------------------- blood group
+    if "bloodGroup" in out:
+        code = str(out["bloodGroup"]).strip()
+        if code not in BLOOD_GROUP_API_ACCEPTED:
+            out["bloodGroup"] = BLOOD_GROUP_UNDER_INVESTIGATION
+
+    return out
 
 
 @dataclass
@@ -190,6 +273,11 @@ def run_auto_gp(
             for field_name, default in AUTO_GP_DEFAULTS.items()
             if is_blank(fresh.get(field_name))
         }
+
+        # Then enforce the portal's cross-field rules on what we are writing.
+        # A rule only adjusts a field already in `updates`; it never invents an
+        # update for a field the student already has.
+        updates = apply_gp_rules(fresh, updates)
 
         if not updates:
             result.status = "NO_CHANGE"

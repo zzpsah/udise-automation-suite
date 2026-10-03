@@ -32,7 +32,7 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 110 passing** (24 core + 68 EP/Facility + 8 eShikshaKosh + 10 FP), no network required.
+**Test suite: 131 passing** (24 core + 68 EP/Facility + 8 eShikshaKosh + 10 FP + 21 GP), no network required.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -153,6 +153,64 @@ Blank-fill rules:
 Values are **seeded per student** (`sha256(seed:pen)`) so a re-run produces the
 same numbers and read-back can compare. Plain `random.randint` makes every
 re-run look like a mismatch.
+
+---
+
+## 1d. General Profile — blank-fill rules
+
+GP was already complete for all 208 students when checked, so nothing was
+written. The rules are implemented and tested anyway.
+
+**Blank-only.** A value the portal already holds is never overwritten. Verified
+live: 205 students carry `bloodGroup=9` (Under Investigation) and 3 carry real
+groups (A+, B+, B-) — the three are left alone.
+
+| Field | Blank becomes |
+|---|---|
+| Blood Group | **Under Investigation** (code 9) |
+| 4.1.14 BPL beneficiary | No (2) |
+| 4.1.16 EWS / Disadvantaged | No (2) |
+| 4.1.17 CWSN | No (2) |
+| 4.1.18 Indian National | **Yes** (1) |
+| 4.1.19 Out-of-School-Child | No (2) |
+| Mother Tongue | HINDI - Hindi (42) |
+
+### Cross-field rules
+
+The portal pairs these fields. A rule fires **only on a field that is blank or
+already being written** — a saved value is left alone, same as everywhere else.
+
+| Rule | Behaviour |
+|---|---|
+| 4.1.15 AAY | BPL = No → AAY = **Not Applicable** (9). A student who is not BPL cannot be an AAY beneficiary. |
+| 4.1.16 EWS | Social category SC / ST / OBC → EWS = **No** (2). A reserved-category student cannot also claim EWS. |
+| Blood group | Code 0 ("Unknown") is offered by the UI but **rejected by the API**, so it is clamped to 9. |
+
+**CWSN = Yes skips the student entirely** for manual review — never auto-filled.
+
+These rules were verified against all 208 live records: **zero violations**, so
+they are guards, not corrections.
+
+---
+
+## 1e. Which file does what
+
+| Path | Responsibility |
+|---|---|
+| `udise_vps/cli.py` | Argument parsing and command dispatch |
+| `udise_vps/session.py` | HTTP session, auth headers, read/write primitives. Reads retry; writes do not |
+| `udise_vps/constants.py` | Enums, class labels, facility tables, GP defaults and rule values |
+| `udise_vps/general_profile.py` | **GP** — blank fill, CWSN skip, AAY/EWS rules, blood-group clamp |
+| `udise_vps/ep.py` | **Enrolment Profile** — admission numbering, cross-portal matching, languages, subjects, streams |
+| `udise_vps/subjects.py` | Subject codes, language plans, exam-result enums, status-4 null rule |
+| `udise_vps/facility.py` | **Facility Profile** — blank fill, 0/9 sentinels, seeded generation |
+| `udise_vps/finalize.py` | **Complete Data** — status gating, pre-POST re-read, read-back |
+| `udise_vps/esk.py` | eShikshaKosh OTR report — your export, or a live fetch |
+| `udise_vps/students.py` | Roster export |
+| `udise_vps/completion.py` | Completion overview workbook |
+| `tests/` | Offline suites — 131 tests, no network |
+| `tools/` | One-off operational scripts |
+| `brain/` | Working context — handoff, architecture, decisions, security |
 
 ---
 

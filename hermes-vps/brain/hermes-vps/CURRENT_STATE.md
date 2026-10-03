@@ -8,7 +8,7 @@ Last verified: **2026-10-03**. Portal **v3.2.0**.
 |---|---|---|
 | Roster export | `students` | `LIVE_READ` — 208 students |
 | Completion overview | `completion` | `LIVE_READ` |
-| General Profile | `gp` | `LIVE_READ` (preview only) |
+| General Profile | `gp` | `LIVE_READ` — **complete for all 208**, rules implemented + tested |
 | Enrolment Profile | `ep` | `LIVE_SAVE` — Class IX 33/33 |
 | Facility Profile | `facility` | `LIVE_SAVE` — Class IX 33/33 |
 | Finalize | `finalize` | `LIVE_SAVE` — Class IX 33/33 |
@@ -54,9 +54,24 @@ for this Board and Class). Admission numbers and streams for Class XI resolve
 
 ### General Profile
 
-Read path works. The write path has never been exercised live from this runner.
-The notebook implements AUTO GP with a CWSN=Yes skip rule — port it only after
-live discovery, not from the notebook's tables.
+**Already complete for all 208 students** — a live census found zero blank AUTO
+fields in any class, so nothing needed writing.
+
+The rules are implemented and covered by 21 tests regardless, because they must
+hold for any school:
+
+- blank blood group → Under Investigation (9); code 0 clamped to 9
+- 4.1.14 BPL → No · 4.1.16 EWS → No · 4.1.17 CWSN → No
+- 4.1.18 Indian National → Yes · 4.1.19 Out-of-School-Child → No
+- Mother Tongue → HINDI - Hindi (42)
+- 4.1.15 AAY: BPL = No → AAY = Not Applicable
+- 4.1.16 EWS: SC/ST/OBC can never be EWS
+
+Live evidence: 205 students carry `bloodGroup=9`, 3 carry real groups (A+, B+,
+B-). The three are left untouched — the blank-only rule works.
+
+**Not yet exercised:** a live GP *write* from this runner. The read path and the
+payload construction are verified; the POST has not been sent.
 
 ## Verification commands
 

@@ -65,6 +65,29 @@ failure:
 
 Optional subject slots report `None` where we send `0`; both must compare equal.
 
+## General Profile
+
+Per student:
+
+1. **Fresh GP read.**
+2. **CWSN = Yes skips the student entirely** for manual review. Never
+   auto-filled.
+3. **Blank-only diff** against `AUTO_GP_DEFAULTS`. A saved value is never
+   included.
+4. **Cross-field rules** (`apply_gp_rules`) adjust only a field that is blank or
+   already in the update set:
+
+   | Rule | Behaviour |
+   |---|---|
+   | 4.1.15 AAY | BPL = No → AAY = Not Applicable (9) |
+   | 4.1.16 EWS | SC/ST/OBC → EWS = No (2) |
+   | Blood group | code 0 is clamped to 9; the API rejects 0 |
+
+5. **POST the full record**, then read-back every submitted field.
+
+Verified against all 208 live records: **zero violations**, so the rules are
+guards, not corrections.
+
 ## Enrolment Profile
 
 The most complex module. Per student:

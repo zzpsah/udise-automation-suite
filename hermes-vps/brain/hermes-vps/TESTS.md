@@ -7,14 +7,15 @@ cd hermes-vps
 ./run_tests.sh
 ```
 
-110 tests, **no network and no credentials required**. Runs in about two
+131 tests, **no network and no credentials required**. Runs in about two
 seconds. Individual suites:
 
 ```bash
-python3 tests/test_offline.py         # 24 — core: session, constants, students
-python3 tests/test_ep_facility.py     # 68 — Enrolment Profile + Facility rules
-python3 tests/test_esk.py             #  8 — eShikshaKosh report source
-python3 tests/test_facility.py        # 10 — Facility blank-detection, sentinels
+python3 tests/test_offline.py          # 24 — core: session, constants, students
+python3 tests/test_ep_facility.py      # 68 — Enrolment Profile + Facility rules
+python3 tests/test_esk.py              #  8 — eShikshaKosh report source
+python3 tests/test_facility.py         # 10 — Facility blank-detection, sentinels
+python3 tests/test_general_profile.py  # 21 — GP blank-fill and cross-field rules
 ```
 
 ## What is covered
@@ -72,6 +73,20 @@ python3 tests/test_facility.py        # 10 — Facility blank-detection, sentine
 - distance is only ever `2` (1–3 km) or `3` (3–5 km), and actually varies
 - a saved distance is kept
 - CWSN facility fields are skipped for non-CWSN students
+
+### General Profile
+
+- `0` reads as unset for a code field
+- a blank blood group fills with **Under Investigation** (9); code `0` is clamped
+  to 9 because the API rejects it
+- a filled blood group is never included in updates
+- BPL = No forces AAY = Not Applicable (9)
+- BPL = Yes with an invalid AAY becomes No (2)
+- SC/ST/OBC can never be EWS
+- **the AAY and EWS rules skip a field the portal already holds** — the
+  blank-only rule applies to cross-field rules too
+- a fully filled GP record proposes no updates at all
+- the payload carries every untouched field, so nothing is silently dropped
 
 ### eShikshaKosh report source
 

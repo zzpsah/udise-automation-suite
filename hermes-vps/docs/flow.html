@@ -168,10 +168,96 @@
   </div>
 </div>
 
-<div class="phase">3 · Per student — the completion loop</div>
+<div class="phase">3 · General Profile (GP)</div>
 
 <div class="step">
   <div class="n">5</div>
+  <div class="box ro">
+    <h3>Fresh GP read</h3>
+    <p><code>GET /p0/api/cy/students/{sid}</code>. Every rule below is
+       <b>blank-only</b>: if the portal already holds a value, it is skipped.</p>
+  </div>
+</div>
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">6</div>
+  <div class="box dec">
+    <h3>CWSN already Yes?</h3>
+    <p>4.1.17. A CWSN student is skipped entirely for manual review — never
+       auto-filled.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag n">YES</div>
+    <div class="box bad">Skip the student. No POST. Manual review.</div></div>
+  <div class="row"><div class="tag y">NO</div>
+    <div class="box ok">Continue to the blank-fill rules.</div></div>
+</div>
+
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">7</div>
+  <div class="box wr">
+    <h3>Fill blank fields only</h3>
+    <p>A value already on the portal is <b>never</b> overwritten. This is the
+       same rule as EP and FP.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag a">FIELD</div>
+    <div class="box" style="padding:8px 11px">
+      <table style="font-size:11.5px;margin:0">
+        <tr><th>Field</th><th>Blank becomes</th></tr>
+        <tr><td>Blood Group</td><td><b>Under Investigation</b> (code 9)</td></tr>
+        <tr><td>4.1.14 BPL beneficiary</td><td>No (2)</td></tr>
+        <tr><td>4.1.16 EWS / Disadvantaged</td><td>No (2)</td></tr>
+        <tr><td>4.1.17 CWSN</td><td>No (2)</td></tr>
+        <tr><td>4.1.18 Indian National</td><td><b>Yes</b> (1)</td></tr>
+        <tr><td>4.1.19 Out-of-School-Child</td><td>No (2)</td></tr>
+        <tr><td>Mother Tongue</td><td>HINDI - Hindi (42)</td></tr>
+      </table>
+    </div></div>
+</div>
+
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">8</div>
+  <div class="box dec">
+    <h3>Cross-field rules — only where blank</h3>
+    <p>The portal pairs these fields. A rule fires only on a field that is blank
+       or already being written; a saved value is left alone.</p>
+  </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag a">4.1.15</div>
+    <div class="box">BPL = No &rarr; AAY = <b>Not Applicable</b> (9).
+      A student who is not BPL cannot be an AAY beneficiary.</div></div>
+  <div class="row"><div class="tag a">4.1.16</div>
+    <div class="box">Social category SC / ST / OBC &rarr; EWS = <b>No</b> (2).
+      A reserved-category student cannot also claim EWS.</div></div>
+  <div class="row"><div class="tag a">BLOOD</div>
+    <div class="box">Code 0 (&quot;Unknown&quot;) is offered by the UI but
+      <b>rejected by the API</b>, so it is clamped to 9.</div></div>
+</div>
+
+<div class="conn"></div>
+
+<div class="step">
+  <div class="n">9</div>
+  <div class="box ok">
+    <h3>POST + read-back</h3>
+    <p><code>POST /p0/api/cy/students/{sid}</code> — the full record, so no
+       field is silently dropped. Read-back must confirm every submitted field.</p>
+  </div>
+</div>
+
+<div class="phase">4 · Enrolment &amp; Facility — the per-student loop</div>
+
+<div class="step">
+  <div class="n">10</div>
   <div class="box ro">
     <h3>Read all three profiles</h3>
     <p>GP <code>/p0/api/cy/students/{sid}</code> ·
@@ -182,7 +268,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">6</div>
+  <div class="n">11</div>
   <div class="box dec">
     <h3>Admission number blank?</h3>
     <p>Field 4.2.1. Priority chain, highest first.</p>
@@ -205,7 +291,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">7</div>
+  <div class="n">12</div>
   <div class="box dec">
     <h3>Language pair — <code>minorityId = 1</code>?</h3>
     <p>Field 4.2.9. Resolved by <b>name</b> against the live catalogue, never a
@@ -222,7 +308,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">8</div>
+  <div class="n">13</div>
   <div class="box wr">
     <h3>Fill mandatory subjects 3–6</h3>
     <p><b>401</b> Mathematics · <b>402</b> Science · <b>404</b> Social Science ·
@@ -232,7 +318,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">9</div>
+  <div class="n">14</div>
   <div class="box dec">
     <h3>Exam result valid? (1, 3, 4 only)</h3>
     <p>Field 4.2.7(a). Anything else cannot satisfy the requirement.</p>
@@ -256,7 +342,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">10</div>
+  <div class="n">15</div>
   <div class="box wr">
     <h3>Facility Profile — blank-only fill</h3>
     <p>height 146–160 cm · weight 42–52 kg · distance <b>randomly 1–3 or 3–5 km</b>
@@ -267,7 +353,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">11</div>
+  <div class="n">16</div>
   <div class="box wr">
     <h3>Build payload and POST</h3>
     <p>EP <code>POST /p0/api/v2/students/enrolment/{sid}</code><br>
@@ -278,7 +364,7 @@
 <div class="conn"></div>
 
 <div class="step">
-  <div class="n">12</div>
+  <div class="n">17</div>
   <div class="box ok">
     <h3>Read-back verify — the stop condition</h3>
     <p>Fresh GET, normalise sentinels, compare every written field.
@@ -287,10 +373,10 @@
   </div>
 </div>
 
-<div class="phase">4 · Finalize — Complete Data</div>
+<div class="phase">5 · Finalize — Complete Data</div>
 
 <div class="step">
-  <div class="n">13</div>
+  <div class="n">18</div>
   <div class="box dec">
     <h3>Fresh status read</h3>
     <p><code>formStatus</code> gates everything. <b>Only 3 is eligible.</b></p>
@@ -362,6 +448,27 @@
     </table>
   </div>
 
+  <div class="panel" style="grid-column:1 / -1">
+    <h4>Which file does what</h4>
+    <table>
+      <tr><th style="width:26%">Path</th><th>Responsibility</th></tr>
+      <tr><td><code>udise_vps/cli.py</code></td><td>Argument parsing and command dispatch. Entry point for <code>udise-vps &lt;command&gt;</code>.</td></tr>
+      <tr><td><code>udise_vps/session.py</code></td><td>HTTP session, auth headers, and the read/write primitives. Reads retry; writes do not.</td></tr>
+      <tr><td><code>udise_vps/constants.py</code></td><td>Enums, class labels, facility tables, GP defaults and cross-field rule values.</td></tr>
+      <tr><td><code>udise_vps/general_profile.py</code></td><td><b>GP</b> — blank-only fill, CWSN skip, the AAY/EWS cross-field rules, blood-group clamping.</td></tr>
+      <tr><td><code>udise_vps/ep.py</code></td><td><b>Enrolment Profile</b> — the bulk of the logic: admission numbering, cross-portal matching, languages, subjects, streams.</td></tr>
+      <tr><td><code>udise_vps/subjects.py</code></td><td>Subject codes, language plans, exam-result enums, the status-4 null rule.</td></tr>
+      <tr><td><code>udise_vps/facility.py</code></td><td><b>Facility Profile</b> — blank-only fill, the 0/9 sentinel handling, seeded value generation.</td></tr>
+      <tr><td><code>udise_vps/finalize.py</code></td><td><b>Complete Data</b> — status gating, pre-POST re-read, read-back confirmation.</td></tr>
+      <tr><td><code>udise_vps/esk.py</code></td><td>eShikshaKosh OTR report — your export, or a live fetch with the school credentials.</td></tr>
+      <tr><td><code>udise_vps/students.py</code></td><td>Roster export.</td></tr>
+      <tr><td><code>udise_vps/completion.py</code></td><td>Completion overview workbook.</td></tr>
+      <tr><td><code>tests/</code></td><td>Offline suites — 131 tests, no network.</td></tr>
+      <tr><td><code>tools/</code></td><td>One-off operational scripts: previews, batch writers, probes.</td></tr>
+      <tr><td><code>brain/</code></td><td>Working context — handoff, architecture, decisions, security.</td></tr>
+    </table>
+  </div>
+
   <div class="panel">
     <h4>Sentinel values to know</h4>
     <table>
@@ -389,7 +496,7 @@
 
 <div class="foot">
   Generic by design — no school ID is hardcoded in <code>udise_vps/</code>.
-  &nbsp;·&nbsp; 110 offline tests passing
+  &nbsp;·&nbsp; 131 offline tests passing
 </div>
 
 </div>

@@ -218,9 +218,12 @@ def test_preview_never_writes():
 
 
 def test_no_blank_fields_means_no_write():
+    # Every AUTO field must be present for this to be a true "nothing blank"
+    # case. aayBplYN is included because the BPL/AAY rule (4.1.15) would
+    # otherwise correctly fill it: BPL=No implies AAY=Not Applicable.
     portal = FakePortal({"1": {"cwsnYN": 2, "motherTongue": 42, "isBplYN": 2,
-                               "ewsYN": 2, "natIndYN": 1, "ooscYN": 2,
-                               "bloodGroup": "9"}})
+                               "aayBplYN": 9, "ewsYN": 2, "natIndYN": 1,
+                               "ooscYN": 2, "bloodGroup": "9"}})
     portal.students = [student("1", "PEN1")]
 
     results = general_profile.run_auto_gp(portal, allow_submit=True)

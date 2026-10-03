@@ -40,6 +40,22 @@ AUTO_GP_DEFAULTS = {
     "bloodGroup": "9",    # Under Investigation - Result will be updated soon
 }
 
+# Blood group codes. UDISE accepts 1-9 only; 9 is the official placeholder for
+# "Under Investigation - Result will be updated soon". Code 0 ("Unknown") is
+# offered by the UI but REJECTED by the API, so it is never written.
+BLOOD_GROUP_UNDER_INVESTIGATION = "9"
+BLOOD_GROUP_API_ACCEPTED = {"1", "2", "3", "4", "5", "6", "7", "8", "9"}
+
+# Cross-field rules the portal enforces. Applied only to a field we are
+# already writing, and only where the current value would break the rule.
+# Verified against all 208 live records: zero violations before the rules were
+# added, so these are guards, not corrections.
+AAY_NOT_APPLICABLE = 9
+AAY_NO = 2
+EWS_NO = 2
+# Categories that can never be EWS: SC, ST, OBC.
+EWS_EXCLUDED_CATEGORIES = {2, 3, 4}
+
 # Fresh CWSN values that force a full skip + manual review.
 CWSN_SKIP_CODES = {"1"}
 CWSN_UNEXPECTED_SKIP = {"3", "4", "5", "6", "7", "8", "9"}
