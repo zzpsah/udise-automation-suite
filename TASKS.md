@@ -29,4 +29,5 @@
 - [x] Add Hermes messaging skill/client.
 - [x] Add test-gated future GitHub promotion timer.
 - [ ] Deploy/connect the Vercel project with encrypted environment values.
-- [ ] Add explicit preview/approval flows before write-stage execution.
+- [x] Add explicit preview/approval flows with typed confirmation, acknowledgement,
+      a per-run write cap, one approval per preview, and fresh read-back.

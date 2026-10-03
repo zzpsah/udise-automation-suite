@@ -106,14 +106,16 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 - Dynamic capabilities expose IX/X/XI/XII and all known stages.
 - Read-only API execution is enabled for Student Roster, Full Read Snapshot,
   and Completion.
-- GP/EP/Facility/Finalize job creation is rejected until write approval exists.
+- Direct GP/EP/Facility/Finalize write-job creation is rejected. Completed
+  previews can create one bounded write after typed confirmation and read-back
+  acknowledgement.
 - Secure one-time UDISE session entry is implemented; Cookie material is kept
   in the user runtime directory rather than durable project state.
 - Public HTTPS reachability for the dedicated control API has been verified.
 - Vercel Next.js UI source builds successfully in production mode.
 - Hermes udise-control skill and local control client are installed.
-- Offline Python baseline is 145/145, including the synthetic control-plane preview
-  lifecycle and write-lock test.
+- The offline control-plane test covers preview, direct-write rejection,
+  bounded approval, duplicate-approval lock, and EP source reuse.
 - Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.
 
 ## Private GUI trial — 2026-10-03
@@ -145,11 +147,12 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 
 - The private GUI is a compact control/output workspace rather than stacked
   cards. Session entry opens inline in a secure modal; no separate tab needed.
-- GP, EP, Facility, and Finalize tiles can run no-POST previews. Each returns
+- GP, EP, Facility, and Finalize tiles first run no-POST previews. Each returns
   an Excel listing proposed values and reasons. EP also embeds a masked
   eShikshaKosh source sheet.
-- Preview files are private and expire after 24 hours. Actual saves remain
-  locked behind a future explicit approval endpoint.
+- Preview files are private and expire after 24 hours. A completed preview can
+  be approved once with a typed stage/class phrase, explicit read-back
+  acknowledgement, and a 1–500 write cap. Direct write creation stays blocked.
 - eShikshaKosh credentials use a separate inline one-time Oracle form. The
   password file is consumed/deleted when EP preview starts; WhatsApp gets only
   the secure link and never the password.

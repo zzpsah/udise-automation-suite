@@ -3,7 +3,7 @@
 Unpacked Manifest V3 extension for desktop Chrome and Edge. It reads the
 current `sdms.udiseplus.gov.in` cookies only after the operator clicks the
 extension button, then submits them to the short-lived session form already
-created by the private Oracle console.
+created by the Oracle or `udise.vercel.app` console.
 
 ## Install
 

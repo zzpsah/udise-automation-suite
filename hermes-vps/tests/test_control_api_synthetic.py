@@ -1,4 +1,4 @@
-"""Synthetic control-plane test with no portal network access or credentials."""
+"""Synthetic preview/approval control-plane test with no portal access."""
 
 from __future__ import annotations
 
@@ -35,11 +35,12 @@ def test_preview_lifecycle_and_write_lock() -> None:
             },
         )
 
-        observed: dict[str, object] = {}
+        observed: dict[str, object] = {"commands": []}
 
         class SyntheticProcess:
             def __init__(self, cmd, cwd, env, **_kwargs):
                 observed["cmd"] = list(cmd)
+                observed["commands"].append(list(cmd))
                 observed["cookie"] = env.get("UDISE_COOKIE_HEADER")
                 out_dir = Path(cmd[cmd.index("--out") + 1])
                 result = out_dir / "synthetic-gp-preview.xlsx"
@@ -119,10 +120,106 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert workbook.sheetnames == ["Proposed Changes"]
             assert workbook["Proposed Changes"].max_row == 2
             workbook.close()
+
+            try:
+                api.approve_job(
+                    queued["job_id"],
+                    api.ApprovalIn(
+                        confirmation="SAVE GP IX",
+                        acknowledge_readback=False,
+                        max_submissions=1,
+                    ),
+                    authorization=authorization,
+                )
+            except HTTPException as exc:
+                assert exc.status_code == 400
+            else:
+                raise AssertionError("Approval without read-back acknowledgement was accepted")
+
+            approved = api.approve_job(
+                queued["job_id"],
+                api.ApprovalIn(
+                    confirmation="SAVE GP IX",
+                    acknowledge_readback=True,
+                    max_submissions=1,
+                ),
+                authorization=authorization,
+            )
+            deadline = time.time() + 5
+            write_state = None
+            while time.time() < deadline:
+                write_state = api.get_job(approved["job_id"], authorization=authorization)
+                if write_state["job"]["status"] in {"completed", "failed"}:
+                    break
+                time.sleep(0.02)
+            assert write_state is not None
+            assert write_state["job"]["status"] == "completed", write_state
+            assert write_state["job"]["preview"] == 0
+            assert write_state["job"]["approved_from"] == queued["job_id"]
+            write_cmd = observed["commands"][-1]
+            assert "--submit" in write_cmd
+            assert write_cmd[write_cmd.index("--max") + 1] == "1"
+
+            try:
+                api.approve_job(
+                    queued["job_id"],
+                    api.ApprovalIn(
+                        confirmation="SAVE GP IX",
+                        acknowledge_readback=True,
+                        max_submissions=1,
+                    ),
+                    authorization=authorization,
+                )
+            except HTTPException as exc:
+                assert exc.status_code == 409
+            else:
+                raise AssertionError("The same preview was approved twice")
+
+            ep_preview_id = "a" * 32
+            ep_dir = api.JOBS / ep_preview_id
+            ep_dir.mkdir(parents=True)
+            ep_result = ep_dir / "UDISE_EP_Preview_2497128_IX.xlsx"
+            ep_source = ep_dir / "eShikshaKosh_OTR_2497128_2026-27.xlsx"
+            for path in (ep_result, ep_source):
+                book = Workbook()
+                book.save(path)
+                book.close()
+            now = int(time.time())
+            with api._db() as connection:
+                connection.execute(
+                    """INSERT INTO jobs(
+                           id,created_at,updated_at,status,stage,class_name,school,
+                           session_id,preview,message,result_path
+                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        ep_preview_id, now, now, "completed", "ep", "IX", "2497128",
+                        session_id, 1, "Completed successfully", str(ep_result),
+                    ),
+                )
+            ep_approved = api.approve_job(
+                ep_preview_id,
+                api.ApprovalIn(
+                    confirmation="SAVE EP IX",
+                    acknowledge_readback=True,
+                    max_submissions=5,
+                ),
+                authorization=authorization,
+            )
+            deadline = time.time() + 5
+            while time.time() < deadline:
+                ep_state = api.get_job(ep_approved["job_id"], authorization=authorization)
+                if ep_state["job"]["status"] in {"completed", "failed"}:
+                    break
+                time.sleep(0.02)
+            assert ep_state["job"]["status"] == "completed", ep_state
+            ep_cmd = observed["commands"][-1]
+            assert "--report" in ep_cmd and str(ep_source) in ep_cmd
+            assert "--fetch-report" not in ep_cmd
+            assert ep_cmd[ep_cmd.index("--max") + 1] == "5"
         finally:
             api.subprocess.Popen = original_popen
 
 
 if __name__ == "__main__":
     test_preview_lifecycle_and_write_lock()
-    print("PASS synthetic control API preview lifecycle and write lock")
+    print("PASS synthetic preview, approval, write cap, and duplicate lock")

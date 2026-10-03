@@ -661,9 +661,12 @@ control_api exposes dynamic class/stage capabilities, secure runtime UDISE
 session entry, read-only jobs, aggregate progress events and protected results.
 
 Students, snapshot, and completion execute as read-only API stages. GP, EP,
-Facility, and Finalize execute only as no-POST preview jobs and return a
-proposed-change Excel. Actual saves remain locked until separate approval.
-Preview workbooks and temporary eShikshaKosh source files expire after 24 hours.
+Facility, and Finalize start as no-POST previews and return a proposed-change
+Excel. A completed preview can authorize one bounded write only after the
+operator reviews the workbook, chooses a cap, acknowledges fresh read-back,
+and types the stage/class confirmation phrase. Direct write-job creation stays
+blocked. Preview workbooks and temporary eShikshaKosh source files expire after
+24 hours.
 
 The Vercel source is in web/. The Hermes natural-language skill and local client
 are in hermes-skill/udise-control/ and tools/control_client.py.

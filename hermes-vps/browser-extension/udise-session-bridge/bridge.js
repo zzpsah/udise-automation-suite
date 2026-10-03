@@ -12,6 +12,18 @@ function approvedEntryUrl(value) {
   }
 }
 
+function approvedConsoleUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && (
+      (url.hostname === "oracle-server.tail2b7fe2.ts.net" && url.port === "3010") ||
+      (url.hostname === "udise.vercel.app" && !url.port)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function cookieHeader(cookies) {
   return cookies
     .filter(cookie => cookie && cookie.name && typeof cookie.value === "string")
@@ -20,6 +32,6 @@ function cookieHeader(cookies) {
     .join("; ");
 }
 
-const api = {approvedEntryUrl, cookieHeader};
+const api = {approvedEntryUrl, approvedConsoleUrl, cookieHeader};
 globalThis.UdiseSessionBridge = api;
 if (typeof module !== "undefined") module.exports = api;

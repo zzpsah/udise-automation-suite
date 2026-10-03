@@ -28,10 +28,11 @@ Current stage registry:
 - students: read-only, executable in MVP
 - snapshot: read-only, executable; combined all-student stage workbook
 - completion: read-only, executable in MVP
-- gp: preview Excel enabled; actual save locked
-- ep: preview Excel enabled with masked eShikshaKosh source; actual save locked
-- facility: preview Excel enabled; actual save locked
-- finalize: eligibility preview Excel enabled; actual finalize locked
+- gp: preview Excel, explicit bounded approval, save, fresh read-back
+- ep: preview Excel with masked eShikshaKosh source, explicit bounded approval,
+  save, fresh read-back
+- facility: preview Excel, explicit bounded approval, save, fresh read-back
+- finalize: status-3 preview, explicit bounded approval, status-6 read-back
 
 The UI must not maintain a second hard-coded class/stage availability matrix. Future runner
 enhancements should update the capability registry and both control surfaces
@@ -69,9 +70,14 @@ to aggregate messages such as: Completion status: 12/38 students checked.
 
 ## Write safety
 
-The control API currently rejects write stages with HTTP 409.
+Direct non-preview job creation is rejected with HTTP 409. A write job can be
+created only from one completed, unexpired preview through
+`POST /api/v1/jobs/{preview_id}/approve`. The operator must type the exact
+`SAVE <STAGE> <CLASS>` phrase, acknowledge the read-back requirement, and
+choose a maximum of 1–500 records. A unique database constraint prevents the
+same preview from being approved twice.
 
-When write workflows are added they must preserve the runner contract:
+The approved job preserves the runner contract:
 
 1. fresh GET
 2. blank-only diff
@@ -79,7 +85,8 @@ When write workflows are added they must preserve the runner contract:
 4. fresh matching read-back
 5. stop the batch on mismatch
 
-No public UI or messaging feature may bypass this boundary.
+No public UI or messaging feature may bypass this boundary. Deployment and
+code promotion do not approve or run a portal write.
 
 ## Vercel web app
 
@@ -87,8 +94,8 @@ Source: hermes-vps/web/
 
 The app requires an application access code, keeps Oracle API credentials
 server-side only, fetches capabilities dynamically, creates secure UDISE session
-links, starts read-only jobs, polls human-readable progress, and proxies
-protected result downloads.
+links, starts read/preview jobs, polls human-readable progress, proxies protected
+result downloads, and exposes the preview-bound approval controls.
 
 Required Vercel environment values are documented in web/.env.example.
 
@@ -115,17 +122,16 @@ A bookmarklet is not a reliable session bridge. Page JavaScript cannot read an
 cookie automatically. The current one-time secure Cookie-header form remains
 the cross-device fallback.
 
-A future desktop Chrome/Edge extension may use the browser Cookies API after a
-user click and explicit host permission for the UDISE and private Oracle
-domains. It must send the cookie only to a newly created short-lived Oracle
+A desktop Chrome/Edge extension may use the browser Cookies API after a user
+click and explicit host permission for UDISE, the Oracle console, and
+`udise.vercel.app`. It sends the cookie only to a newly created short-lived Oracle
 session request and must never log or persist the value. Mobile Chrome does not
 support this extension path, so it does not replace the secure form on phones.
 
 The unpacked extension is implemented in
 `browser-extension/udise-session-bridge/`. It discovers only the one-time
-session iframe already created by the authenticated private console and accepts
-only the configured tailnet host, HTTPS, port 10000, and a valid session-token
-path.
+session iframe already created by an authenticated console and accepts only the
+configured Oracle host, HTTPS, port 10000, and a valid session-token path.
 
 Saved schools are deployment configuration, not runner constants. Set
 `UDISE_SCHOOL_PRESETS_JSON` in the private web service environment. The UI uses

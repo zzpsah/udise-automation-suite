@@ -104,6 +104,10 @@ python3 tests/test_general_profile.py  # 27 — GP blank-fill, cross-field rules
 
 ## What is NOT covered
 
+- **No automatic live write in control-plane verification.** The synthetic test
+  proves the preview-to-approval command boundary, cap, duplicate lock, and EP
+  source reuse; it never contacts UDISE.
+
 - **No live network tests.** Everything is offline by design, so the suite is
   safe to run anywhere and cannot touch a real portal.
 - **No test of a real portal write.** Writes are verified in operation by

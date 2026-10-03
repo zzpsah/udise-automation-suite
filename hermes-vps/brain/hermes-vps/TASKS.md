@@ -80,7 +80,7 @@
 - [x] Add protected read-only job API and aggregate progress events.
 - [x] Add Full Read Snapshot capability and all-stage Excel export.
 - [x] Add one-time secure runtime UDISE session entry.
-- [x] Keep all write stages locked in the control API.
+- [x] Keep direct write-stage creation locked in the control API.
 - [x] Add Vercel Next.js GUI source and pass a production build.
 - [x] Add Hermes natural-language skill and local control client.
 - [x] Add verified GitHub candidate-test-and-promote workflow.
@@ -90,7 +90,7 @@
       capability-driven polls.
 - [ ] Connect/deploy the Vercel project and set encrypted environment values.
 - [ ] Add proactive WhatsApp progress push from job events.
-- [ ] Add dedicated preview/approval workflow before enabling each write stage.
+- [x] Add dedicated preview/approval workflow before enabling each write stage.
 - [x] Enable no-POST preview Excel for GP, EP, Facility, and Finalize.
 - [x] Embed masked eShikshaKosh source data in the EP preview workbook.
 - [x] Add one-time inline eShikshaKosh credential entry for GUI and WhatsApp.
@@ -101,8 +101,9 @@
       without changing the selected class.
 - [x] Add the desktop Chrome/Edge one-click UDISE session bridge.
 - [x] Launch the eShikshaKosh export with its maintained Playwright environment.
-- [ ] Add the explicit approval endpoint and per-run write cap before enabling
-      any GUI or WhatsApp save action.
+- [x] Add the explicit approval endpoint and per-run write cap for GUI saves;
+      typed confirmation and read-back acknowledgement are required, and a
+      preview can be approved only once.
 - [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
       inspect workbook sheet/row counts before marking it `LIVE_READ`. The
       2026-10-03 attempt stopped safely at session check (HTTP 302).

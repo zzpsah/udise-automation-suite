@@ -20,3 +20,6 @@
   synthetic preview-lifecycle and write-lock integration test.
 - Class-first operation scope with unsupported workflows disabled.
 - Desktop UDISE session bridge and corrected eShikshaKosh export interpreter.
+- Preview-bound write approval for GP, EP, Facility, and Complete Data with a
+  typed phrase, explicit read-back acknowledgement, bounded writes, and no
+  automatic live execution during deployment.

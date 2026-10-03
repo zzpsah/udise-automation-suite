@@ -17,7 +17,7 @@ Never commit it — `.gitignore` covers it.
 compromised and rotate it.** A cookie is a full session for the school's portal.
 
 The desktop session bridge requires an explicit user click and restricts host
-permissions to UDISE SDMS and the private Oracle tailnet host. It submits the
+permissions to UDISE SDMS, the Oracle console, and `udise.vercel.app`. It submits the
 cookie only to a valid, short-lived `/session/{token}` request already visible
 in the authenticated console. It must not add storage, logging, analytics,
 broader host permissions, or a background upload path.
@@ -92,6 +92,9 @@ the discrepancy is understood — the portal may have partially applied the writ
   kept in the user runtime directory, not durable project state.
 - Vercel never receives the UDISE Cookie.
 - Raw per-student progress is not exposed to the web UI.
-- The current control API rejects all write stages.
+- The control API rejects direct write-job creation. A write can be derived only
+  from one completed, unexpired preview after an exact typed phrase, explicit
+  read-back acknowledgement, and a bounded maximum. A preview can be approved
+  only once.
 - Public exposure must target only the control API listener, not unrelated
   Oracle/Hermes services.

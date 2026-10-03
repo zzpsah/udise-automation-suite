@@ -52,13 +52,16 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
   bound to loopback and exposed only through Tailscale Serve.
 - GUI: `https://oracle-server.tail2b7fe2.ts.net:3010/`; the one-time secure
   session form is separately tailnet-only on port `10000`.
-- The former public Funnel was removed. No UDISE portal write stage is enabled.
+- The private Oracle trial still uses Tailscale Serve. GP/EP/Facility/Finalize
+  now have a preview-bound approval implementation; deployment itself does not
+  execute a write.
 - GUI metadata follows the five phases in `hermes-vps/docs/flow.html`.
 - The GUI uses formal English operational copy derived from the Hermes VPS flow
   and capability matrix; decorative labels and notebook references are absent.
-- A synthetic control-plane test verifies preview job creation, progress,
-  workbook output, and rejection of non-preview write-stage requests without
-  using portal credentials or network access.
+- A synthetic control-plane test verifies preview job creation, workbook output,
+  direct-write rejection, typed/acknowledged bounded approval, one approval per
+  preview, EP source reuse, and the `--submit --max` runner boundary without
+  portal credentials or network access.
 - Class scope is selected before workflow selection; unsupported class/stage
   combinations are visibly unavailable and never rewrite the selected class.
 - The desktop UDISE session bridge is implemented as a user-clicked Chrome/Edge

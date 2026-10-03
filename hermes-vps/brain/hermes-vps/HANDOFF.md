@@ -78,10 +78,11 @@ For UI/messaging work, read ../../docs/CONTROL_PLANE.md after this file.
 
 Current safe MVP:
 - students and completion execute through the control API
-- all write stages are capability-visible but API-locked
+- GP/EP/Facility/Finalize run preview first; one completed preview may create
+  one bounded write job after typed confirmation and read-back acknowledgement
 - Vercel source builds
 - Hermes skill/client are installed
 - GitHub auto-promotion validates a candidate before fast-forwarding live
 
-Do not enable GP/EP/Facility/Finalize writes merely by changing capability mode.
-Each requires a dedicated preview/approval contract with read-back.
+Direct non-preview job creation remains rejected. Do not add any path that can
+bypass the preview id, one-approval rule, write cap, or runner read-back.

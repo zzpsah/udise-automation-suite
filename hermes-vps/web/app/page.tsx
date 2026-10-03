@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires_class:boolean;description:string;preview_enabled?:boolean};
+type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires_class:boolean;description:string;preview_enabled?:boolean;approval_enabled?:boolean};
 type SchoolPreset={internal_id:string;udise_code:string;name:string};
 type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
-type JobState={job:{id:string;status:string;stage:string;class_name?:string;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
+type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
   students: "Phase 1 · Validate session and fetch the current roster",
@@ -41,6 +41,9 @@ export default function Page(){
   const [eshikshaReady,setEshikshaReady]=useState(false);
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
+  const [maxWrites,setMaxWrites]=useState("1");
+  const [approvalText,setApprovalText]=useState("");
+  const [acknowledgeReadback,setAcknowledgeReadback]=useState(false);
   const [msg,setMsg]=useState("");
 
   async function loadCaps(){
@@ -122,6 +125,22 @@ export default function Page(){
     setJobId(d.job_id);setMsg("Workflow started.");
   }
 
+  const approvalPhrase=job?.job?`SAVE ${job.job.stage.toUpperCase()} ${job.job.class_name||"ALL"}`:"";
+  const approvedStage=job?.job?caps?.stages.find(item=>item.id===job.job.stage):undefined;
+  const canApprove=Boolean(job&&job.job.status==="completed"&&job.job.preview&&job.job.has_result&&approvedStage?.approval_enabled);
+
+  async function approveWrite(){
+    if(!job||!canApprove) return;
+    setMsg("Submitting the bounded approval…");
+    const r=await fetch(`/api/jobs/${job.job.id}/approve`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+      confirmation:approvalText,acknowledge_readback:acknowledgeReadback,max_submissions:Number(maxWrites)
+    })});
+    const d=await r.json();
+    if(!r.ok){setMsg(d.detail||d.error||"Approval was rejected");return}
+    setJob(null);setJobId(d.job_id);setApprovalText("");setAcknowledgeReadback(false);
+    setMsg(`Approved save started for up to ${d.max_submissions} record(s).`);
+  }
+
   useEffect(()=>{
     if(!jobId) return;
     const poll=async()=>{
@@ -141,7 +160,7 @@ export default function Page(){
 
   const pct=job?.job.progress_total?Math.min(100,Math.round(job.job.progress_current*100/job.job.progress_total)):0;
   return <main>
-    <div className="hero"><div><span className="eyebrow">HERMES VPS</span><h1>UDISE Operations Console</h1></div><span className="privacy-pill">Private · Tailnet</span></div>
+    <div className="hero"><div><span className="eyebrow">HERMES VPS</span><h1>UDISE Operations Console</h1></div><span className="privacy-pill">Secure control plane</span></div>
     <div className="workspace">
       <div className="controls">
         <section className="card setup-card">
@@ -173,14 +192,14 @@ export default function Page(){
             return <button type="button" aria-pressed={stage===s.id} disabled={unavailable} key={s.id} className={"choice "+(stage===s.id?"active ":"")+(s.mode==="write"?"previewable":"ready")} onClick={()=>setStage(s.id)}>
               <span className="stage-icon" aria-hidden="true">{meta.icon}</span>
               <span className="stage-copy"><strong>{s.label}</strong><small>{meta.short}</small></span>
-              <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Preview":"Ready"}</span>
+              <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Review + Save":"Ready"}</span>
             </button>})}</div>
 
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
             <div className="selected-stage-head"><span aria-hidden="true">{selectedMeta?.icon||"--"}</span><div><strong>{selected.label}</strong><small>{HERMES_FLOW_REFERENCE[selected.id]}</small></div></div>
             <div className="fill-chips">{selectedMeta?.fills.map(item=><span key={item}>{item}</span>)}</div>
             {selected.id==="ep"&&<div className={"source-status "+(eshikshaReady?"ready":"needed")}>{eshikshaReady?"● eShikshaKosh source ready":"○ eShikshaKosh sign-in required"}</div>}
-            {selected.mode==="write"?<div className="lock-reason"><div><strong>Preview enabled · Portal save protected</strong><span>This run produces an Excel proposal only. A portal write requires separate explicit approval and must be followed by a fresh matching read-back.{selected.id==="ep"?" The workbook also includes the masked eShikshaKosh source report.":""}</span></div></div>:<p>{selected.description}</p>}
+            {selected.mode==="write"?<div className="lock-reason"><div><strong>Preview first · Explicit approval required</strong><span>Review the Excel proposal, choose a maximum write count, and type the confirmation phrase. Every save uses a fresh pre-write read and matching post-write read-back.{selected.id==="ep"?" The preview also retains the masked eShikshaKosh source for the approved run.":""}</span></div></div>:<p>{selected.description}</p>}
           </div>}
 
           <div className="run-row">
@@ -197,6 +216,18 @@ export default function Page(){
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           <ul className="events">{job.events.slice(-6).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
+          {canApprove&&<div className="approval-box">
+            <strong>Approve portal save</strong>
+            <span>Review the workbook first. Saved values stay unchanged; processing stops on an unconfirmed read-back.</span>
+            <label>Maximum records</label>
+            <select value={maxWrites} onChange={e=>setMaxWrites(e.target.value)} aria-label="Maximum records to save">
+              <option value="1">1 record</option><option value="5">Up to 5 records</option><option value="20">Up to 20 records</option><option value="500">All eligible records</option>
+            </select>
+            <label>Type {approvalPhrase}</label>
+            <input value={approvalText} onChange={e=>setApprovalText(e.target.value)} aria-label="Write confirmation phrase" autoComplete="off"/>
+            <label className="approval-check"><input type="checkbox" checked={acknowledgeReadback} onChange={e=>setAcknowledgeReadback(e.target.checked)}/><span>I approve this bounded portal save and understand that a fresh read-back is required.</span></label>
+            <button className="approve-button" disabled={approvalText!==approvalPhrase||!acknowledgeReadback} onClick={approveWrite}>Approve and save</button>
+          </div>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}
       </aside>

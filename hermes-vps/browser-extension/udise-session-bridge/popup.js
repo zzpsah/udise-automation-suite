@@ -23,8 +23,8 @@ async function connect() {
   show("Checking the private console and current SDMS session…");
   try {
     const tab = await activeTab();
-    if (!tab?.id || !String(tab.url || "").startsWith("https://oracle-server.tail2b7fe2.ts.net:3010/")) {
-      throw new Error("Open the private UDISE console before using this extension.");
+    if (!tab?.id || !UdiseSessionBridge.approvedConsoleUrl(tab.url || "")) {
+      throw new Error("Open the UDISE console before using this extension.");
     }
 
     const entryUrl = await sessionEntryUrl(tab.id);

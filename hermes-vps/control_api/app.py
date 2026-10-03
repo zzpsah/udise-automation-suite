@@ -41,7 +41,7 @@ for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, ESK_REQUESTS):
     p.mkdir(parents=True, exist_ok=True)
     os.chmod(p, 0o700)
 
-app = FastAPI(title="UDISE Hermes Control API", version="0.1.0")
+app = FastAPI(title="UDISE Hermes Control API", version="0.2.0")
 
 
 def _db() -> sqlite3.Connection:
@@ -62,9 +62,24 @@ def _db() -> sqlite3.Connection:
             progress_total INTEGER NOT NULL DEFAULT 0,
             message TEXT NOT NULL DEFAULT '',
             result_path TEXT,
-            error TEXT
+            error TEXT,
+            approved_from TEXT,
+            approved_at INTEGER,
+            max_submissions INTEGER NOT NULL DEFAULT 0
         )
     """)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    for name, definition in (
+        ("approved_from", "TEXT"),
+        ("approved_at", "INTEGER"),
+        ("max_submissions", "INTEGER NOT NULL DEFAULT 0"),
+    ):
+        if name not in columns:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {definition}")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS jobs_one_approval "
+        "ON jobs(approved_from) WHERE approved_from IS NOT NULL"
+    )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,6 +149,12 @@ class JobIn(BaseModel):
     stage: str
     class_name: str | None = None
     preview: bool = True
+
+
+class ApprovalIn(BaseModel):
+    confirmation: str = Field(min_length=1, max_length=100)
+    acknowledge_readback: bool = False
+    max_submissions: int = Field(default=1, ge=1, le=500)
 
 
 def _request_file(directory: Path, token: str) -> Path:
@@ -404,17 +425,25 @@ def _run_job(job_id: str) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         os.chmod(out_dir, 0o700)
         stage = row["stage"]
+        is_preview = bool(row["preview"])
         cmd = [str(RUNNER), stage, "--school", row["school"], "--out", str(out_dir)]
         if stage == "completion":
             cmd += ["--class", row["class_name"]]
         elif stage == "gp":
             cmd += ["--class", row["class_name"], "--run-mode", "All students"]
         elif stage == "ep":
-            eshiksha = _load_eshiksha_credentials()
-            cmd += [
-                "--class", row["class_name"], "--fetch-report",
-                "--year", eshiksha.get("year", "2026-27"),
-            ]
+            if is_preview:
+                eshiksha = _load_eshiksha_credentials()
+                cmd += [
+                    "--class", row["class_name"], "--fetch-report",
+                    "--year", eshiksha.get("year", "2026-27"),
+                ]
+            else:
+                source_dir = JOBS / str(row["approved_from"])
+                reports = sorted(source_dir.glob("eShikshaKosh_OTR_*.xlsx"))
+                if not reports:
+                    raise RuntimeError("Approved eShikshaKosh source report is no longer available; generate a new preview")
+                cmd += ["--class", row["class_name"], "--report", str(reports[-1])]
         elif stage == "facility":
             cmd += ["--class", row["class_name"]]
         elif stage == "finalize":
@@ -422,9 +451,12 @@ def _run_job(job_id: str) -> None:
         elif stage not in {"students", "snapshot"}:
             raise RuntimeError("This stage is not enabled in the read-only MVP")
 
+        if not is_preview:
+            cmd += ["--submit", "--max", str(row["max_submissions"])]
+
         env = os.environ.copy()
         env["UDISE_COOKIE_HEADER"] = session["cookie"]
-        if stage == "ep":
+        if stage == "ep" and is_preview:
             env["ESHIKSHAKOSH_UDISE"] = eshiksha["udise"]
             env["ESHIKSHAKOSH_PASSWORD"] = eshiksha["password"]
         with _db() as conn:
@@ -435,7 +467,7 @@ def _run_job(job_id: str) -> None:
         proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 bufsize=1)
-        if stage == "ep":
+        if stage == "ep" and is_preview:
             ESK_CREDENTIAL.unlink(missing_ok=True)
         report_path = None
         runner_error = None
@@ -493,6 +525,61 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
                       body.session_id, 1, "Queued"))
     threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
     return {"job_id": job_id, "status": "queued"}
+
+
+def _approval_phrase(stage: str, class_name: str | None) -> str:
+    return f"SAVE {stage.upper()} {class_name or 'ALL'}"
+
+
+@app.post("/api/v1/jobs/{job_id}/approve")
+def approve_job(job_id: str, body: ApprovalIn, authorization: str | None = Header(default=None)) -> dict:
+    """Create one bounded write job from a completed preview."""
+    require_api(authorization)
+    _cleanup_expired_results()
+    with _db() as conn:
+        preview = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        if not preview:
+            raise HTTPException(404, "Preview job not found")
+        if preview["status"] != "completed" or not bool(preview["preview"]):
+            raise HTTPException(409, "Only a completed preview can be approved")
+        stage = next(
+            (item for item in get_capabilities()["stages"] if item["id"] == preview["stage"]),
+            None,
+        )
+        if not stage or stage["mode"] != "write":
+            raise HTTPException(409, "This job is not an approvable write preview")
+        _load_session(preview["session_id"])
+        expected = _approval_phrase(preview["stage"], preview["class_name"])
+        if not body.acknowledge_readback or not secrets.compare_digest(body.confirmation.strip(), expected):
+            raise HTTPException(400, f"Type {expected} and acknowledge fresh read-back")
+        if not preview["result_path"] or not Path(preview["result_path"]).is_file():
+            raise HTTPException(410, "Preview workbook expired; generate a new preview")
+        existing = conn.execute(
+            "SELECT id FROM jobs WHERE approved_from=? AND status IN ('queued','running','completed') LIMIT 1",
+            (job_id,),
+        ).fetchone()
+        if existing:
+            raise HTTPException(409, "This preview has already been approved")
+        if preview["stage"] == "ep" and not list((JOBS / job_id).glob("eShikshaKosh_OTR_*.xlsx")):
+            raise HTTPException(410, "eShikshaKosh source expired; generate a new EP preview")
+        write_job_id = uuid.uuid4().hex
+        now = int(time.time())
+        try:
+            conn.execute(
+                """INSERT INTO jobs(
+                       id,created_at,updated_at,status,stage,class_name,school,session_id,
+                       preview,message,approved_from,approved_at,max_submissions
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    write_job_id, now, now, "queued", preview["stage"], preview["class_name"],
+                    preview["school"], preview["session_id"], 0,
+                    "Approved write queued", job_id, now, body.max_submissions,
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(409, "This preview has already been approved") from exc
+    threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
+    return {"job_id": write_job_id, "status": "queued", "max_submissions": body.max_submissions}
 
 
 def _job_dict(row: sqlite3.Row) -> dict:

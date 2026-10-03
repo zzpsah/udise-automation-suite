@@ -11,7 +11,8 @@ assert.equal(manifest.manifest_version, 3);
 assert.deepEqual(manifest.permissions.sort(), ["activeTab", "cookies"]);
 assert.deepEqual(manifest.host_permissions.sort(), [
   "https://oracle-server.tail2b7fe2.ts.net/*",
-  "https://sdms.udiseplus.gov.in/*"
+  "https://sdms.udiseplus.gov.in/*",
+  "https://udise.vercel.app/*"
 ]);
 
 assert.equal(bridge.approvedEntryUrl(
@@ -23,6 +24,9 @@ assert.equal(bridge.approvedEntryUrl(
 assert.equal(bridge.approvedEntryUrl(
   "http://oracle-server.tail2b7fe2.ts.net:10000/session/abcdefghijklmnopqrstuvwxyz_123456"
 ), false);
+assert.equal(bridge.approvedConsoleUrl("https://oracle-server.tail2b7fe2.ts.net:3010/"), true);
+assert.equal(bridge.approvedConsoleUrl("https://udise.vercel.app/"), true);
+assert.equal(bridge.approvedConsoleUrl("https://udise.vercel.app.evil.example/"), false);
 
 const header = bridge.cookieHeader([
   {name: "XSRF-TOKEN", value: "xsrf"},
