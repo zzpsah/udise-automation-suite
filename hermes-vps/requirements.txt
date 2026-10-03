@@ -3,3 +3,4 @@ openpyxl>=3.1
 pandas>=2.0
 python-multipart>=0.0.9
 nest-asyncio>=1.6
+playwright>=1.48
