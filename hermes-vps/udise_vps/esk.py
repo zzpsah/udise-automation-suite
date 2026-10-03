@@ -140,7 +140,8 @@ def export_report(
            "--year", year, "--output", str(out)]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if proc.returncode != 0 or not out.is_file():
-        tail = re.sub(r"\s+", " ", (proc.stderr or proc.stdout or "").strip())[-600:]
+        diagnostics = "\n".join(part for part in (proc.stderr, proc.stdout) if part)
+        tail = re.sub(r"\s+", " ", diagnostics.strip())[-1600:]
         raise RuntimeError(
             f"eShikshaKosh export failed (exit {proc.returncode}). "
             f"{tail or 'No diagnostic output was returned.'}"
