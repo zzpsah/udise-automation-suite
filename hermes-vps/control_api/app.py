@@ -26,14 +26,17 @@ RUNTIME = Path(os.environ.get("UDISE_CONTROL_RUNTIME", Path(os.environ.get("XDG_
 JOBS = STATE / "jobs"
 SESSIONS = RUNTIME / "sessions"
 REQUESTS = RUNTIME / "session-requests"
+ESK_REQUESTS = RUNTIME / "eshiksha-requests"
+ESK_CREDENTIAL = RUNTIME / "eshiksha-credential.json"
 DB = STATE / "jobs.sqlite3"
 CONTROL_TOKEN_FILE = Path(os.environ.get("UDISE_CONTROL_TOKEN_FILE", Path.home() / ".config/udise-control/api-token"))
 RUNNER = Path(os.environ.get("UDISE_VPS_RUNNER", Path.home() / ".local/bin/udise-vps"))
 SESSION_TTL = 8 * 60 * 60
 REQUEST_TTL = 10 * 60
+ESK_CREDENTIAL_TTL = 30 * 60
 RESULT_TTL = 24 * 60 * 60
 
-for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS):
+for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, ESK_REQUESTS):
     p.mkdir(parents=True, exist_ok=True)
     os.chmod(p, 0o700)
 
@@ -132,6 +135,12 @@ class JobIn(BaseModel):
     preview: bool = True
 
 
+def _request_file(directory: Path, token: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,120}", token or ""):
+        raise HTTPException(400, "Invalid request token")
+    return directory / f"{token}.json"
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "service": "udise-control", "version": app.version}
@@ -227,6 +236,97 @@ async def session_submit(token: str, request: Request):
 <h2>✅ Session saved</h2><p>Ab UDISE automation screen/WhatsApp par wapas ja sakte hain.</p></body></html>""")
 
 
+@app.post("/api/v1/eshiksha-requests")
+def create_eshiksha_request(body: SessionRequestIn, authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    token = secrets.token_urlsafe(32)
+    now = int(time.time())
+    _json_write(ESK_REQUESTS / f"{token}.json", {
+        "created_at": now, "expires_at": now + REQUEST_TTL,
+        "used": False, "ready": False, "return_url": body.return_url or "",
+    })
+    base = os.environ.get("UDISE_CONTROL_PUBLIC_BASE", "").rstrip("/")
+    return {
+        "token": token, "expires_in": REQUEST_TTL,
+        "entry_url": f"{base}/eshiksha/{token}" if base else f"/eshiksha/{token}",
+    }
+
+
+@app.get("/api/v1/eshiksha-requests/{token}")
+def eshiksha_request_status(token: str, authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    p = _request_file(ESK_REQUESTS, token)
+    if not p.exists():
+        raise HTTPException(404, "Not found")
+    data = _json_read(p)
+    if int(time.time()) > int(data.get("expires_at", 0)):
+        raise HTTPException(410, "Expired")
+    return {"ready": bool(data.get("ready"))}
+
+
+@app.get("/eshiksha/{token}", response_class=HTMLResponse)
+def eshiksha_form(token: str):
+    p = _request_file(ESK_REQUESTS, token)
+    if not p.exists():
+        raise HTTPException(404, "Link unavailable")
+    data = _json_read(p)
+    if data.get("used") or int(time.time()) > int(data.get("expires_at", 0)):
+        raise HTTPException(410, "Link expired or already used")
+    return HTMLResponse(f"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>eShikshaKosh Secure Login</title><style>
+body{{font-family:system-ui;max-width:620px;margin:24px auto;padding:0 18px;background:#f6f7f9;color:#111}}
+.card{{background:#fff;border:1px solid #ddd;border-radius:16px;padding:22px}}
+input{{width:100%;box-sizing:border-box;padding:12px;margin:5px 0 11px;border:1px solid #bbb;border-radius:10px;font-size:16px}}
+label{{font-weight:650;font-size:13px}}button{{width:100%;padding:13px;border:0;border-radius:10px;background:#111;color:white;font-size:16px}}
+small{{color:#666}}</style></head><body><div class="card"><h2>eShikshaKosh Secure Login</h2>
+<p>Read-only OTR report fetch ke liye details enter karein.</p>
+<form method="post" action="/eshiksha/{html.escape(token)}">
+<label>UDISE code / username</label><input name="udise" autocomplete="username" required>
+<label>Password</label><input name="password" type="password" autocomplete="current-password" required>
+<label>Academic year</label><input name="year" value="2026-27" required>
+<button type="submit">Use once for preview</button></form>
+<p><small>Password EP preview start hote hi temporary storage se delete ho jayega.</small></p>
+</div></body></html>""")
+
+
+@app.post("/eshiksha/{token}")
+async def eshiksha_submit(token: str, request: Request):
+    p = _request_file(ESK_REQUESTS, token)
+    if not p.exists():
+        raise HTTPException(404, "Link unavailable")
+    data = _json_read(p)
+    now = int(time.time())
+    if data.get("used") or now > int(data.get("expires_at", 0)):
+        raise HTTPException(410, "Link expired or already used")
+    form = await request.form()
+    udise = str(form.get("udise") or "").strip()
+    password = str(form.get("password") or "").strip()
+    year = str(form.get("year") or "2026-27").strip()
+    if not udise or not password or not re.fullmatch(r"\d{4}-\d{2}", year):
+        raise HTTPException(400, "UDISE, password and valid year are required")
+    _json_write(ESK_CREDENTIAL, {
+        "udise": udise, "password": password, "year": year,
+        "created_at": now, "expires_at": now + ESK_CREDENTIAL_TTL,
+    })
+    data.update({"used": True, "ready": True, "used_at": now})
+    _json_write(p, data)
+    return HTMLResponse("""<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">
+<body style="font-family:system-ui;max-width:560px;margin:50px auto;padding:20px;text-align:center">
+<h2>✅ eShikshaKosh ready</h2><p>Is box ko band karke EP Preview Excel chala sakte hain.</p></body></html>""")
+
+
+def _load_eshiksha_credentials() -> dict:
+    if not ESK_CREDENTIAL.exists():
+        raise RuntimeError("Connect eShikshaKosh securely before running EP preview")
+    data = _json_read(ESK_CREDENTIAL)
+    if int(time.time()) > int(data.get("expires_at", 0)):
+        ESK_CREDENTIAL.unlink(missing_ok=True)
+        raise RuntimeError("eShikshaKosh temporary credentials expired; connect again")
+    if not data.get("udise") or not data.get("password"):
+        raise RuntimeError("eShikshaKosh temporary credentials are incomplete")
+    return data
+
+
 def _event(job_id: str, message: str, level: str = "info") -> None:
     message = message.strip()[:500]
     with _db() as conn:
@@ -309,7 +409,11 @@ def _run_job(job_id: str) -> None:
         elif stage == "gp":
             cmd += ["--class", row["class_name"], "--run-mode", "All students"]
         elif stage == "ep":
-            cmd += ["--class", row["class_name"], "--fetch-report"]
+            eshiksha = _load_eshiksha_credentials()
+            cmd += [
+                "--class", row["class_name"], "--fetch-report",
+                "--year", eshiksha.get("year", "2026-27"),
+            ]
         elif stage == "facility":
             cmd += ["--class", row["class_name"]]
         elif stage == "finalize":
@@ -319,6 +423,9 @@ def _run_job(job_id: str) -> None:
 
         env = os.environ.copy()
         env["UDISE_COOKIE_HEADER"] = session["cookie"]
+        if stage == "ep":
+            env["ESHIKSHAKOSH_UDISE"] = eshiksha["udise"]
+            env["ESHIKSHAKOSH_PASSWORD"] = eshiksha["password"]
         with _db() as conn:
             conn.execute("UPDATE jobs SET status='running',updated_at=?,message=? WHERE id=?",
                          (int(time.time()), "Starting UDISE job", job_id))
@@ -327,6 +434,8 @@ def _run_job(job_id: str) -> None:
         proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 bufsize=1)
+        if stage == "ep":
+            ESK_CREDENTIAL.unlink(missing_ok=True)
         report_path = None
         runner_error = None
         assert proc.stdout is not None

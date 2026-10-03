@@ -30,6 +30,8 @@ def main():
     sub.add_parser("capabilities")
     c=sub.add_parser("connect"); c.add_argument("--return-url",default="")
     cs=sub.add_parser("connect-status"); cs.add_argument("token")
+    ec=sub.add_parser("eshiksha-connect"); ec.add_argument("--return-url",default="")
+    es=sub.add_parser("eshiksha-status"); es.add_argument("token")
     r=sub.add_parser("run")
     r.add_argument("--session",required=True); r.add_argument("--school",required=True)
     r.add_argument("--stage",required=True); r.add_argument("--class",dest="klass",default=None)
@@ -44,6 +46,10 @@ def main():
         print(json.dumps(call("/api/v1/session-requests","POST",{"return_url":a.return_url}),ensure_ascii=False)); return
     if a.cmd=="connect-status":
         print(json.dumps(call("/api/v1/session-requests/"+a.token),ensure_ascii=False)); return
+    if a.cmd=="eshiksha-connect":
+        print(json.dumps(call("/api/v1/eshiksha-requests","POST",{"return_url":a.return_url}),ensure_ascii=False)); return
+    if a.cmd=="eshiksha-status":
+        print(json.dumps(call("/api/v1/eshiksha-requests/"+a.token),ensure_ascii=False)); return
     if a.cmd=="run":
         body={"session_id":a.session,"school":a.school,"stage":a.stage,"class_name":a.klass,"preview":True}
         print(json.dumps(call("/api/v1/jobs","POST",body),ensure_ascii=False)); return

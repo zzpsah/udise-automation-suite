@@ -95,6 +95,7 @@
 - [ ] Add dedicated preview/approval workflow before enabling each write stage.
 - [x] Enable no-POST preview Excel for GP, EP, Facility, and Finalize.
 - [x] Embed masked eShikshaKosh source data in the EP preview workbook.
+- [x] Add one-time inline eShikshaKosh credential entry for GUI and WhatsApp.
 - [x] Expire preview/source files after 24 hours.
 - [ ] Add the explicit approval endpoint and per-run write cap before enabling
       any GUI or WhatsApp save action.

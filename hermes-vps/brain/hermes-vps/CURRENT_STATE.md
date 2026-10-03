@@ -136,3 +136,6 @@ python3 -m udise_vps.cli completion --school <id> --class IX
   eShikshaKosh source sheet.
 - Preview files are private and expire after 24 hours. Actual saves remain
   locked behind a future explicit approval endpoint.
+- eShikshaKosh credentials use a separate inline one-time Oracle form. The
+  password file is consumed/deleted when EP preview starts; WhatsApp gets only
+  the secure link and never the password.

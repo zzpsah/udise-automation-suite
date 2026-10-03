@@ -60,6 +60,10 @@ Preview workbooks and any fetched eShikshaKosh source stay in the private job
 directory for 24 hours, then the control API removes the files. Job metadata is
 retained for audit without the expired result path.
 
+EP uses a separate one-time eShikshaKosh credential form hosted directly by
+the Oracle control API. The password does not pass through chat and its runtime
+file is removed as soon as the EP preview process starts.
+
 Raw per-student CLI lines are not returned to the web UI. Progress is converted
 to aggregate messages such as: Completion status: 12/38 students checked.
 

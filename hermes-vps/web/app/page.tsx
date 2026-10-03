@@ -35,6 +35,9 @@ export default function Page(){
   const [sessionToken,setSessionToken]=useState("");
   const [sessionId,setSessionId]=useState("");
   const [entryUrl,setEntryUrl]=useState("");
+  const [eshikshaToken,setEshikshaToken]=useState("");
+  const [eshikshaUrl,setEshikshaUrl]=useState("");
+  const [eshikshaReady,setEshikshaReady]=useState(false);
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
   const [msg,setMsg]=useState("");
@@ -82,9 +85,30 @@ export default function Page(){
     return ()=>clearInterval(t);
   },[sessionToken,sessionId]);
 
+  async function connectEshiksha(){
+    setMsg("eShikshaKosh secure login taiyar ho raha hai…");
+    const r=await fetch("/api/eshiksha-request",{method:"POST"});
+    const d=await r.json();
+    if(!r.ok){setMsg(d.error||"eShikshaKosh secure login nahi bana");return}
+    setEshikshaToken(d.token);setEshikshaUrl(d.entry_url);
+    setMsg("Secure box mein eShikshaKosh details enter karein.");
+  }
+
+  useEffect(()=>{
+    if(!eshikshaToken || eshikshaReady) return;
+    const t=setInterval(async()=>{
+      const r=await fetch("/api/eshiksha-status?token="+encodeURIComponent(eshikshaToken),{cache:"no-store"});
+      if(!r.ok) return;
+      const d=await r.json();
+      if(d.ready){setEshikshaReady(true);setEshikshaUrl("");setMsg("eShikshaKosh ready hai. Ab EP preview chala sakte hain.");clearInterval(t)}
+    },2000);
+    return ()=>clearInterval(t);
+  },[eshikshaToken,eshikshaReady]);
+
   async function startJob(){
     if(!sessionId){setMsg("Pehle secure UDISE session connect karein.");return}
     if(!school.trim()){setMsg("School ID ya URL daaliye.");return}
+    if(selected?.id==="ep"&&!eshikshaReady){await connectEshiksha();return}
     setMsg("Kaam taiyar ho raha hai…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
       session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true
@@ -139,6 +163,7 @@ export default function Page(){
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
             <div className="selected-stage-head"><span aria-hidden="true">{selectedMeta?.icon||"📄"}</span><div><strong>{selected.label}</strong><small>{HERMES_FLOW_REFERENCE[selected.id]}</small></div></div>
             <div className="fill-chips">{selectedMeta?.fills.map(item=><span key={item}>{item}</span>)}</div>
+            {selected.id==="ep"&&<div className={"source-status "+(eshikshaReady?"ready":"needed")}>{eshikshaReady?"● eShikshaKosh ready":"○ eShikshaKosh login needed"}</div>}
             {selected.mode==="write"?<div className="lock-reason"><span aria-hidden="true">👁️</span><div><strong>Preview enabled—save abhi locked</strong><span>Excel verify karne ke baad hi <b>Approval → Save → Read-back</b> hoga.{selected.id==="ep"?" eShikshaKosh source bhi isi temporary workbook mein milega.":""}</span></div></div>:<p>{selected.description}</p>}
           </div>}
 
@@ -146,7 +171,7 @@ export default function Page(){
             {selected?.requires_class&&<div className="class-picker"><label>Class</label><select value={klass} onChange={e=>setKlass(e.target.value)}>
               {selected.classes.map(c=><option value={c} key={c}>{caps?.classes.find(x=>x.id===c)?.label||c}</option>)}
             </select></div>}
-            <button className="run-button" disabled={selected?.mode==="write"&&!selected.preview_enabled} onClick={startJob}>{selected?.mode==="write"?"Preview Excel":"Run now"}</button>
+            <button className="run-button" disabled={selected?.mode==="write"&&!selected.preview_enabled} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady?"Connect eShiksha":selected?.mode==="write"?"Preview Excel":"Run now"}</button>
           </div>
         </section>
       </div>
@@ -168,6 +193,13 @@ export default function Page(){
         <div className="modal-head"><div><span className="eyebrow">SECURE SESSION</span><h2>UDISE Cookie paste karein</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
         <p>Cookie direct Oracle ke temporary secure storage mein jayegi—chat ya page output mein nahi dikhegi.</p>
         <iframe title="Secure UDISE Cookie entry" src={entryUrl}/>
+      </div>
+    </div>}
+    {eshikshaUrl&&!eshikshaReady&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure eShikshaKosh login">
+      <div className="session-modal">
+        <div className="modal-head"><div><span className="eyebrow">READ-ONLY SOURCE</span><h2>eShikshaKosh connect karein</h2></div><button className="modal-close" onClick={()=>setEshikshaUrl("")} aria-label="Close">×</button></div>
+        <p>Password sirf ek EP preview ke liye runtime mein rahega; report 24 hours verification ke liye available hogi.</p>
+        <iframe title="Secure eShikshaKosh login" src={eshikshaUrl}/>
       </div>
     </div>}
   </main>

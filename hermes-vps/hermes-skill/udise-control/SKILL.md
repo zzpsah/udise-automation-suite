@@ -42,6 +42,8 @@ phase; do not restart at Phase 1 when a valid pending session already exists.
    Excel. Explain that no portal save occurred.
 4. **Enrollment / Facility.** Run each as a preview-only job. EP fetches the
    read-only eShikshaKosh source and embeds a masked source sheet in the Excel.
+   If eShikshaKosh is not ready, use the secure one-time source-login flow;
+   never request its password in WhatsApp text.
 5. **Completion / Finalize.** Completion Overview is read-only. Finalize may
    produce an eligibility preview Excel but may not POST.
 
@@ -67,6 +69,19 @@ If no usable UDISE session is available:
 6. If ready, retain the returned opaque session_id only in pending task context and continue automatically.
 
 Never request UDISE cookie/session values in WhatsApp text.
+
+## eShikshaKosh source flow
+
+Before an EP preview, if temporary source credentials are not ready:
+
+1. Run `~/.local/bin/udise-control-client eshiksha-connect`.
+2. Send only its short-lived `entry_url` to the user.
+3. The user enters UDISE code, password, and year on that secure Oracle page.
+4. Poll with `~/.local/bin/udise-control-client eshiksha-status TOKEN`.
+5. When ready, run the EP preview. The credential file is deleted when the EP
+   process starts; the masked source/preview workbook expires after 24 hours.
+
+Never ask the user to send the eShikshaKosh password in WhatsApp.
 
 ## Read-only jobs
 
