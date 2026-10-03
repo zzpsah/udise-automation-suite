@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -29,12 +29,13 @@ SESSIONS = RUNTIME / "sessions"
 REQUESTS = RUNTIME / "session-requests"
 ESK_REQUESTS = RUNTIME / "eshiksha-requests"
 ESK_CREDENTIAL = RUNTIME / "eshiksha-credential.json"
+ESK_UPLOAD = RUNTIME / "eshiksha-upload.xlsx"
 DB = STATE / "jobs.sqlite3"
 CONTROL_TOKEN_FILE = Path(os.environ.get("UDISE_CONTROL_TOKEN_FILE", Path.home() / ".config/udise-control/api-token"))
 RUNNER = Path(os.environ.get("UDISE_VPS_RUNNER", Path.home() / ".local/bin/udise-vps"))
 SESSION_TTL = 8 * 60 * 60
 REQUEST_TTL = 10 * 60
-ESK_CREDENTIAL_TTL = 30 * 60
+ESK_CREDENTIAL_TTL = 8 * 60 * 60
 RESULT_TTL = 24 * 60 * 60
 
 for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, ESK_REQUESTS):
@@ -285,7 +286,21 @@ def eshiksha_request_status(token: str, authorization: str | None = Header(defau
         raise HTTPException(410, "Expired")
     credential_available = ESK_CREDENTIAL.exists()
     return {"ready": bool(data.get("ready")) and credential_available,
-            "credential_available": credential_available}
+            "credential_available": credential_available,
+            "report_available": ESK_UPLOAD.exists()}
+
+
+@app.post("/api/v1/eshiksha-upload")
+async def eshiksha_upload(file: UploadFile = File(...), authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "Upload an Excel eShikshaKosh report (.xlsx or .xls)")
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(413, "Report is larger than the 20 MB limit")
+    ESK_UPLOAD.write_bytes(data)
+    os.chmod(ESK_UPLOAD, 0o600)
+    return {"ready": True, "report_available": True}
 
 
 @app.get("/eshiksha/{token}", response_class=HTMLResponse)
@@ -435,11 +450,11 @@ def _run_job(job_id: str) -> None:
             cmd += ["--class", row["class_name"], "--run-mode", "All students"]
         elif stage == "ep":
             if is_preview:
-                eshiksha = _load_eshiksha_credentials()
-                cmd += [
-                    "--class", row["class_name"], "--fetch-report",
-                    "--year", eshiksha.get("year", "2026-27"),
-                ]
+                if ESK_UPLOAD.exists():
+                    cmd += ["--class", row["class_name"], "--report", str(ESK_UPLOAD)]
+                else:
+                    eshiksha = _load_eshiksha_credentials()
+                    cmd += ["--class", row["class_name"], "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
             else:
                 source_dir = JOBS / str(row["approved_from"])
                 reports = sorted(source_dir.glob("eShikshaKosh_OTR_*.xlsx"))
@@ -458,7 +473,7 @@ def _run_job(job_id: str) -> None:
 
         env = os.environ.copy()
         env["UDISE_COOKIE_HEADER"] = session["cookie"]
-        if stage == "ep" and is_preview:
+        if stage == "ep" and is_preview and "eshiksha" in locals():
             env["ESHIKSHAKOSH_UDISE"] = eshiksha["udise"]
             env["ESHIKSHAKOSH_PASSWORD"] = eshiksha["password"]
         with _db() as conn:
@@ -471,8 +486,6 @@ def _run_job(job_id: str) -> None:
         proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 bufsize=1)
-        if stage == "ep" and is_preview:
-            ESK_CREDENTIAL.unlink(missing_ok=True)
         report_path = None
         runner_error = None
         assert proc.stdout is not None
@@ -516,7 +529,7 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
         raise HTTPException(400, "Unsupported stage")
     if stage["mode"] != "read" and not (stage.get("preview_enabled") and body.preview):
         raise HTTPException(409, "Actual saves require a separately approved write workflow")
-    if body.stage == "ep" and body.preview:
+    if body.stage == "ep" and body.preview and not ESK_UPLOAD.exists():
         try:
             _load_eshiksha_credentials()
         except RuntimeError as exc:

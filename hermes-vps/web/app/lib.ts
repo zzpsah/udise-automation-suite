@@ -21,13 +21,12 @@ export async function requireUi() {
 }
 
 export async function oracleFetch(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers || {});
+  headers.set("Authorization", "Bearer " + apiToken());
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   return fetch(oracleBase() + path, {
     ...init,
     cache: "no-store",
-    headers: {
-      ...(init?.headers || {}),
-      Authorization: "Bearer " + apiToken(),
-      "Content-Type": "application/json"
-    }
+    headers
   });
 }

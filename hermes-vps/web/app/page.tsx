@@ -38,6 +38,8 @@ export default function Page(){
   const [eshikshaToken,setEshikshaToken]=useState("");
   const [eshikshaUrl,setEshikshaUrl]=useState("");
   const [eshikshaReady,setEshikshaReady]=useState(false);
+  const [eshikshaReportReady,setEshikshaReportReady]=useState(false);
+  const [eshikshaFile,setEshikshaFile]=useState<File|null>(null);
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
   const [maxWrites,setMaxWrites]=useState("1");
@@ -104,6 +106,16 @@ export default function Page(){
     setMsg("Enter the eShikshaKosh details in the secure panel.");
   }
 
+  async function uploadEshikshaReport(){
+    if(!eshikshaFile){setMsg("Choose an eShikshaKosh Excel report first.");return}
+    setMsg("Uploading the eShikshaKosh report securely…");
+    const form=new FormData(); form.append("file",eshikshaFile);
+    const r=await fetch("/api/eshiksha-upload",{method:"POST",body:form});
+    const d=await r.json();
+    if(!r.ok){setMsg(d.error||"Report upload failed");return}
+    setEshikshaReportReady(true);setEshikshaFile(null);setMsg("eShikshaKosh report ready. Generate the EP preview.");
+  }
+
   useEffect(()=>{
     if(!eshikshaToken || eshikshaReady) return;
     const t=setInterval(async()=>{
@@ -120,7 +132,7 @@ export default function Page(){
     if(!sessionId){setMsg("Connect a secure UDISE session first.");return}
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
-    if(selected?.id==="ep"&&!eshikshaReady){await connectEshiksha();return}
+    if(selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
     setMsg("Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
       session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true
@@ -205,12 +217,16 @@ export default function Page(){
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
             <div className="selected-stage-head"><span aria-hidden="true">{selectedMeta?.icon||"--"}</span><div><strong>{selected.label}</strong><small>{HERMES_FLOW_REFERENCE[selected.id]}</small></div></div>
             <div className="fill-chips">{selectedMeta?.fills.map(item=><span key={item}>{item}</span>)}</div>
-            {selected.id==="ep"&&<div className={"source-status "+(eshikshaReady?"ready":"needed")}>{eshikshaReady?"● eShikshaKosh source ready":"○ eShikshaKosh sign-in required"}</div>}
+            {selected.id==="ep"&&<div className="source-panel">
+              <div className={"source-status "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"● Uploaded eShikshaKosh report ready":eshikshaReady?"● eShikshaKosh credentials ready for this page":"○ eShikshaKosh report or credentials required"}</div>
+              <div className="source-actions"><button type="button" onClick={connectEshiksha}>Use credentials</button><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
+              <small>Credentials remain available for up to 8 hours, or until replaced. The uploaded report is stored temporarily on Oracle.</small>
+            </div>}
             {selected.mode==="write"?<div className="lock-reason"><div><strong>Preview first · Explicit approval required</strong><span>Review the Excel proposal, choose a maximum write count, and type the confirmation phrase. Every save uses a fresh pre-write read and matching post-write read-back.{selected.id==="ep"?" The preview also retains the masked eShikshaKosh source for the approved run.":""}</span></div></div>:<p>{selected.description}</p>}
           </div>}
 
           <div className="run-row">
-            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady?"Connect eShikshaKosh":selected?.mode==="write"?"Generate preview":"Run report"}</button>
+            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Generate preview":"Run report"}</button>
           </div>
         </section>
       </div>
