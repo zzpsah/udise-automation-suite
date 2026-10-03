@@ -143,6 +143,12 @@ def _load_session(session_id: str) -> dict:
 class SessionRequestIn(BaseModel):
     return_url: str | None = None
 
+class EshikshaCredentialIn(BaseModel):
+    token: str
+    udise: str
+    password: str
+    year: str = "2026-27"
+
 
 class JobIn(BaseModel):
     session_id: str
@@ -274,6 +280,20 @@ def create_eshiksha_request(body: SessionRequestIn, authorization: str | None = 
         "entry_url": f"{base}/eshiksha/{token}" if base else f"/eshiksha/{token}",
     }
 
+@app.post("/api/v1/eshiksha-credentials")
+def save_eshiksha_credentials(body: EshikshaCredentialIn, authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    p = _request_file(ESK_REQUESTS, body.token)
+    if not p.exists(): raise HTTPException(404, "eShikshaKosh request not found")
+    data = _json_read(p); now = int(time.time())
+    if data.get("used") or now > int(data.get("expires_at", 0)): raise HTTPException(410, "Link expired or already used")
+    if not body.udise.strip() or not body.password.strip() or not re.fullmatch(r"\d{4}-\d{2}", body.year):
+        raise HTTPException(400, "UDISE, password and valid year are required")
+    _json_write(ESK_CREDENTIAL, {"udise": body.udise.strip(), "password": body.password, "year": body.year, "created_at": now, "expires_at": now + ESK_CREDENTIAL_TTL})
+    ESK_UPLOAD.unlink(missing_ok=True)
+    data.update({"used": True, "ready": True, "used_at": now}); _json_write(p, data)
+    return {"ready": True}
+
 
 @app.get("/api/v1/eshiksha-requests/{token}")
 def eshiksha_request_status(token: str, authorization: str | None = Header(default=None)) -> dict:
@@ -377,6 +397,9 @@ def _event(job_id: str, message: str, level: str = "info") -> None:
 
 def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
     line = line.strip()
+    m = re.search(r"scope:\s*([A-Za-z ]+)\s*\|\s*(\d+)\s+student", line, re.I)
+    if m:
+        return f"{line}", 0, int(m.group(2))
     m = re.search(r"\[COMPLETION\]\s+(\d+)/(\d+)\s+", line)
     if m:
         a, b = int(m.group(1)), int(m.group(2))
@@ -500,6 +523,8 @@ def _run_job(job_id: str) -> None:
                 _update_progress(job_id, cur, total)
         code = proc.wait()
         if code != 0:
+            if code == -15:
+                raise RuntimeError("Runner was stopped before completion (SIGTERM); no remaining students were written.")
             raise RuntimeError(runner_error or f"Runner exited with code {code}")
         if report_path and Path(report_path).is_file():
             rp = str(Path(report_path).resolve())

@@ -40,6 +40,9 @@ export default function Page(){
   const [eshikshaReady,setEshikshaReady]=useState(false);
   const [eshikshaReportReady,setEshikshaReportReady]=useState(false);
   const [eshikshaFile,setEshikshaFile]=useState<File|null>(null);
+  const [eshikshaUdise,setEshikshaUdise]=useState("");
+  const [eshikshaPassword,setEshikshaPassword]=useState("");
+  const [eshikshaYear,setEshikshaYear]=useState("2026-27");
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
   const [maxWrites,setMaxWrites]=useState("1");
@@ -114,6 +117,12 @@ export default function Page(){
     const d=await r.json();
     if(!r.ok){setMsg(d.error||"Report upload failed");return}
     setEshikshaReportReady(true);setEshikshaFile(null);setMsg("eShikshaKosh report ready. Generate the EP preview.");
+  }
+  async function saveEshikshaCredentials(){
+    if(!eshikshaToken||!eshikshaUdise||!eshikshaPassword){setMsg("Enter eShikshaKosh UDISE code and password.");return}
+    const r=await fetch("/api/eshiksha-credentials",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:eshikshaToken,udise:eshikshaUdise,password:eshikshaPassword,year:eshikshaYear})});
+    const d=await r.json(); if(!r.ok){setMsg(d.detail||d.error||"Could not save eShikshaKosh credentials");return}
+    setEshikshaReady(true);setEshikshaUrl("");setEshikshaPassword("");setMsg("eShikshaKosh credentials saved temporarily for this page.");
   }
 
   useEffect(()=>{
@@ -217,6 +226,7 @@ export default function Page(){
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
             <div className="selected-stage-head"><span aria-hidden="true">{selectedMeta?.icon||"--"}</span><div><strong>{selected.label}</strong><small>{HERMES_FLOW_REFERENCE[selected.id]}</small></div></div>
             <div className="fill-chips">{selectedMeta?.fills.map(item=><span key={item}>{item}</span>)}</div>
+            {selected.mode!=="read"&&<div className="blank-only-note"><strong>Blank-only rule:</strong> values already saved in UDISE are untouched. Only eligible blank fields are proposed; skipped and already-complete students are listed in the Excel result.</div>}
             {selected.id==="ep"&&<div className="source-panel">
               <div className={"source-status "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"● Uploaded eShikshaKosh report ready":eshikshaReady?"● eShikshaKosh credentials ready for this page":"○ eShikshaKosh report or credentials required"}</div>
               <div className="source-actions"><button type="button" onClick={connectEshiksha}>Use credentials</button><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
@@ -265,8 +275,8 @@ export default function Page(){
     {eshikshaUrl&&!eshikshaReady&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure eShikshaKosh login">
       <div className="session-modal">
         <div className="modal-head"><div><span className="eyebrow">READ-ONLY SOURCE</span><h2>Connect eShikshaKosh</h2></div><button className="modal-close" onClick={()=>setEshikshaUrl("")} aria-label="Close">×</button></div>
-        <p>Credentials are used once for the read-only EP source fetch. The password is deleted when the preview starts; the masked report remains available for 24 hours.</p>
-        <iframe title="Secure eShikshaKosh login" src={eshikshaUrl}/>
+        <p>Enter credentials here or upload the Excel report. Credentials stay temporarily available for this page session and expire automatically.</p>
+        <div className="inline-form"><label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label><label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label><button className="run-button" onClick={saveEshikshaCredentials}>Save temporarily</button></div>
       </div>
     </div>}
   </main>
