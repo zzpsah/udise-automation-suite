@@ -1008,6 +1008,21 @@ def run_ep(
         admission_inputs, annotated, fallback_width=fallback_width,
         style=admission_style,
     )
+    source_counts = {}
+    for decision in decisions:
+        source = decision.get("source", "pending")
+        source_counts[source] = source_counts.get(source, 0) + 1
+    print(
+        "📊 eShikshaKosh matching: "
+        f"report rows={len(annotated)} | matched={source_counts.get('eshikshakosh', 0)} | "
+        f"already filled={source_counts.get('kept_saved', 0)} | "
+        f"roll-number fallback={source_counts.get('roll_number', 0)} | "
+        f"not found/pending={source_counts.get('pending', 0)} | "
+        f"manual review={source_counts.get('manual_review', 0)}",
+        flush=True,
+    )
+    if source_counts.get("pending", 0) or source_counts.get("manual_review", 0):
+        print("ℹ️ Not-found or ambiguous students are left without a guessed admission number and remain in the preview workbook for manual review.", flush=True)
 
     results: list[EpResult] = []
     submissions = 0
