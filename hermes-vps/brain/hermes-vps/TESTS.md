@@ -7,7 +7,7 @@ cd hermes-vps
 ./run_tests.sh
 ```
 
-137 tests, **no network and no credentials required**. Runs in about two
+138 tests, **no network and no credentials required**. Runs in about two
 seconds. Individual suites:
 
 ```bash
@@ -106,6 +106,9 @@ python3 tests/test_general_profile.py  # 27 — GP blank-fill, cross-field rules
 - **No test of a real portal write.** Writes are verified in operation by
   read-back, not by the test suite. The tests cover payload construction and
   comparison logic.
+- **The GP payload's required field set is not asserted.** The 34-field shape
+  was found empirically; a test pins the identity fields being present, but not
+  that the portal accepts them. Re-verify live if the portal changes.
 - **General Profile write path** — never exercised live, so untested.
 
 ## Adding a test

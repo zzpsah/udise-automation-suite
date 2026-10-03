@@ -9,7 +9,7 @@ Last verified: **2026-10-03**. Portal **v3.2.0**.
 | Roster export | `students` | `LIVE_READ` — 208 students |
 | Full read snapshot | `snapshot` | `DEPLOYED` + `OFFLINE_TESTED`; fresh live session needed |
 | Completion overview | `completion` | `LIVE_READ` |
-| General Profile | `gp` | `LIVE_READ` — **complete for all 208**, rules implemented + tested |
+| General Profile | `gp` | **`LIVE_SAVE`** — payload fixed, write verified on 4 students |
 | Enrolment Profile | `ep` | `LIVE_SAVE` — Class IX 33/33 |
 | Facility Profile | `facility` | `LIVE_SAVE` — Class IX 33/33 |
 | Finalize | `finalize` | `LIVE_SAVE` — Class IX 33/33 |
@@ -71,8 +71,21 @@ hold for any school:
 Live evidence: 205 students carry `bloodGroup=9`, 3 carry real groups (A+, B+,
 B-). The three are left untouched — the blank-only rule works.
 
-**Not yet exercised:** a live GP *write* from this runner. The read path and the
-payload construction are verified; the POST has not been sent.
+**Live write verified** (3 Oct 2026) after fixing the payload.
+
+The first attempt failed on every student with `INTERNAL_SERVER_ERROR`. The
+cause: our payload sent only the 14 dropdown fields, while the portal requires
+the record's identity block too. A short payload fails **even when every value
+is unchanged**.
+
+| Payload | Result |
+|---|---|
+| 14 fields | `INTERNAL_SERVER_ERROR` |
+| 34 fields | `status: true`, values preserved |
+
+Verified on 4 students — `lastModifiedOn` stamped, and a fresh read-back
+confirmed every field unchanged. GP is still complete for all 208, so no real
+gap-fill has been needed.
 
 ## Verification commands
 

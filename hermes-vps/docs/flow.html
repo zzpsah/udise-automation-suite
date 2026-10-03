@@ -252,9 +252,10 @@
 
 <div class="step">
   <div class="n">9</div>
-  <div class="box wr">
+  <div class="box ok">
     <h3>POST + read-back</h3>
-    <p><code>POST /p0/api/cy/students/{sid}</code></p>
+    <p><code>POST /p0/api/cy/students/{sid}</code> — 34 fields. Verified live:
+       accepted, and every value preserved.</p>
   </div>
 </div>
 <div class="br">
@@ -265,8 +266,8 @@
       mobile, and the <code>uuidUpdateYN / uuid / nameAsUuid</code> trio.
       <br>A short payload omitting these returns
       <code>INTERNAL_SERVER_ERROR</code> <b>even when the values are unchanged</b>.
-      <br>Verified live: 14 fields &rarr; error · full shape &rarr;
-      <code>status: true</code>.
+      <br>Verified live: 14 fields &rarr; <code>INTERNAL_SERVER_ERROR</code> ·
+      34 fields &rarr; <code>status: true</code>, all values preserved.
     </div></div>
   <div class="row"><div class="tag y">VERIFY</div>
     <div class="box ok">Read-back must confirm every submitted field.</div></div>
@@ -417,7 +418,7 @@
     <tr><th style="width:34%">Path</th><th>Evidence</th></tr>
     <tr><td>Roster read</td><td class="g">LIVE_READ — 208 students</td></tr>
     <tr><td>GP read</td><td class="g">LIVE_READ</td></tr>
-    <tr><td>GP write</td><td class="a">Payload shape fixed; write not yet re-verified</td></tr>
+    <tr><td>GP write</td><td class="g">LIVE_SAVE — payload shape fixed and verified on 4 students</td></tr>
     <tr><td>EP read</td><td class="g">LIVE_READ</td></tr>
     <tr><td>EP write</td><td class="g">LIVE_SAVE — Class IX 33/33</td></tr>
     <tr><td>Facility read + write</td><td class="g">LIVE_SAVE — Class IX 33/33</td></tr>

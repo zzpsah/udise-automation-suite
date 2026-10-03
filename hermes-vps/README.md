@@ -28,12 +28,12 @@ Never treat one as another. `HTTP 200` alone is **not** proof of a save.
 | Student roster export | `students` | `LIVE_READ` — 208 students |
 | Full read snapshot | `snapshot` | `OFFLINE_TESTED` — combined stage workbook |
 | Completion Overview | `completion` | `LIVE_READ` — 33 Class IX read |
-| General Profile | `gp` | `LIVE_READ` preview only (see §6) |
+| General Profile | `gp` | **`LIVE_SAVE`** — payload fixed and verified |
 | **Enrollment Profile** | `ep` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Facility Profile** | `facility` | **`LIVE_SAVE` — Class IX 33/33 complete** |
 | **Finalize / Complete Data** | `finalize` | **`LIVE_SAVE` — Class IX 33/33 `formStatus=6`** |
 
-**Test suite: 142 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 27 GP + 2 snapshot + 2 preview-report), no network required.
+**Test suite: 143 passing** (24 core + 68 EP/Facility + 9 eShikshaKosh + 10 FP + 28 GP + 2 snapshot + 2 preview-report), no network required.
 Run with `./run_tests.sh`.
 
 ### Per-class state (3 October 2026)
@@ -189,6 +189,24 @@ already being written** — a saved value is left alone, same as everywhere else
 
 **CWSN = Yes skips the student entirely** for manual review — never auto-filled.
 
+### The GP write payload must be complete
+
+The portal rejects a payload that omits the record's identity block with an
+`INTERNAL_SERVER_ERROR` — **even when every value is unchanged**.
+
+| Payload | Result |
+|---|---|
+| 14 fields (dropdowns only) | `INTERNAL_SERVER_ERROR` |
+| **34 fields** (identity + contact + dropdowns) | **`status: true`** |
+
+The required block is `classId`, `sectionId`, `studentId`, `schoolId`,
+`gender`, `dob`, `motherName`, `fatherName`, `guardianName`, `address`,
+`pincode`, `primaryMobile`, `email`, `studentCodeState`, and the
+`uuidUpdateYN` / `uuid` / `nameAsUuid` trio.
+
+Verified live on 4 students: accepted, and a fresh read-back confirmed every
+value preserved.
+
 **Mother Tongue (4.1.12)** — a blank gets a randomised pick between the generic
 default `42 - HINDI - Hindi` and the region option `28 - HINDI - Bhojpuri`.
 Values are seeded per student (`sha256(seed:pen)`) so a re-run reproduces the
@@ -215,7 +233,7 @@ they are guards, not corrections.
 | `udise_vps/esk.py` | eShikshaKosh OTR report — your export, or a live fetch |
 | `udise_vps/students.py` | Roster export |
 | `udise_vps/completion.py` | Completion overview workbook |
-| `tests/` | Offline suites — 137 tests, no network |
+| `tests/` | Offline suites — 138 tests, no network |
 | `tools/` | One-off operational scripts |
 | `brain/` | Working context — handoff, architecture, decisions, security |
 

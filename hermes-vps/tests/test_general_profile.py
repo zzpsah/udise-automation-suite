@@ -286,6 +286,47 @@ def _():
     assert payload["motherTongue"] == 28
 
 
+@check("payload_carries_the_identity_block")
+def _():
+    """REGRESSION: the portal rejects a payload without the identity block.
+
+    A payload of only the dropdown fields returns INTERNAL_SERVER_ERROR even
+    when every value is unchanged. Verified live: 14 fields -> error,
+    34 fields -> status:true. This cost a debugging round because the failure
+    reads like a server fault, not a validation error.
+    """
+    original = {
+        "classId": 9, "sectionId": 1, "studentId": 1587505878,
+        "schoolId": 2497128, "studentCodeState": "", "gender": 1,
+        "dob": "02/03/2012", "motherName": "KAVSALIYA DEVI",
+        "fatherName": "PAHLAD KUMAR RAM", "guardianName": None,
+        "address": "TETAHALI", "pincode": 841232,
+        "primaryMobile": "8521049937", "secondaryMobile": None,
+        "email": None, "motherTongue": 28, "socCatId": 2, "minorityId": 7,
+        "isBplYN": 1, "aayBplYN": 2, "ewsYN": 2, "cwsnYN": 2,
+        "natIndYN": 1, "ooscYN": 2, "impairmentType": [],
+        "disabilityCerti": 9, "impairmentPercent": "",
+        "ooscMainstreamedYN": "9", "bloodGroup": "9",
+    }
+    payload = gp.build_gp_payload(original, {})
+    required = [
+        "classId", "sectionId", "studentId", "schoolId", "studentCodeState",
+        "uuidUpdateYN", "uuid", "nameAsUuid", "certifiedCheckCount",
+        "gender", "dob", "motherName", "fatherName", "guardianName",
+        "address", "pincode", "primaryMobile", "secondaryMobile", "email",
+        "motherTongue", "socCatId", "minorityId",
+        "isBplYN", "aayBplYN", "ewsYN", "cwsnYN", "natIndYN", "ooscYN",
+        "impairmentType", "disabilityCerti", "impairmentPercent",
+        "ooscMainstreamedYN", "bloodGroup",
+    ]
+    missing = [k for k in required if k not in payload]
+    assert not missing, f"payload missing required fields: {missing}"
+    # the uuid trio must be present and not claim an Aadhaar change
+    assert payload["uuidUpdateYN"] == 2
+    assert payload["uuid"] == ""
+    assert payload["nameAsUuid"] == ""
+
+
 @check("non_cwsn_clears_impairment")
 def _():
     payload = gp.build_gp_payload({"cwsnYN": 2}, {"cwsnYN": 2})

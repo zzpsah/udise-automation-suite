@@ -19,6 +19,7 @@
 - [x] Distance 4.3.6 randomised between 1–3 km and 3–5 km
 - [x] 142 offline tests
 - [x] Flow diagram (`docs/flow.html`)
+- [x] **GP write verified** after fixing the payload shape
 - [x] DevOS + brain documentation
 
 ## Next — Class X
@@ -38,13 +39,10 @@
 
 ## Found 3 Oct 2026 — needs a decision
 
-- [ ] **GP POST returns INTERNAL_SERVER_ERROR.** A trial write re-sending
-      unchanged values failed on all 5 students with
-      `{"type":"INTERNAL_SERVER_ERROR","errorId":"..."}` at HTTP 200. The
-      payload carries 14 fields; the record has ~70. Some omitted field is
-      likely required. Diagnose by diffing the record against the payload and
-      posting the full record. **GP write is therefore NOT live-verified** —
-      only the read path and payload construction are.
+- [x] **GP POST returned INTERNAL_SERVER_ERROR — FIXED.** The payload sent only
+      the 14 dropdown fields; the portal requires the record's identity block as
+      well. A 34-field payload is accepted. Verified live on 4 students with a
+      matching read-back. See `DECISIONS.md`.
 - [ ] **The portal's own "download all students" export.** The SPA exposes a
       Download button that returns every UDISE field including APAAR ID.
       Candidate routes all return a 200 with an INTERNAL_SERVER_ERROR body, so

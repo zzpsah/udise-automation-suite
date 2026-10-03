@@ -77,6 +77,22 @@ other fields filled normally.
 **Why.** Error `1002` is a server-side configuration gap, not something a retry
 or a better payload fixes. Looping would hammer the portal and produce noise.
 
+## The GP payload must carry the record's identity block
+
+**Decision.** `build_gp_payload` sends 34 fields — the identity block, the
+contact block, and the dropdowns — not just the fields being changed.
+
+**Why.** A payload containing only the 14 dropdown fields returns
+`INTERNAL_SERVER_ERROR` **even when every value is unchanged**. The portal
+validates the record's identity as part of the write, so `classId`, `sectionId`,
+`studentId`, `schoolId`, `gender`, `dob`, the parents' names, `address`,
+`pincode`, `primaryMobile`, `email`, `studentCodeState`, and the
+`uuidUpdateYN` / `uuid` / `nameAsUuid` trio must all be present.
+
+Verified live: 14 fields → error, 34 fields → `status: true` with every value
+preserved. This cost a debugging round because the failure looks like a server
+fault rather than a validation error.
+
 ## Blank-only, always
 
 **Decision.** Never overwrite a value the portal already holds.
