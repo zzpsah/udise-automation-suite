@@ -118,6 +118,11 @@
     <p><code>JSESSIONID</code> + <code>XSRF-TOKEN</code> + <code>NSC_tent</code>
        load-balancer token, copied from the browser's Network tab.
        Verify with <code>GET /p0/check-session</code>.</p>
+    <p style="margin-top:5px"><b>Expires often.</b> When it does, the API returns
+       the SPA shell (HTML) instead of JSON, or a 200 with an
+       <code>INTERNAL_SERVER_ERROR</code> body. Check for JSON before trusting
+       any response. Auto-login is not implemented — the portal's login route
+       has not been located.</p>
   </div>
 </div>
 <div class="conn"></div>
@@ -247,11 +252,24 @@
 
 <div class="step">
   <div class="n">9</div>
-  <div class="box ok">
+  <div class="box wr">
     <h3>POST + read-back</h3>
-    <p><code>POST /p0/api/cy/students/{sid}</code> — the full record, so no
-       field is silently dropped. Read-back must confirm every submitted field.</p>
+    <p><code>POST /p0/api/cy/students/{sid}</code></p>
   </div>
+</div>
+<div class="br">
+  <div class="row"><div class="tag n">REQUIRED</div>
+    <div class="box bad">
+      <b>The payload must carry the record's identity block</b> — classId,
+      sectionId, studentId, schoolId, gender, dob, parents' names, address,
+      mobile, and the <code>uuidUpdateYN / uuid / nameAsUuid</code> trio.
+      <br>A short payload omitting these returns
+      <code>INTERNAL_SERVER_ERROR</code> <b>even when the values are unchanged</b>.
+      <br>Verified live: 14 fields &rarr; error · full shape &rarr;
+      <code>status: true</code>.
+    </div></div>
+  <div class="row"><div class="tag y">VERIFY</div>
+    <div class="box ok">Read-back must confirm every submitted field.</div></div>
 </div>
 
 <div class="phase">4 · Enrolment &amp; Facility — the per-student loop</div>
@@ -391,6 +409,25 @@
     <div class="box ok">Re-read, then one POST to
       <code>/p0/api/v2/students/submit/{sid}</code> with the id as
       <code>text/plain</code>. Read-back must show <b>6</b>.</div></div>
+</div>
+
+<div class="phase">Verification status</div>
+<div class="panel" style="margin-top:8px">
+  <table>
+    <tr><th style="width:34%">Path</th><th>Evidence</th></tr>
+    <tr><td>Roster read</td><td class="g">LIVE_READ — 208 students</td></tr>
+    <tr><td>GP read</td><td class="g">LIVE_READ</td></tr>
+    <tr><td>GP write</td><td class="a">Payload shape fixed; write not yet re-verified</td></tr>
+    <tr><td>EP read</td><td class="g">LIVE_READ</td></tr>
+    <tr><td>EP write</td><td class="g">LIVE_SAVE — Class IX 33/33</td></tr>
+    <tr><td>Facility read + write</td><td class="g">LIVE_SAVE — Class IX 33/33</td></tr>
+    <tr><td>Finalize</td><td class="g">LIVE_SAVE — Class IX 33/33 at formStatus=6</td></tr>
+    <tr><td>eShikshaKosh report</td><td class="g">LIVE_READ — 220 rows</td></tr>
+  </table>
+  <p style="color:var(--muted);font-size:11.5px;margin:9px 0 0">
+    <code>HTTP 200</code> is never proof of a save. Only a matching fresh
+    read-back is.
+  </p>
 </div>
 
 <div class="phase">Where it stands</div>

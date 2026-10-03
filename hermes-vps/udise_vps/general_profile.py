@@ -166,39 +166,92 @@ class GpResult:
 
 
 def build_gp_payload(original: dict, updates: dict) -> dict:
-    """Carry every untouched field across, then apply the approved updates.
+    """Build the GP write payload.
 
-    Mirrors the notebook's payload construction so no field is silently dropped.
+    The portal rejects a payload that omits the record's identity fields with
+    an INTERNAL_SERVER_ERROR, so every field the form carries is sent back:
+    the identity block, the contact block, and the dropdown block. Omitting any
+    of them fails the write even when the values are unchanged.
+
+    Verified live: a 14-field payload returns
+      {"type": "INTERNAL_SERVER_ERROR"}
+    while this full shape returns {"status": true}.
     """
+    def txt(key: str) -> str:
+        value = original.get(key)
+        return "" if value is None else str(value).strip()
+
+    def num(key: str, default=None):
+        value = original.get(key)
+        if value is None or str(value).strip() == "":
+            return default
+        return value
+
     payload = {
-        "motherTongue": original.get("motherTongue"),
-        "socCatId": original.get("socCatId"),
-        "minorityId": original.get("minorityId"),
-        "isBplYN": original.get("isBplYN"),
-        "aayBplYN": original.get("aayBplYN"),
-        "ewsYN": original.get("ewsYN"),
-        "cwsnYN": original.get("cwsnYN"),
-        "natIndYN": original.get("natIndYN"),
-        "ooscYN": original.get("ooscYN"),
-        "impairmentType": original.get("impairmentType"),
-        "disabilityCerti": original.get("disabilityCerti"),
-        "impairmentPercent": original.get("impairmentPercent"),
+        # ------------------------------------------------------- identity block
+        "classId": txt("classId"),
+        "sectionId": txt("sectionId"),
+        "studentId": txt("studentId"),
+        "schoolId": txt("schoolId"),
+        "studentCodeState": txt("studentCodeState"),
+        # 2 = the Aadhaar/uuid is not being changed by this write.
+        "uuidUpdateYN": 2,
+        "uuid": "",
+        "nameAsUuid": "",
+        "certifiedCheckCount": 0,
+        "ageCheckSkipped": num("ageCheckSkipped", 2) or 2,
+
+        # ------------------------------------------------------- demographic
+        "gender": num("gender"),
+        "dob": txt("dob"),
+        "motherName": txt("motherName"),
+        "fatherName": txt("fatherName"),
+        "guardianName": txt("guardianName"),
+
+        # ----------------------------------------------------------- contact
+        "address": txt("address"),
+        "pincode": num("pincode"),
+        "primaryMobile": txt("primaryMobile"),
+        "secondaryMobile": txt("secondaryMobile") or None,
+        "email": txt("email"),
+
+        # --------------------------------------------------------- dropdowns
+        "motherTongue": num("motherTongue"),
+        "socCatId": num("socCatId"),
+        "minorityId": num("minorityId"),
+
+        # ---------------------------------------------------------- yes / no
+        "isBplYN": num("isBplYN"),
+        "aayBplYN": num("aayBplYN"),
+        "ewsYN": num("ewsYN"),
+        "cwsnYN": num("cwsnYN"),
+        "natIndYN": num("natIndYN"),
+        "ooscYN": num("ooscYN"),
+
+        # ------------------------------------------------------- CWSN detail
+        "impairmentType": original.get("impairmentType") or [],
+        "disabilityCerti": num("disabilityCerti", 9),
+        "impairmentPercent": "",
+
+        # --------------------------------------------------------------- OOSC
         "ooscMainstreamedYN": str(
             original.get("ooscMainstreamedYN")
             if not is_blank(original.get("ooscMainstreamedYN"))
             else "9"
         ),
+
+        # -------------------------------------------------------- blood group
         "bloodGroup": str(
             original.get("bloodGroup")
             if not is_blank(original.get("bloodGroup"))
-            else "9"
+            else BLOOD_GROUP_UNDER_INVESTIGATION
         ),
     }
 
     payload.update(updates)
 
     # Non-CWSN representation, matching the manual GP workflow.
-    if updates.get("cwsnYN") == 2:
+    if payload.get("cwsnYN") == 2:
         payload["impairmentType"] = []
         payload["disabilityCerti"] = 9
         payload["impairmentPercent"] = ""
