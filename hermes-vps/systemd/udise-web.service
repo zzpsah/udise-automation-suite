@@ -1,0 +1,16 @@
+[Unit]
+Description=UDISE private trial web UI
+After=network-online.target udise-control-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/udise-automation-suite/hermes-vps/web
+Environment=NODE_ENV=production
+Environment=PATH=%h/.local/node/current/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.config/udise-control/web.env
+ExecStart=/bin/bash -lc 'export UDISE_CONTROL_TOKEN="$$(cat %h/.config/udise-control/api-token)"; exec node_modules/.bin/next start --hostname 127.0.0.1 --port 3010'
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
