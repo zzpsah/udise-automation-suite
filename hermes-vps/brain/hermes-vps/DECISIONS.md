@@ -146,7 +146,7 @@ control endpoints publicly. GP, EP, Facility, and Finalize remain API-locked.
 ## 2026-10-03 — Vercel production uses a dedicated API path
 
 **Decision.** Publish the production Vercel control surface at
-`udise-automation-suite.vercel.app` and expose only the bearer-protected Oracle
+`udise-auto.vercel.app` and expose only the bearer-protected Oracle
 control API through port 10000 Funnel. Keep the Oracle Next.js GUI on the
 tailnet-only port 3010.
 

@@ -131,7 +131,7 @@ python3 -m udise_vps.cli completion --school <id> --class IX
 ## Vercel production deployment — 2026-10-03
 
 - Project: `zzpsah/udise-automation-suite`.
-- Production URL: `https://udise-automation-suite.vercel.app/`.
+- Production URL: `https://udise-auto.vercel.app/`.
 - Verified access-code login, capabilities, the predefined Tetahali school,
   secure Oracle session-link creation, and API health. Encrypted environment
   values are configured in Vercel.

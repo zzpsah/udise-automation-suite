@@ -71,7 +71,7 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 ## Vercel production deployment — 2026-10-03
 
 - Project: `zzpsah/udise-automation-suite` (manual CLI deployment).
-- Production URL: `https://udise-automation-suite.vercel.app/`.
+- Production URL: `https://udise-auto.vercel.app/`.
 - Verified from production: access-code login, dynamic capabilities, Tetahali
   preset, secure one-time Oracle session-link creation, and API health.
 - Oracle control API reaches Vercel through dedicated HTTPS Funnel port `10000`;

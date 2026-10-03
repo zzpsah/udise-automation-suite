@@ -29,7 +29,7 @@
 - [x] Add Hermes messaging skill/client.
 - [x] Add test-gated future GitHub promotion timer.
 - [x] Deploy `zzpsah/udise-automation-suite` with encrypted environment values;
-      production is `https://udise-automation-suite.vercel.app`. The requested
+      production is `https://udise-auto.vercel.app`. The requested
       `udise.vercel.app` alias is already owned by another Vercel deployment and
       remains a manual operator handoff.
 - [x] Add explicit preview/approval flows with typed confirmation, acknowledgement,

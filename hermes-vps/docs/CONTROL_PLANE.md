@@ -104,7 +104,7 @@ Required Vercel environment values are documented in web/.env.example.
 The same source runs without Vercel as user-level `udise-web.service`, binding
 Next.js to `127.0.0.1:3010`. Tailscale Serve publishes only
 `https://oracle-server.tail2b7fe2.ts.net:3010/`. The Vercel production app is
-`https://udise-automation-suite.vercel.app/`; it reaches only the control API
+`https://udise-auto.vercel.app/`; it reaches only the control API
 through dedicated HTTPS Funnel port `10000`. The Oracle GUI remains tailnet-only.
 The legacy `udise.vercel.app` alias is owned by another Vercel deployment and is
 left unchanged for the operator to reassign later.
