@@ -1,0 +1,6 @@
+[Unit]
+Description=Verify and promote UDISE automation updates
+
+[Service]
+Type=oneshot
+ExecStart=/home/prashant/.local/bin/udise-promote

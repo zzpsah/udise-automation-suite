@@ -68,7 +68,9 @@ def _():
     saved = {k: os.environ.pop(k, None)
              for k in ("ESHIKSHAKOSH_UDISE", "ESHIKSHAKOSH_PASSWORD")}
     real = esk.read_credentials
+    real_find = esk.find_fetch_script
     esk.read_credentials = lambda *a, **k: {}
+    esk.find_fetch_script = lambda: Path("/fake/esk_otr_api.py")
     try:
         try:
             esk.export_report(udise="", password="")
@@ -77,6 +79,7 @@ def _():
             assert "credential" in str(exc).lower(), str(exc)
     finally:
         esk.read_credentials = real
+        esk.find_fetch_script = real_find
         for k, v in saved.items():
             if v is not None:
                 os.environ[k] = v

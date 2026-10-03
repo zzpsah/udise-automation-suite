@@ -85,3 +85,17 @@ cd hermes-vps
 export UDISE_COOKIE_HEADER='...'
 python3 -m udise_vps.cli completion --school <id> --class IX
 ```
+
+## Control-plane MVP — 2026-10-03
+
+- Oracle control API is implemented and running from the mirrored repository.
+- Dynamic capabilities expose IX/X/XI/XII and all known stages.
+- Read-only API execution is enabled only for Student Roster and Completion.
+- GP/EP/Facility/Finalize job creation is rejected until write approval exists.
+- Secure one-time UDISE session entry is implemented; Cookie material is kept
+  in the user runtime directory rather than durable project state.
+- Public HTTPS reachability for the dedicated control API has been verified.
+- Vercel Next.js UI source builds successfully in production mode.
+- Hermes udise-control skill and local control client are installed.
+- Offline baseline is 137/137.
+- Periodic GitHub promotion tooling is installed; dirty worktrees skip safely.

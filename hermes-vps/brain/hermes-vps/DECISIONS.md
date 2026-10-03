@@ -107,3 +107,14 @@ so the same code works for any school.
 **Why.** The repo root documents the project as a whole. `brain/` documents this
 runner in the depth someone needs when they are working *inside* it. The
 `HANDOFF.md` is the entry point.
+
+## 2026-10-03 — One execution engine, multiple control surfaces
+
+Decision: keep udise_vps as the single portal execution engine. Vercel and
+Hermes use a shared Oracle control API rather than duplicating class/stage logic.
+
+Decision: class/stage support is capability-driven so future verified
+enhancements do not require parallel hard-coded UI changes.
+
+Decision: automatic GitHub synchronization is test-gated promotion only. It may
+update server code after offline verification; it never authorizes UDISE writes.

@@ -18,3 +18,15 @@
 - [ ] Keep write toggles disabled by default.
 - [ ] Keep documentation synchronized with every promoted baseline.
 - [ ] Keep private student data and credentials out of Git.
+
+## Hermes/Vercel control plane
+
+- [x] Mirror udise-automation-suite on Oracle.
+- [x] Add read-only Oracle control API for roster/completion jobs.
+- [x] Add dynamic capabilities for class/stage UI generation.
+- [x] Add secure runtime UDISE session-entry flow.
+- [x] Add Vercel UI source and production-build verification.
+- [x] Add Hermes messaging skill/client.
+- [x] Add test-gated future GitHub promotion timer.
+- [ ] Deploy/connect the Vercel project with encrypted environment values.
+- [ ] Add explicit preview/approval flows before write-stage execution.

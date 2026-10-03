@@ -1,0 +1,11 @@
+[Unit]
+Description=Check UDISE automation repository updates
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=90s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

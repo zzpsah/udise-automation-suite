@@ -156,3 +156,14 @@ sides and different = different person. Everything else scores — see
 - No scheduler or daemon. It is a CLI, run when you want it.
 - No credential storage. Cookies are runtime-only.
 - No school-specific configuration in the package.
+
+## Control-plane extension
+
+udise_vps remains the only portal-contract implementation.
+
+Vercel and Hermes call the Oracle control_api; neither surface calls UDISE
+directly. The API owns dynamic capabilities, secure runtime session references,
+job state, aggregate progress events and result-file access.
+
+The web UI and messaging layer consume /api/v1/capabilities instead of
+maintaining their own class/stage support matrix.

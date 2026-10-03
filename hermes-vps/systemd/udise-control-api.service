@@ -1,0 +1,16 @@
+[Unit]
+Description=UDISE Hermes Control API
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/udise-automation-suite/hermes-vps
+Environment=PYTHONPATH=%h/projects/udise-automation-suite/hermes-vps
+Environment=UDISE_CONTROL_TOKEN_FILE=%h/.config/udise-control/api-token
+EnvironmentFile=-%h/.config/udise-control/control.env
+ExecStart=%h/projects/udise-automation-suite/hermes-vps/.venv/bin/uvicorn control_api.app:app --host 127.0.0.1 --port 9135
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

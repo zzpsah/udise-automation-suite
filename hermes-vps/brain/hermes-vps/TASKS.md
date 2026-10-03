@@ -55,3 +55,19 @@
 - Any write to eShikshaKosh. It is a read-only data source.
 - Storing credentials or sessions.
 - Scheduling / daemonising. It stays a CLI run deliberately.
+
+## Control plane / UI / messaging
+
+- [x] Mirror the repository on Oracle.
+- [x] Add dynamic class/stage capability registry.
+- [x] Add protected read-only job API and aggregate progress events.
+- [x] Add one-time secure runtime UDISE session entry.
+- [x] Keep all write stages locked in the control API.
+- [x] Add Vercel Next.js GUI source and pass a production build.
+- [x] Add Hermes natural-language skill and local control client.
+- [x] Add verified GitHub candidate-test-and-promote workflow.
+- [ ] Connect/deploy the Vercel project and set encrypted environment values.
+- [ ] Add proactive WhatsApp progress push from job events.
+- [ ] Add dedicated preview/approval workflow before enabling each write stage.
+- [ ] Replace Cookie-header entry with direct username/password/CAPTCHA login
+      when the live portal login contract is implemented.

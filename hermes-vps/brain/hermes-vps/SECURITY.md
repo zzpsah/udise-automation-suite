@@ -78,3 +78,14 @@ the class scope named, and check the output.
 If a write is reported as successful but a read-back disagrees, **stop**. Record
 the student id, the field, what was sent, and what came back. Do not retry until
 the discrepancy is understood — the portal may have partially applied the write.
+
+## Control-plane security
+
+- The API bearer token is generated locally and never committed.
+- UDISE Cookie material is accepted only by a high-entropy one-time form and is
+  kept in the user runtime directory, not durable project state.
+- Vercel never receives the UDISE Cookie.
+- Raw per-student progress is not exposed to the web UI.
+- The current control API rejects all write stages.
+- Public exposure must target only the control API listener, not unrelated
+  Oracle/Hermes services.

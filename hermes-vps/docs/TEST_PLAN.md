@@ -19,7 +19,7 @@ Never promote one to another. `HTTP 200` is not `LIVE_SAVE`.
 
 ## Layer 1 — offline (automated, always run)
 
-`./run_tests.sh` — 110 tests, no network, no credentials, ~2s.
+`./run_tests.sh` — 137 tests, no network, no credentials, ~2s.
 
 Covers: cross-portal matching and its scoring, admission-number priority and
 parsing, language plans, exam-result validity, the status-4 null rule, sentinel

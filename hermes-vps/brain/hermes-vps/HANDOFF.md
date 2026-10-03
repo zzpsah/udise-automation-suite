@@ -8,7 +8,7 @@ Resume here. Read this before changing anything.
    `TESTS.md`, `TASKS.md` (all in this folder).
 2. Read `../../RULES.md` and `../../DEVOS.md` at the repo root.
 3. `git status --short` before any change.
-4. Run `../../hermes-vps/run_tests.sh` — 110 tests, no network, ~2 seconds.
+4. Run `../../hermes-vps/run_tests.sh` — 137 tests, no network, ~2 seconds.
 5. Distinguish implemented / offline-tested / live-read / live-save evidence.
    Never upgrade one to another without a fresh read-back.
 
@@ -69,3 +69,17 @@ python3 -m udise_vps.cli students --school <id>
   notebook's enum tables are wrong in places this code has corrected.
 - Commit credentials, cookies, student exports, or completed workbooks.
 - Make bulk portal mutations without explicit user approval.
+
+## Control-plane resume point
+
+For UI/messaging work, read ../../docs/CONTROL_PLANE.md after this file.
+
+Current safe MVP:
+- students and completion execute through the control API
+- all write stages are capability-visible but API-locked
+- Vercel source builds
+- Hermes skill/client are installed
+- GitHub auto-promotion validates a candidate before fast-forwarding live
+
+Do not enable GP/EP/Facility/Finalize writes merely by changing capability mode.
+Each requires a dedicated preview/approval contract with read-back.

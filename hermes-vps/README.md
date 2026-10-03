@@ -597,3 +597,22 @@ material, raw student API responses, or completed student workbooks.
 `.gitignore` excludes `*.xlsx`, `*.csv`, `*.log`, `smoke-out/`, `.env`.
 
 The `smoke-out/` workbooks contain student data — delete when no longer needed.
+
+## 7. Oracle control plane, Vercel and Hermes
+
+The verified CLI remains the execution engine. A control-plane layer under
+control_api exposes dynamic class/stage capabilities, secure runtime UDISE
+session entry, read-only jobs, aggregate progress events and protected results.
+
+The first executable API stages are students and completion. GP, EP, Facility
+and Finalize are visible in capabilities but intentionally locked until their
+dedicated preview/approval write workflows are added.
+
+The Vercel source is in web/. The Hermes natural-language skill and local client
+are in hermes-skill/udise-control/ and tools/control_client.py.
+
+Future GitHub main updates can be verified and fast-forward promoted by
+tools/promote_from_github.sh. Promotion runs offline tests first and never means
+automatic portal writes.
+
+See docs/CONTROL_PLANE.md.
