@@ -125,6 +125,16 @@ export default function Page(){
     setEshikshaReady(true);setEshikshaUrl("");setEshikshaPassword("");setMsg("eShikshaKosh credentials saved temporarily for this page.");
   }
 
+  async function downloadEshikshaReport(){
+    if(!eshikshaReady){
+      await connectEshiksha();
+      setMsg("Enter eShikshaKosh credentials first. Download will be enabled after they are saved.");
+      return;
+    }
+    setMsg("Starting the eShikshaKosh report download. This does not require a UDISE session…");
+    window.location.href=`/api/eshiksha-export?class=${encodeURIComponent(klass)}`;
+  }
+
   useEffect(()=>{
     if(!eshikshaToken || eshikshaReady) return;
     const t=setInterval(async()=>{
@@ -235,7 +245,7 @@ export default function Page(){
             {selected.mode!=="read"&&<div className="blank-only-note"><strong>Blank-only rule:</strong> values already saved in UDISE are untouched. Only eligible blank fields are proposed; skipped and already-complete students are listed in the Excel result.</div>}
             {selected.id==="ep"&&<div className="source-panel">
               <div className={"source-status "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"● Uploaded eShikshaKosh report ready":eshikshaReady?"● eShikshaKosh credentials ready for this page":"○ eShikshaKosh report or credentials required"}</div>
-              <div className="source-actions"><button type="button" onClick={connectEshiksha}>Prepare credential fields</button><a className="download template-download" href={`/api/ep-template?class=${encodeURIComponent(klass)}`}>Download manual EP template</a><a className="download template-download" href={`/api/eshiksha-export?class=${encodeURIComponent(klass)}`}>Download eShikshaKosh report</a><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
+              <div className="source-actions"><button type="button" onClick={connectEshiksha}>Prepare credential fields</button><a className="download template-download" href={`/api/ep-template?class=${encodeURIComponent(klass)}`}>Download manual EP template</a><button type="button" className="download template-download" onClick={downloadEshikshaReport}>Download eShikshaKosh report</button><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
               {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="inline-form compact"><label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label><label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label><button type="button" className="run-button" onClick={saveEshikshaCredentials}>Save credentials temporarily</button></div>}
               <small>Choose one method: enter credentials for an automatic read-only report, or upload an Excel report that you have filled with Admission No. and subjects. The uploaded report is used only for this EP preview.</small>
             </div>}
