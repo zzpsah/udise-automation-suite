@@ -79,3 +79,14 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 - `https://udise.vercel.app/` is assigned to another Vercel deployment and was
   not changed or deleted; the operator can reassign it from that account later.
 - No live UDISE portal write ran during deployment; writes remain preview-bound.
+
+## eShikshaKosh Playwright export — 2026-10-04
+
+- The maintained exporter is `~/projects/eshikshakosh-automation/local-script/esk_otr_api.py` on Oracle.
+- CAPTCHA detection and arithmetic solving are working.
+- A Playwright diagnostic captured the real login request: `POST /auth/login` returns HTTP 422 with `Invalid userId/Password.`
+- The browser remains at `/login`; no token, localStorage value, or cookie is created because the portal rejects the supplied credentials.
+- This is not currently a selector, CAPTCHA, or token-listener defect. A valid eShikshaKosh UDISE/password pair is required for the next live export test.
+- Oracle runtime dependencies `nest-asyncio` and `playwright` were missing from the Hermes venv and have been installed; both are now declared in `hermes-vps/requirements.txt`.
+- The Playwright listener now checks nested token fields, storage, and cookies after login for portal-version drift.
+- Live export remains unverified until credentials are refreshed. No credentials or private reports are stored in Git.

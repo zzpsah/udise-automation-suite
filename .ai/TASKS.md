@@ -2,6 +2,7 @@
 
 ## Active
 - Implement upload-driven AUTO EP for IX and XI.
+- Refresh eShikshaKosh credentials and rerun the Oracle Playwright export smoke test; record HTTP login result and report download separately from UDISE workflow evidence.
 - Keep whole-file processing before manual review.
 - Discover XI EP form/API contract before writes.
 - Run reviewed live AUTO GP and Facility verification tests.
