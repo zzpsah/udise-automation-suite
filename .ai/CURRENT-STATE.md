@@ -90,3 +90,4 @@ See `hermes-vps/brain/HANDOFF.md` for the full handoff, and
 - Oracle runtime dependencies `nest-asyncio` and `playwright` were missing from the Hermes venv and have been installed; both are now declared in `hermes-vps/requirements.txt`.
 - The Playwright listener now checks nested token fields, storage, and cookies after login for portal-version drift.
 - Live export remains unverified until credentials are refreshed. No credentials or private reports are stored in Git.
+- Next offline test: `hermes-vps/tests/test_esk.py` passed 10/10. The complete local suite could not run in the bare Windows interpreter because `fastapi` is not installed there; this is an environment limitation, not a test failure in the eShiksha module.
