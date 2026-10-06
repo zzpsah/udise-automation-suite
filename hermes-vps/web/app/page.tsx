@@ -38,12 +38,15 @@ const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
 export default function Page(){
   const [caps,setCaps]=useState<Caps|null>(null);
   const [school,setSchool]=useState("");
-  const [savedSchools,setSavedSchools]=useState<Array<{id:string;label:string}>>([]);
   const [klass,setKlass]=useState("IX");
   const [stage,setStage]=useState("completion");
-  const [sessionToken,setSessionToken]=useState("");
   const [sessionId,setSessionId]=useState("");
-  const [entryUrl,setEntryUrl]=useState("");
+  const [loginToken,setLoginToken]=useState("");
+  const [username,setUsername]=useState("");
+  const [password,setPassword]=useState("");
+  const [captcha,setCaptcha]=useState("");
+  const [captchaNonce,setCaptchaNonce]=useState(0);
+  const [loginBusy,setLoginBusy]=useState(false);
   const [eshikshaToken,setEshikshaToken]=useState("");
   const [eshikshaUrl,setEshikshaUrl]=useState("");
   const [eshikshaReady,setEshikshaReady]=useState(false);
@@ -66,18 +69,6 @@ export default function Page(){
     if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
-  useEffect(()=>{
-    try { const raw=window.localStorage.getItem("udise_saved_schools"); if(raw) setSavedSchools(JSON.parse(raw)); } catch {}
-  },[]);
-
-  function saveSchool(){
-    const id=school.trim();
-    if(!id) return;
-    const next=[{id,label:id},...savedSchools.filter(item=>item.id!==id)].slice(0,12);
-    setSavedSchools(next);
-    window.localStorage.setItem("udise_saved_schools",JSON.stringify(next));
-    setMsg("School saved in this browser's dropdown.");
-  }
 
   const selected=useMemo(()=>caps?.stages.find(x=>x.id===stage),[caps,stage]);
   const selectedMeta=selected?STAGE_META[selected.id]:undefined;
@@ -87,25 +78,45 @@ export default function Page(){
     if(selected?.requires_class && !selected.classes.includes(klass)) setStage("completion");
   },[selected,klass]);
 
-  async function connectSession(){
-    setMsg("Creating a secure session link…");
-    const r=await fetch("/api/session-request",{method:"POST"});
+  async function beginUdiseLogin(){
+    setLoginBusy(true);
+    setCaptcha("");
+    setMsg("Loading UDISE CAPTCHA…");
+    const r=await fetch("/api/udise-login/start",{method:"POST"});
     const d=await r.json();
-    if(!r.ok){setMsg(d.error||"Could not create secure session link");return}
-    setSessionToken(d.token);setEntryUrl(d.entry_url);
-    setMsg("Paste the UDISE Cookie header in the secure panel.");
+    if(!r.ok){setLoginBusy(false);setMsg(d.error||d.detail||"Could not start UDISE login");return}
+    setLoginToken(d.token);
+    setCaptchaNonce(Date.now());
+    setLoginBusy(false);
+    setMsg("");
   }
 
-  useEffect(()=>{
-    if(!sessionToken || sessionId) return;
-    const t=setInterval(async()=>{
-      const r=await fetch("/api/session-status?token="+encodeURIComponent(sessionToken),{cache:"no-store"});
-      if(!r.ok) return;
-      const d=await r.json();
-      if(d.ready && d.session_id){setSessionId(d.session_id);setEntryUrl("");setMsg("UDISE session connected. Choose a workflow to continue.");clearInterval(t)}
-    },2000);
-    return ()=>clearInterval(t);
-  },[sessionToken,sessionId]);
+  async function submitUdiseLogin(){
+    if(!loginToken){await beginUdiseLogin();return}
+    if(!username.trim()||!password||!captcha.trim()){setMsg("Enter username, password and CAPTCHA.");return}
+    setLoginBusy(true);
+    setMsg("Signing in to UDISE…");
+    const r=await fetch("/api/udise-login/submit",{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({token:loginToken,username:username.trim(),password,captcha:captcha.trim()})
+    });
+    const d=await r.json();
+    setLoginBusy(false);
+    if(!r.ok){
+      setPassword("");
+      setCaptcha("");
+      setMsg(d.detail||d.error||"UDISE login failed");
+      await beginUdiseLogin();
+      return;
+    }
+    setSessionId(d.session_id);
+    setPassword("");
+    setCaptcha("");
+    setMsg("UDISE connected. Select class and workflow.");
+  }
+
+  useEffect(()=>{beginUdiseLogin()},[]);
 
   async function connectEshiksha(){
     setMsg("Preparing secure eShikshaKosh sign-in…");
@@ -209,24 +220,20 @@ export default function Page(){
     <div className="workspace">
       <div className="controls">
         <section className="card setup-card">
-          <div className="section-title"><span className="step">1</span><div><h2>Connect school</h2><p>{LOGIN_REFERENCE}</p></div></div>
-          <div className="setup-row">
-            {Boolean(caps?.school_presets?.length)&&<select className="school-preset" aria-label="Saved school" value={caps?.school_presets?.some(p=>p.internal_id===school)?school:""} onChange={e=>setSchool(e.target.value)}>
-              <option value="">Custom school</option>
-              {caps?.school_presets?.map(p=><option value={p.internal_id} key={p.internal_id}>{p.udise_code} · {p.name}</option>)}
-            </select>}
-            {savedSchools.length>0&&<select className="school-preset" aria-label="My saved schools" value={savedSchools.some(item=>item.id===school)?school:""} onChange={e=>setSchool(e.target.value)}>
-              <option value="">My saved schools</option>
-              {savedSchools.map(item=><option value={item.id} key={item.id}>{item.label}</option>)}
-            </select>}
-            <input aria-label="School URL or internal ID" value={school} onChange={e=>setSchool(e.target.value)} placeholder="School URL or 7-digit internal ID"/>
-            <button type="button" onClick={saveSchool}>Save school</button>
-            <button onClick={connectSession}>{sessionId?"Reconnect":"Connect UDISE"}</button>
-            {sessionId&&<span className="badge ok">● Ready</span>}
-            {!sessionId&&sessionToken&&<span className="badge">Waiting…</span>}
-          </div>
+          <div className="section-title"><span className="step">1</span><div><h2>UDISE Login</h2><p>Username, password and CAPTCHA</p></div></div>
+          {!sessionId?<div className="login-form-grid">
+            <label>Username<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" placeholder="UDISE username"/></label>
+            <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Password"/></label>
+            <div className="captcha-row">
+              {loginToken?<img className="captcha-image" src={"/api/udise-login/captcha?token="+encodeURIComponent(loginToken)+"&v="+captchaNonce} alt="UDISE CAPTCHA"/>:<div className="captcha-placeholder">Loading CAPTCHA…</div>}
+              <button type="button" className="secondary-button" onClick={beginUdiseLogin} disabled={loginBusy}>Refresh CAPTCHA</button>
+            </div>
+            <label>CAPTCHA<input value={captcha} onChange={e=>setCaptcha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitUdiseLogin()} autoComplete="off" placeholder="Enter CAPTCHA"/></label>
+            <button type="button" className="run-button" onClick={submitUdiseLogin} disabled={loginBusy}>{loginBusy?"Please wait…":"Sign in"}</button>
+          </div>:<div className="connected-row"><span className="badge ok">● UDISE connected</span><button type="button" className="secondary-button" onClick={()=>{setSessionId("");beginUdiseLogin()}}>Sign in again</button></div>}
         </section>
 
+        {sessionId&&<>
         <section className="card scope-card">
           <div className="section-heading"><div className="section-title"><span className="step">2</span><div><h2>Select class</h2><p>Phase 2 · Class scope for all profile operations</p></div></div><span className="stage-count">Class {klass}</span></div>
           <div className="class-grid" role="group" aria-label="Operation class">
@@ -269,6 +276,7 @@ export default function Page(){
             <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>
           </div>
         </section>
+        </>}
       </div>
 
       <aside className="card output-card">
@@ -288,13 +296,6 @@ export default function Page(){
         <div className="modal-head"><div><span className="eyebrow">WORKFLOW</span><h2>{WORKFLOW_INFO[infoStage].title}</h2></div><button className="modal-close" onClick={()=>setInfoStage(null)} aria-label="Close">×</button></div>
         <ol>{WORKFLOW_INFO[infoStage].steps.map((step,i)=><li key={i} style={{marginBottom:10}}>{step}</li>)}</ol>
         <button className="run-button" onClick={()=>setInfoStage(null)}>Close</button>
-      </div>
-    </div>}
-    {entryUrl&&!sessionId&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure UDISE session">
-      <div className="session-modal">
-        <div className="modal-head"><div><span className="eyebrow">SECURE SESSION</span><h2>Connect UDISE securely</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
-        <p>Desktop Chrome/Edge can use the UDISE Hermes Session Bridge extension. Otherwise paste the browser Cookie header below. It goes directly to protected Oracle runtime storage and is never shown in chat or job output.</p>
-        <iframe title="Secure UDISE Cookie entry" src={entryUrl}/>
       </div>
     </div>}
   </main>

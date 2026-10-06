@@ -11,6 +11,9 @@ import subprocess
 import threading
 import time
 import uuid
+
+import requests
+from urllib.parse import urlencode
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +30,7 @@ RUNTIME = Path(os.environ.get("UDISE_CONTROL_RUNTIME", Path(os.environ.get("XDG_
 JOBS = STATE / "jobs"
 SESSIONS = RUNTIME / "sessions"
 REQUESTS = RUNTIME / "session-requests"
+LOGIN_REQUESTS = RUNTIME / "login-requests"
 ESK_REQUESTS = RUNTIME / "eshiksha-requests"
 ESK_CREDENTIAL = RUNTIME / "eshiksha-credential.json"
 ESK_UPLOAD = RUNTIME / "eshiksha-upload.xlsx"
@@ -38,7 +42,7 @@ REQUEST_TTL = 10 * 60
 ESK_CREDENTIAL_TTL = 8 * 60 * 60
 RESULT_TTL = 24 * 60 * 60
 
-for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, ESK_REQUESTS):
+for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, LOGIN_REQUESTS, ESK_REQUESTS):
     p.mkdir(parents=True, exist_ok=True)
     os.chmod(p, 0o700)
 
@@ -143,6 +147,11 @@ def _load_session(session_id: str) -> dict:
 class SessionRequestIn(BaseModel):
     return_url: str | None = None
 
+class UdiseLoginSubmitIn(BaseModel):
+    username: str
+    password: str
+    captcha: str
+
 class EshikshaCredentialIn(BaseModel):
     token: str
     udise: str
@@ -170,6 +179,54 @@ def _request_file(directory: Path, token: str) -> Path:
     return directory / f"{token}.json"
 
 
+UDISE_AUTH_BASE = "https://auth.udiseplus.gov.in"
+UDISE_AUTH_PARAMS = {
+    "response_type": "code",
+    "client_id": "udise-sdms-g0",
+    "scope": "read user_info",
+    "redirect_uri": "https://sdms.udiseplus.gov.in/p0/oauth2/callback",
+}
+
+def _dump_cookies(session: requests.Session) -> list[dict[str, str]]:
+    return [{
+        "name": c.name, "value": c.value, "domain": c.domain or "",
+        "path": c.path or "/",
+    } for c in session.cookies]
+
+def _restore_http_session(items: list[dict[str, str]]) -> requests.Session:
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0"})
+    for item in items:
+        session.cookies.set(
+            str(item.get("name") or ""),
+            str(item.get("value") or ""),
+            domain=str(item.get("domain") or "") or None,
+            path=str(item.get("path") or "/"),
+        )
+    return session
+
+def _csrf_from_login_html(text: str) -> str:
+    m = re.search(r'name="_csrf"\s+value="([^"]+)"', text, re.I)
+    if not m:
+        m = re.search(r'value="([^"]+)"\s+name="_csrf"', text, re.I)
+    if not m:
+        raise RuntimeError("UDISE login page did not provide a CSRF token")
+    return html.unescape(m.group(1))
+
+def _sdms_cookie_header(session: requests.Session) -> str:
+    values: list[str] = []
+    seen: set[str] = set()
+    for c in session.cookies:
+        domain = (c.domain or "").lstrip(".").lower()
+        if domain and not domain.endswith("sdms.udiseplus.gov.in"):
+            continue
+        if c.name in seen:
+            continue
+        seen.add(c.name)
+        values.append(f"{c.name}={c.value}")
+    return "; ".join(values)
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "service": "udise-control", "version": app.version}
@@ -178,6 +235,119 @@ def health() -> dict:
 @app.get("/api/v1/capabilities")
 def capabilities() -> dict:
     return get_capabilities()
+
+
+@app.post("/api/v1/login-requests")
+def create_udise_login_request(authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    token = secrets.token_urlsafe(32)
+    now = int(time.time())
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0"})
+    try:
+        login = session.get(
+            UDISE_AUTH_BASE + "/login",
+            params=UDISE_AUTH_PARAMS,
+            timeout=25,
+        )
+        login.raise_for_status()
+        csrf = _csrf_from_login_html(login.text)
+        captcha = session.get(UDISE_AUTH_BASE + "/captcha-image", timeout=25)
+        captcha.raise_for_status()
+    except Exception as exc:
+        raise HTTPException(502, f"UDISE login service unavailable: {type(exc).__name__}") from exc
+    _json_write(LOGIN_REQUESTS / f"{token}.json", {
+        "created_at": now,
+        "expires_at": now + REQUEST_TTL,
+        "used": False,
+        "csrf": csrf,
+        "auth_url": login.url,
+        "cookies": _dump_cookies(session),
+    })
+    captcha_path = LOGIN_REQUESTS / f"{token}.png"
+    captcha_path.write_bytes(captcha.content)
+    os.chmod(captcha_path, 0o600)
+    return {"token": token, "expires_in": REQUEST_TTL}
+
+
+@app.get("/api/v1/login-requests/{token}/captcha")
+def udise_login_captcha(token: str, authorization: str | None = Header(default=None)):
+    require_api(authorization)
+    p = _request_file(LOGIN_REQUESTS, token)
+    if not p.exists():
+        raise HTTPException(404, "Login request not found")
+    data = _json_read(p)
+    if int(time.time()) > int(data.get("expires_at", 0)):
+        p.unlink(missing_ok=True)
+        (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+        raise HTTPException(410, "Login request expired")
+    captcha_path = LOGIN_REQUESTS / f"{token}.png"
+    if not captcha_path.exists():
+        raise HTTPException(404, "CAPTCHA unavailable")
+    return FileResponse(captcha_path, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v1/login-requests/{token}/submit")
+def submit_udise_login(
+    token: str,
+    body: UdiseLoginSubmitIn,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    require_api(authorization)
+    p = _request_file(LOGIN_REQUESTS, token)
+    if not p.exists():
+        raise HTTPException(404, "Login request not found")
+    data = _json_read(p)
+    now = int(time.time())
+    if data.get("used") or now > int(data.get("expires_at", 0)):
+        raise HTTPException(410, "Login request expired or already used")
+    if not body.username.strip() or not body.password or not body.captcha.strip():
+        raise HTTPException(400, "Username, password and CAPTCHA are required")
+
+    session = _restore_http_session(list(data.get("cookies") or []))
+    form = {
+        "_csrf": str(data.get("csrf") or ""),
+        "loginTxnId": "",
+        "username": body.username.strip(),
+        "password": body.password,
+        "captchaMode": "image",
+        "captcha": body.captcha.strip(),
+    }
+    try:
+        result = session.post(
+            UDISE_AUTH_BASE + "/login",
+            data=form,
+            headers={"Referer": str(data.get("auth_url") or UDISE_AUTH_BASE + "/login")},
+            timeout=40,
+            allow_redirects=True,
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"UDISE login request failed: {type(exc).__name__}") from exc
+
+    cookie = _sdms_cookie_header(session)
+    if "JSESSIONID=" not in cookie or "XSRF-TOKEN=" not in cookie:
+        final_url = str(result.url or "")
+        text = (result.text or "").lower()
+        if "captchaerror" in final_url.lower() or "captcha" in text:
+            detail = "CAPTCHA incorrect or expired. Refresh CAPTCHA and try again."
+        elif "invalid" in text or "password" in text or "error" in final_url.lower():
+            detail = "UDISE username or password was not accepted."
+        else:
+            detail = "UDISE login was not completed. Refresh CAPTCHA and try again."
+        raise HTTPException(401, detail)
+
+    sid = secrets.token_urlsafe(32)
+    _json_write(SESSIONS / f"{sid}.json", {
+        "cookie": cookie,
+        "created_at": now,
+        "expires_at": now + SESSION_TTL,
+    })
+    data.update({"used": True, "ready": True, "session_id": sid, "used_at": now})
+    data.pop("csrf", None)
+    data.pop("cookies", None)
+    _json_write(p, data)
+    (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+    return {"ready": True, "session_id": sid, "expires_in": SESSION_TTL}
 
 
 @app.post("/api/v1/session-requests", dependencies=[])
