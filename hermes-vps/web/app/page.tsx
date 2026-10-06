@@ -16,6 +16,15 @@ const HERMES_FLOW_REFERENCE: Record<string,string> = {
   finalize: "Phase 5 · Fresh status read → status 3 eligibility → one approved submission → status 6 read-back",
 };
 const LOGIN_REFERENCE = "Phase 1 · Secure session and roster access";
+const WORKFLOW_INFO: Record<string,{title:string;steps:string[]}> = {
+  students:{title:"Student roster",steps:["Read current UDISE student roster","Mask Aadhaar in output","Generate downloadable Excel","No portal data is changed"]},
+  snapshot:{title:"Full read snapshot",steps:["Read Students, GP, EP, Facility and Completion","Collect issues in a separate sheet","Generate one audit workbook","No portal data is changed"]},
+  gp:{title:"General Profile",steps:["Read current GP values","Fill only eligible blank fields","Save eligible changes","Read back and verify the save"]},
+  ep:{title:"Enrollment Profile",steps:["Read current UDISE profile","Fetch required source from eShikshaKosh","Prepare eligible EP values","Save and verify with fresh read-back"]},
+  facility:{title:"Facility Profile",steps:["Read current Facility values","Fill only eligible blank fields","Save changes","Read back and verify each saved record"]},
+  completion:{title:"Completion overview",steps:["Read GP, EP and Facility completion state","Calculate current student status","Generate downloadable report","No portal data is changed"]},
+  finalize:{title:"Complete Data",steps:["Read fresh completion status","Use only currently eligible records","Submit Complete Data","Read back and verify completed status"]},
+};
 const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
   students: {icon:"P1",short:"Export the current masked roster",fills:["Read-only","Masked Aadhaar"]},
   snapshot: {icon:"RA",short:"Export a full read-only audit workbook with class-wise pending counts",fills:["Class IX / X / XI / XII student totals","GP pending: blank eligible fields by class","EP pending: admission, language and subject gaps by class","Facility pending: blank measurements and Yes/No fields by class","Completion status and Issues sheets; read-only, no portal changes"]},
@@ -45,9 +54,8 @@ export default function Page(){
   const [eshikshaYear,setEshikshaYear]=useState("2026-27");
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
-  const [maxWrites,setMaxWrites]=useState("1");
-  const [customMaxWrites,setCustomMaxWrites]=useState("10");
-  const [acknowledgeReadback,setAcknowledgeReadback]=useState(false);
+  const [autoSavePreview,setAutoSavePreview]=useState(false);
+  const [infoStage,setInfoStage]=useState<string|null>(null);
   const [msg,setMsg]=useState("");
 
   async function loadCaps(){
@@ -152,7 +160,7 @@ export default function Page(){
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
     if(selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
-    setMsg("Preparing the workflow…");setJob(null);setJobId("");
+    setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");setAutoSavePreview(selected?.mode==="write");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
       session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true
     })});
@@ -161,21 +169,17 @@ export default function Page(){
     setJobId(d.job_id);setMsg("Workflow started.");
   }
 
-  const approvalPhrase=job?.job?`SAVE ${job.job.stage.toUpperCase()} ${job.job.class_name||"ALL"}`:"";
-  const approvedStage=job?.job?caps?.stages.find(item=>item.id===job.job.stage):undefined;
-  const canApprove=Boolean(job&&job.job.status==="completed"&&job.job.preview&&job.job.has_result&&approvedStage?.approval_enabled);
-  const requestedMax=maxWrites==="all"?500:maxWrites==="custom"?Math.max(1,Math.min(500,Number(customMaxWrites)||1)):Number(maxWrites);
-
-  async function approveWrite(){
-    if(!job||!canApprove) return;
-    setMsg("Submitting the bounded approval…");
-    const r=await fetch(`/api/jobs/${job.job.id}/approve`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-      confirmation:approvalPhrase,acknowledge_readback:acknowledgeReadback,max_submissions:requestedMax
+  async function autoApproveWrite(previewJob:JobState){
+    setAutoSavePreview(false);
+    const phrase="SAVE "+previewJob.job.stage.toUpperCase()+" "+(previewJob.job.class_name||"ALL");
+    setMsg("Preview checked. Saving eligible changes…");
+    const r=await fetch(`/api/jobs/${previewJob.job.id}/approve`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+      confirmation:phrase,acknowledge_readback:true,max_submissions:500
     })});
     const d=await r.json();
-    if(!r.ok){setMsg(d.detail||d.error||"Approval was rejected");return}
-    setJob(null);setJobId(d.job_id);setAcknowledgeReadback(false);
-    setMsg(`Approved save started for up to ${d.max_submissions} record(s).`);
+    if(!r.ok){setMsg(d.detail||d.error||"Save could not start");return}
+    setJob(null);setJobId(d.job_id);
+    setMsg("Saving to UDISE. Fresh read-back will verify each change.");
   }
 
   useEffect(()=>{
@@ -185,11 +189,19 @@ export default function Page(){
       if(!r.ok) return;
       const d=await r.json();setJob(d);
       if(d.job.stage==="ep"&&d.job.status==="failed") setEshikshaReady(false);
-      if(["completed","failed"].includes(d.job.status)) clearInterval(timer);
+      if(d.job.status==="completed"&&autoSavePreview&&d.job.preview&&d.job.has_result){
+        clearInterval(timer);
+        await autoApproveWrite(d);
+        return;
+      }
+      if(["completed","failed"].includes(d.job.status)){
+        clearInterval(timer);
+        if(d.job.status==="failed") setAutoSavePreview(false);
+      }
     };
     const timer=setInterval(poll,1800);poll();
     return ()=>clearInterval(timer);
-  },[jobId]);
+  },[jobId,autoSavePreview]);
 
   const pct=job?.job.progress_total?Math.min(100,Math.round(job.job.progress_current*100/job.job.progress_total)):0;
   return <main>
@@ -230,7 +242,8 @@ export default function Page(){
             return <button type="button" aria-pressed={stage===s.id} disabled={unavailable} key={s.id} className={"choice "+(stage===s.id?"active ":"")+(s.mode==="write"?"previewable":"ready")} onClick={()=>setStage(s.id)}>
               <span className="stage-icon" aria-hidden="true">{meta.icon}</span>
               <span className="stage-copy"><strong>{s.label}</strong><small>{meta.short}</small></span>
-              <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Review + Save":"Ready"}</span>
+              <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Save":"Ready"}</span>
+              <span className="badge" role="button" tabIndex={0} aria-label={"How "+s.label+" works"} onClick={e=>{e.stopPropagation();setInfoStage(s.id)}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();setInfoStage(s.id)}}}>ⓘ</span>
             </button>})}
             <button type="button" aria-pressed={stage==="ep"} className={"choice ready source-choice "+(stage==="ep"?"active":"")} onClick={()=>setStage("ep")}>
               <span className="stage-icon" aria-hidden="true">SRC</span>
@@ -249,11 +262,11 @@ export default function Page(){
               {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="inline-form compact"><label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label><label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label><button type="button" className="run-button" onClick={saveEshikshaCredentials}>Save credentials temporarily</button></div>}
               <small>Choose one method: enter credentials for an automatic read-only report, or upload an Excel report that you have filled with Admission No. and subjects. The uploaded report is used only for this EP preview.</small>
             </div>}
-            {selected.mode==="write"?<div className="lock-reason"><div><strong>Preview first · Explicit approval required</strong><span>Review the Excel proposal, choose a maximum write count, and type the confirmation phrase. Every save uses a fresh pre-write read and matching post-write read-back.{selected.id==="ep"?" The preview also retains the masked eShikshaKosh source for the approved run.":""}</span></div></div>:<p>{selected.description}</p>}
+            {selected.mode==="write"?<div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?" The masked eShikshaKosh source is used for the EP run.":""}</span></div></div>:<p>{selected.description}</p>}
           </div>}
 
           <div className="run-row">
-            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Generate preview":"Run report"}</button>
+            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>
           </div>
         </section>
       </div>
@@ -266,22 +279,17 @@ export default function Page(){
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           <ul className="events">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
-          {canApprove&&<div className="approval-box">
-            <strong>Approve portal save</strong>
-            <span>Review the workbook first. Saved values stay unchanged; processing stops on an unconfirmed read-back.</span>
-            <label>Maximum records</label>
-            <select value={maxWrites} onChange={e=>setMaxWrites(e.target.value)} aria-label="Maximum records to save">
-              <option value="1">1 record</option><option value="5">Up to 5 records</option><option value="20">Up to 20 records</option><option value="custom">Custom number</option><option value="all">All eligible records</option>
-            </select>
-            {maxWrites==="custom"&&<input type="number" min="1" max="500" value={customMaxWrites} onChange={e=>setCustomMaxWrites(e.target.value)} aria-label="Custom maximum records" placeholder="Number of students"/>}
-            <span className="approval-note">The save confirmation is generated automatically for this selected stage and class.</span>
-            <label className="approval-check"><input type="checkbox" checked={acknowledgeReadback} onChange={e=>setAcknowledgeReadback(e.target.checked)}/><span>I approve this bounded portal save and understand that a fresh read-back is required.</span></label>
-            <button className="approve-button" disabled={!acknowledgeReadback} onClick={approveWrite}>Approve and save</button>
-          </div>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}
       </aside>
     </div>
+    {infoStage&&WORKFLOW_INFO[infoStage]&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Workflow information">
+      <div className="session-modal">
+        <div className="modal-head"><div><span className="eyebrow">WORKFLOW</span><h2>{WORKFLOW_INFO[infoStage].title}</h2></div><button className="modal-close" onClick={()=>setInfoStage(null)} aria-label="Close">×</button></div>
+        <ol>{WORKFLOW_INFO[infoStage].steps.map((step,i)=><li key={i} style={{marginBottom:10}}>{step}</li>)}</ol>
+        <button className="run-button" onClick={()=>setInfoStage(null)}>Close</button>
+      </div>
+    </div>}
     {entryUrl&&!sessionId&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Secure UDISE session">
       <div className="session-modal">
         <div className="modal-head"><div><span className="eyebrow">SECURE SESSION</span><h2>Connect UDISE securely</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
