@@ -42,3 +42,7 @@ Do not overwrite stronger existing documentation simply to match the template. F
 - Do not make consequential portal/database/bulk-data changes without the established approval boundary.
 - Do not claim completion without verification.
 - After material work, update durable documentation so the next AI/session can recover what changed, why, how it was verified, and what remains.
+
+## Remote access / Desktop Commander
+
+For authorized Oracle VPS access, read [`docs/REMOTE-ACCESS.md`](docs/REMOTE-ACCESS.md). A new AI chat must use Desktop Commander `list_devices`, select the online `oracle-server`, ping it, and only then operate on the live server. Do not confuse GitHub access with VPS/runtime access.
