@@ -41,6 +41,8 @@ export default function Page(){
   const [klass,setKlass]=useState("IX");
   const [stage,setStage]=useState("completion");
   const [sessionId,setSessionId]=useState("");
+  const [sessionToken,setSessionToken]=useState("");
+  const [entryUrl,setEntryUrl]=useState("");
   const [loginToken,setLoginToken]=useState("");
   const [username,setUsername]=useState("");
   const [password,setPassword]=useState("");
@@ -104,10 +106,11 @@ export default function Page(){
     const d=await r.json();
     setLoginBusy(false);
     if(!r.ok){
+      const errorMessage=d.detail||d.error||"UDISE login failed";
       setPassword("");
       setCaptcha("");
-      setMsg(d.detail||d.error||"UDISE login failed");
       await beginUdiseLogin();
+      setMsg(errorMessage);
       return;
     }
     setSessionId(d.session_id);
@@ -117,6 +120,29 @@ export default function Page(){
   }
 
   useEffect(()=>{beginUdiseLogin()},[]);
+
+  async function connectExistingSession(){
+    setMsg("Creating secure browser-session link…");
+    const r=await fetch("/api/session-request",{method:"POST"});
+    const d=await r.json();
+    if(!r.ok){setMsg(d.error||d.detail||"Could not create browser-session link");return}
+    setSessionToken(d.token);
+    setEntryUrl(d.entry_url);
+    setMsg("Use the secure fallback panel to connect your existing UDISE browser session.");
+  }
+
+  useEffect(()=>{
+    if(!sessionToken||sessionId) return;
+    const t=setInterval(async()=>{
+      const r=await fetch("/api/session-status?token="+encodeURIComponent(sessionToken),{cache:"no-store"});
+      if(!r.ok) return;
+      const d=await r.json();
+      if(d.ready&&d.session_id){
+        setSessionId(d.session_id);setEntryUrl("");setMsg("UDISE session connected.");clearInterval(t)
+      }
+    },1800);
+    return ()=>clearInterval(t);
+  },[sessionToken,sessionId]);
 
   async function connectEshiksha(){
     setMsg("Preparing secure eShikshaKosh sign-in…");
@@ -230,6 +256,7 @@ export default function Page(){
             </div>
             <label>CAPTCHA<input value={captcha} onChange={e=>setCaptcha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitUdiseLogin()} autoComplete="off" placeholder="Enter CAPTCHA"/></label>
             <button type="button" className="run-button" onClick={submitUdiseLogin} disabled={loginBusy}>{loginBusy?"Please wait…":"Sign in"}</button>
+            <details className="advanced-login"><summary>Advanced / fallback login</summary><button type="button" className="secondary-button" onClick={connectExistingSession}>Use existing browser session</button></details>
           </div>:<div className="connected-row"><span className="badge ok">● UDISE connected</span><button type="button" className="secondary-button" onClick={()=>{setSessionId("");beginUdiseLogin()}}>Sign in again</button></div>}
         </section>
 
@@ -291,6 +318,13 @@ export default function Page(){
         </div>}
       </aside>
     </div>
+    {entryUrl&&!sessionId&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Existing UDISE browser session">
+      <div className="session-modal">
+        <div className="modal-head"><div><span className="eyebrow">FALLBACK</span><h2>Use existing browser session</h2></div><button className="modal-close" onClick={()=>setEntryUrl("")} aria-label="Close">×</button></div>
+        <p>Use this only if direct UDISE login is unavailable. Connect the already signed-in browser session using the secure session bridge or cookie header.</p>
+        <iframe title="Secure UDISE browser session" src={entryUrl}/>
+      </div>
+    </div>}
     {infoStage&&WORKFLOW_INFO[infoStage]&&<div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Workflow information">
       <div className="session-modal">
         <div className="modal-head"><div><span className="eyebrow">WORKFLOW</span><h2>{WORKFLOW_INFO[infoStage].title}</h2></div><button className="modal-close" onClick={()=>setInfoStage(null)} aria-label="Close">×</button></div>

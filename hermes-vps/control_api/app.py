@@ -13,7 +13,7 @@ import time
 import uuid
 
 import requests
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from typing import Any
 
@@ -180,12 +180,7 @@ def _request_file(directory: Path, token: str) -> Path:
 
 
 UDISE_AUTH_BASE = "https://auth.udiseplus.gov.in"
-UDISE_AUTH_PARAMS = {
-    "response_type": "code",
-    "client_id": "udise-sdms-g0",
-    "scope": "read user_info",
-    "redirect_uri": "https://sdms.udiseplus.gov.in/p0/oauth2/callback",
-}
+UDISE_LOGIN_START = "https://sdms.udiseplus.gov.in/p0/oauth2/login"
 
 def _dump_cookies(session: requests.Session) -> list[dict[str, str]]:
     return [{
@@ -205,13 +200,19 @@ def _restore_http_session(items: list[dict[str, str]]) -> requests.Session:
         )
     return session
 
+def _hidden_input(text: str, name: str) -> str:
+    escaped = re.escape(name)
+    m = re.search(rf'name="{escaped}"[^>]*value="([^"]*)"', text, re.I)
+    if not m:
+        m = re.search(rf'value="([^"]*)"[^>]*name="{escaped}"', text, re.I)
+    return html.unescape(m.group(1)) if m else ""
+
+
 def _csrf_from_login_html(text: str) -> str:
-    m = re.search(r'name="_csrf"\s+value="([^"]+)"', text, re.I)
-    if not m:
-        m = re.search(r'value="([^"]+)"\s+name="_csrf"', text, re.I)
-    if not m:
+    value = _hidden_input(text, "_csrf")
+    if not value:
         raise RuntimeError("UDISE login page did not provide a CSRF token")
-    return html.unescape(m.group(1))
+    return value
 
 def _sdms_cookie_header(session: requests.Session) -> str:
     values: list[str] = []
@@ -245,13 +246,28 @@ def create_udise_login_request(authorization: str | None = Header(default=None))
     session = requests.Session()
     session.headers.update({"User-Agent": "Mozilla/5.0"})
     try:
-        login = session.get(
-            UDISE_AUTH_BASE + "/login",
-            params=UDISE_AUTH_PARAMS,
-            timeout=25,
+        bootstrap = session.get(
+            UDISE_LOGIN_START,
+            timeout=30,
+            allow_redirects=False,
         )
+        bootstrap.raise_for_status()
+        auth_start = str(bootstrap.headers.get("Location") or "")
+        if auth_start.startswith("http://auth.udiseplus.gov.in/"):
+            auth_start = "https://" + auth_start[len("http://"):]
+        if not auth_start.startswith(UDISE_AUTH_BASE + "/oauth2/authorize?"):
+            raise RuntimeError("Students OAuth bootstrap did not provide the auth redirect")
+        login = session.get(auth_start, timeout=30, allow_redirects=True)
         login.raise_for_status()
+        if not str(login.url).startswith(UDISE_AUTH_BASE + "/login?"):
+            raise RuntimeError("Students OAuth flow did not reach the UDISE login page")
         csrf = _csrf_from_login_html(login.text)
+        login_txn_id = _hidden_input(login.text, "loginTxnId")
+        if not login_txn_id:
+            login_txn_id = str((parse_qs(urlparse(login.url).query).get("loginTxnId") or [""])[0])
+        state = str((parse_qs(urlparse(login.url).query).get("state") or [""])[0])
+        if not login_txn_id or not state:
+            raise RuntimeError("Students OAuth flow did not provide state/loginTxnId")
         captcha = session.get(UDISE_AUTH_BASE + "/captcha-image", timeout=25)
         captcha.raise_for_status()
     except Exception as exc:
@@ -261,6 +277,8 @@ def create_udise_login_request(authorization: str | None = Header(default=None))
         "expires_at": now + REQUEST_TTL,
         "used": False,
         "csrf": csrf,
+        "login_txn_id": login_txn_id,
+        "state": state,
         "auth_url": login.url,
         "cookies": _dump_cookies(session),
     })
@@ -307,7 +325,7 @@ def submit_udise_login(
     session = _restore_http_session(list(data.get("cookies") or []))
     form = {
         "_csrf": str(data.get("csrf") or ""),
-        "loginTxnId": "",
+        "loginTxnId": str(data.get("login_txn_id") or ""),
         "username": body.username.strip(),
         "password": body.password,
         "captchaMode": "image",
@@ -325,10 +343,29 @@ def submit_udise_login(
         raise HTTPException(502, f"UDISE login request failed: {type(exc).__name__}") from exc
 
     cookie = _sdms_cookie_header(session)
-    if "JSESSIONID=" not in cookie or "XSRF-TOKEN=" not in cookie:
+    cookies = {c.name: c.value for c in session.cookies if (c.domain or "").lstrip(".").lower().endswith("sdms.udiseplus.gov.in")}
+    authenticated = False
+    if "JSESSIONID=" in cookie and "XSRF-TOKEN=" in cookie:
+        try:
+            check = session.get(
+                "https://sdms.udiseplus.gov.in/p0/check-session",
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": "https://sdms.udiseplus.gov.in/p0/",
+                    "User-Agent": "Mozilla/5.0",
+                    "X-XSRF-TOKEN": str(cookies.get("XSRF-TOKEN") or ""),
+                },
+                timeout=20,
+                allow_redirects=False,
+            )
+            authenticated = check.status_code == 200
+        except Exception:
+            authenticated = False
+
+    if not authenticated:
         final_url = str(result.url or "")
         text = (result.text or "").lower()
-        if "captchaerror" in final_url.lower() or "captcha" in text:
+        if "captchaerror" in final_url.lower() or "captcha incorrect" in text:
             detail = "CAPTCHA incorrect or expired. Refresh CAPTCHA and try again."
         elif "invalid" in text or "password" in text or "error" in final_url.lower():
             detail = "UDISE username or password was not accepted."
@@ -344,6 +381,8 @@ def submit_udise_login(
     })
     data.update({"used": True, "ready": True, "session_id": sid, "used_at": now})
     data.pop("csrf", None)
+    data.pop("login_txn_id", None)
+    data.pop("state", None)
     data.pop("cookies", None)
     _json_write(p, data)
     (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
