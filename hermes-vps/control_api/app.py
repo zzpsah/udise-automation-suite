@@ -228,6 +228,28 @@ def _sdms_cookie_header(session: requests.Session) -> str:
     return "; ".join(values)
 
 
+def _login_failure_detail(result: requests.Response) -> str:
+    final_url = str(result.url or "")
+    query = parse_qs(urlparse(final_url).query, keep_blank_values=True)
+    flags = {str(k).lower() for k in query}
+    text = result.text or ""
+    plain = html.unescape(re.sub(r"<[^>]+>", " ", text))
+    plain = re.sub(r"\s+", " ", plain).strip()
+    low = plain.lower()
+
+    if "captchaerror" in flags or "invalid captcha" in low:
+        return "CAPTCHA incorrect or expired. A fresh CAPTCHA has been loaded."
+    if "locked" in flags or "account is locked" in low or "login locked" in low:
+        return "UDISE has temporarily locked this login after failed attempts. Try again after the lock period."
+    if flags.intersection({"expired", "sessionexpired", "sessioninvalid", "flowwarning"}) or "login page has expired" in low or "link has expired" in low:
+        return "UDISE login session expired. A fresh CAPTCHA has been loaded; enter the credentials again."
+    if "error" in flags:
+        return "UDISE did not accept the username/password for this login attempt."
+    if "invalid credential" in low or "invalid username" in low or "incorrect password" in low:
+        return "UDISE did not accept the username/password for this login attempt."
+    return "UDISE login was not completed. A fresh CAPTCHA has been loaded."
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "service": "udise-control", "version": app.version}
@@ -363,15 +385,7 @@ def submit_udise_login(
             authenticated = False
 
     if not authenticated:
-        final_url = str(result.url or "")
-        text = (result.text or "").lower()
-        if "captchaerror" in final_url.lower() or "captcha incorrect" in text:
-            detail = "CAPTCHA incorrect or expired. Refresh CAPTCHA and try again."
-        elif "invalid" in text or "password" in text or "error" in final_url.lower():
-            detail = "UDISE username or password was not accepted."
-        else:
-            detail = "UDISE login was not completed. Refresh CAPTCHA and try again."
-        raise HTTPException(401, detail)
+        raise HTTPException(401, _login_failure_detail(result))
 
     sid = secrets.token_urlsafe(32)
     _json_write(SESSIONS / f"{sid}.json", {
