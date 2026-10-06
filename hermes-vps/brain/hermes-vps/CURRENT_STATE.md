@@ -217,3 +217,12 @@ Live verification completed with a fresh runtime session:
 - UDISE session creation still uses short-lived opaque runtime session requests.
 - Write stages remain preview-bound, explicitly approved, bounded, and read-back verified.
 - Direct portal-write bypasses remain blocked.
+
+## Direct UDISE login — 2026-10-06
+
+- Public/local console now starts with Username, Password and the live UDISE image CAPTCHA.
+- Oracle creates a short-lived auth request against auth.udiseplus.gov.in, keeps only the auth-session cookie/CSRF state, and proxies the CAPTCHA image.
+- The password is submitted once and is not written to disk; successful login stores only the resulting SDMS runtime cookie header under the existing session TTL.
+- Class/workflow controls stay hidden until UDISE login succeeds.
+- Read stages use Run; write stages use Run & Save with the existing internal preview/approval/read-back safeguards.
+- Production Vercel deployment was refreshed manually and the project was reconnected to GitHub for future push-triggered deployments.

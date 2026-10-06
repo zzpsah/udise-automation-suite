@@ -109,5 +109,4 @@
 - [ ] Live-run Full Read Snapshot on Oracle with a fresh UDISE session and
       inspect workbook sheet/row counts before marking it `LIVE_READ`. The
       2026-10-03 attempt stopped safely at session check (HTTP 302).
-- [ ] Replace Cookie-header entry with direct username/password/CAPTCHA login
-      when the live portal login contract is implemented.
+- [x] Replace Cookie-header entry with direct username/password/CAPTCHA login. The Oracle control API now starts a short-lived UDISE auth session, proxies the CAPTCHA, accepts credentials once, and stores only the resulting runtime SDMS cookies.
