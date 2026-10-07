@@ -286,6 +286,27 @@ def _cookie_header_from_playwright(items: list[dict[str, Any]]) -> tuple[str, di
     return "; ".join(values), by_name
 
 
+def _extract_school_context(value: Any) -> dict[str, str]:
+    found: dict[str, str] = {}
+    school_keys = {"schoolid", "school_id", "internalschoolid", "schoolpk", "schid", "schoolinternalid"}
+    udise_keys = {"udisecode", "schoolcode", "udiseid", "userid"}
+    def walk(obj: Any) -> None:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                nk = re.sub(r"[^a-z0-9_]", "", str(k).lower())
+                sv = str(v).strip() if isinstance(v, (str, int)) else ""
+                if nk in school_keys and re.fullmatch(r"\d{6,8}", sv):
+                    found.setdefault("school_id", sv)
+                if nk in udise_keys and re.fullmatch(r"\d{11}", sv):
+                    found.setdefault("udise_code", sv)
+                walk(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                walk(item)
+    walk(value)
+    return found
+
+
 async def _close_login_browser(token: str) -> None:
     state = LOGIN_BROWSERS.pop(token, None)
     if not state:
@@ -505,17 +526,63 @@ async def submit_udise_login(
             (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
             raise HTTPException(401, detail)
 
+        school_context: dict[str, str] = {}
+        try:
+            user_response = await context.request.get(
+                "https://sdms.udiseplus.gov.in/p0/api/user",
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": "https://sdms.udiseplus.gov.in/g0/",
+                    "X-XSRF-TOKEN": str(cookies.get("XSRF-TOKEN") or ""),
+                },
+                timeout=20_000,
+                max_redirects=0,
+            )
+            if user_response.status == 200:
+                user_json = await user_response.json()
+                school_context.update(_extract_school_context(user_json))
+        except Exception:
+            pass
+
+        try:
+            storage = await page.evaluate("""() => {
+              const out = {};
+              for (const store of [localStorage, sessionStorage]) {
+                for (let i = 0; i < store.length; i++) {
+                  const k = store.key(i);
+                  if (k) out[k] = store.getItem(k);
+                }
+              }
+              return out;
+            }""")
+            school_context.update({
+                k: v for k, v in _extract_school_context(storage).items()
+                if k not in school_context
+            })
+        except Exception:
+            pass
+
         sid = secrets.token_urlsafe(32)
-        _json_write(SESSIONS / f"{sid}.json", {
+        session_record = {
             "cookie": cookie,
             "created_at": now,
             "expires_at": now + SESSION_TTL,
-        })
+        }
+        session_record.update(school_context)
+        _json_write(SESSIONS / f"{sid}.json", session_record)
         data.update({"used": True, "ready": True, "session_id": sid, "used_at": now})
+        data.update(school_context)
         _json_write(p, data)
         await _close_login_browser(token)
         (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
-        return {"ready": True, "session_id": sid, "expires_in": SESSION_TTL, "mode": "browser"}
+        return {
+            "ready": True,
+            "session_id": sid,
+            "expires_in": SESSION_TTL,
+            "mode": "browser",
+            "school_id": school_context.get("school_id"),
+            "udise_code": school_context.get("udise_code"),
+        }
     except HTTPException:
         raise
     except Exception as exc:
@@ -909,13 +976,16 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
     if stage.get("requires_class"):
         if not body.class_name or body.class_name not in stage["classes"]:
             raise HTTPException(400, "Select a supported class")
-    _load_session(body.session_id)
+    session_data = _load_session(body.session_id)
+    effective_school = str(session_data.get("school_id") or body.school).strip()
+    if not effective_school:
+        raise HTTPException(409, "Authenticated school scope could not be detected. Sign in again or use Advanced fallback.")
     job_id = uuid.uuid4().hex
     now = int(time.time())
     with _db() as conn:
         conn.execute("""INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message)
                         VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                     (job_id, now, now, "queued", body.stage, body.class_name, body.school,
+                     (job_id, now, now, "queued", body.stage, body.class_name, effective_school,
                       body.session_id, 1, "Queued"))
     threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
     return {"job_id": job_id, "status": "queued"}

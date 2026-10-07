@@ -197,8 +197,12 @@ class UdiseSession:
         if status != 200:
             raise RuntimeError(f"Portal returned HTTP {status}; roster not loaded.")
         if body.get("status") is not True:
+            safe_keys = ",".join(sorted(str(k) for k in body.keys())[:12])
+            safe_message = str(body.get("message") or body.get("error") or "")[:240]
             raise RuntimeError(
-                "Portal did not confirm a successful roster response."
+                "Portal did not confirm a successful roster response"
+                + (f" (keys={safe_keys})" if safe_keys else "")
+                + (f": {safe_message}" if safe_message else ".")
             )
         students = body.get("data") or []
         if not isinstance(students, list):

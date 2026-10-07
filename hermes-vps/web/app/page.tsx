@@ -114,9 +114,10 @@ export default function Page(){
       return;
     }
     setSessionId(d.session_id);
+    if(d.school_id) setSchool(String(d.school_id));
     setPassword("");
     setCaptcha("");
-    setMsg("UDISE connected. Select class and workflow.");
+    setMsg(d.school_id?"UDISE connected. School scope detected automatically. Select class and workflow.":"UDISE connected. School scope could not be detected automatically; use Advanced fallback if a workflow is denied.");
   }
 
   useEffect(()=>{beginUdiseLogin()},[]);
