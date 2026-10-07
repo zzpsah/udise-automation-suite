@@ -190,11 +190,32 @@ export default function Page(){
   async function downloadEshikshaReport(){
     if(!eshikshaReady){
       await connectEshiksha();
-      setMsg("Enter eShikshaKosh credentials first. Download will be enabled after they are saved.");
+      setMsg("Connect eShikshaKosh first, then fetch the source report.");
       return;
     }
-    setMsg("Starting the eShikshaKosh report download. This does not require a UDISE session…");
-    window.location.href=`/api/eshiksha-export?class=${encodeURIComponent(klass)}`;
+    setMsg("Fetching the latest eShikshaKosh source report…");
+    const r=await fetch(`/api/eshiksha-export?class=${encodeURIComponent(klass)}`,{cache:"no-store"});
+    if(!r.ok){
+      let detail="eShikshaKosh report fetch failed.";
+      try{
+        const d=await r.json();
+        detail=d.detail||d.error||detail;
+      }catch{
+        const t=await r.text();
+        if(t) detail=t.slice(0,500);
+      }
+      setEshikshaReady(false);
+      setMsg(detail);
+      return;
+    }
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`eShikshaKosh_EP_Source_${klass}.xlsx`;
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+    setMsg("eShikshaKosh source report downloaded.");
   }
 
   useEffect(()=>{
@@ -296,22 +317,46 @@ export default function Page(){
               <span className={"badge "+(unavailable?"warn":s.mode==="write"?"preview":"ok")}>{unavailable?"Unavailable":s.mode==="write"?"Save":"Ready"}</span>
               <span className="badge" role="button" tabIndex={0} aria-label={"How "+s.label+" works"} onClick={e=>{e.stopPropagation();setInfoStage(s.id)}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();setInfoStage(s.id)}}}>ⓘ</span>
             </button>})}
-            <button type="button" aria-pressed={stage==="ep"} className={"choice ready source-choice "+(stage==="ep"?"active":"")} onClick={()=>setStage("ep")}>
-              <span className="stage-icon" aria-hidden="true">SRC</span>
-              <span className="stage-copy"><strong>eShikshaKosh Report</strong><small>Open download, upload, or secure connection controls</small></span>
-              <span className="badge ok">Open</span>
-            </button>
           </div>
 
           {selected&&<div className={"selected-stage "+(selected.mode==="write"?"is-locked":"is-ready")}>
             <div className="selected-stage-head"><span aria-hidden="true">{selectedMeta?.icon||"--"}</span><div><strong>{selected.label}</strong><small>{HERMES_FLOW_REFERENCE[selected.id]}</small></div></div>
             <div className="fill-chips">{selectedMeta?.fills.map(item=><span key={item}>{item}</span>)}</div>
             {selected.mode!=="read"&&<div className="blank-only-note"><strong>Blank-only rule:</strong> values already saved in UDISE are untouched. Only eligible blank fields are proposed; skipped and already-complete students are listed in the Excel result.</div>}
-            {selected.id==="ep"&&<div className="source-panel">
-              <div className={"source-status "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"● Uploaded eShikshaKosh report ready":eshikshaReady?"● eShikshaKosh credentials ready for this page":"○ eShikshaKosh report or credentials required"}</div>
-              <div className="source-actions"><button type="button" onClick={connectEshiksha}>Prepare credential fields</button><a className="download template-download" href={`/api/ep-template?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}&school=${encodeURIComponent(school)}`}>{sessionId?"Download class roster EP template":"Connect UDISE to include class roster"}</a><button type="button" className="download template-download" onClick={downloadEshikshaReport}>Download eShikshaKosh report</button><label className="upload-label">Upload Excel report<input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label><button type="button" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Upload report</button></div>
-              {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="inline-form compact"><label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label><label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label><button type="button" className="run-button" onClick={saveEshikshaCredentials}>Save credentials temporarily</button></div>}
-              <small>Choose one method: enter credentials for an automatic read-only report, or upload an Excel report that you have filled with Admission No. and subjects. The uploaded report is used only for this EP preview.</small>
+            {selected.id==="ep"&&<div className="ep-source">
+              <div className="ep-source-head">
+                <div>
+                  <span className="eyebrow">ENROLLMENT DATA SOURCE</span>
+                  <h3>Use eShikshaKosh to complete UDISE Enrollment Profile</h3>
+                  <p>eShikshaKosh supplies the source data used to match students and fill eligible blank EP fields—primarily <strong>Admission Number</strong> and, for Class XI, <strong>stream</strong>. Connecting this source does not write anything to UDISE.</p>
+                </div>
+                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"Excel source ready":eshikshaReady?"Automatic source ready":"Source required"}</span>
+              </div>
+
+              <div className="source-methods">
+                <div className="source-method recommended">
+                  <div className="method-title"><div><strong>Automatic fetch</strong><span>Recommended</span></div><small>Sign in once and fetch the latest read-only eShikshaKosh report for Class {klass}.</small></div>
+                  {!eshikshaReady&&<button type="button" className="source-primary" onClick={connectEshiksha}>{eshikshaToken?"Update sign-in details":"Connect eShikshaKosh"}</button>}
+                  {eshikshaReady&&<div className="method-actions"><button type="button" className="source-primary" onClick={downloadEshikshaReport}>Fetch latest report</button><button type="button" className="source-secondary" onClick={connectEshiksha}>Change sign-in</button></div>}
+                  {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="credential-grid">
+                    <label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label>
+                    <label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label>
+                    <label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label>
+                    <button type="button" className="source-primary" onClick={saveEshikshaCredentials}>Use for this EP session</button>
+                  </div>}
+                </div>
+
+                <div className="source-method">
+                  <div className="method-title"><div><strong>Upload existing Excel</strong><span>Fallback</span></div><small>Use a previously exported eShikshaKosh workbook instead of signing in.</small></div>
+                  <label className="file-picker"><span>{eshikshaFile?eshikshaFile.name:"Choose Excel report"}</span><input type="file" accept=".xlsx,.xls" onChange={e=>setEshikshaFile(e.target.files?.[0]||null)}/></label>
+                  <button type="button" className="source-secondary" onClick={uploadEshikshaReport} disabled={!eshikshaFile}>Use uploaded report</button>
+                </div>
+              </div>
+
+              <div className="source-utility">
+                <div><strong>Need a review template?</strong><span>Download the current UDISE Class {klass} roster as an EP template for manual review or matching.</span></div>
+                <a className="source-link" href={`/api/ep-template?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}&school=${encodeURIComponent(school)}`}>Download EP template</a>
+              </div>
             </div>}
             {selected.mode==="write"?<div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?" The masked eShikshaKosh source is used for the EP run.":""}</span></div></div>:<p>{selected.description}</p>}
           </div>}

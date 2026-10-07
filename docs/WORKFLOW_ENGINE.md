@@ -35,6 +35,21 @@ GP payload requires identity block plus editable fields.
 
 Combines UDISE profile + eShikshaKosh source.
 
+### Why eShikshaKosh is connected
+
+eShikshaKosh supplies source values for Enrollment Profile matching and proposals, especially:
+- Admission Number;
+- Class XI stream where available;
+- supporting student identity evidence used by the match engine.
+
+It is read-only from this workflow's perspective. Connecting or fetching eShikshaKosh data does **not** write to UDISE.
+
+The UI offers:
+- Automatic fetch (recommended);
+- Upload existing Excel (fallback);
+- EP review template as a utility.
+
+
 Portal error `1002` means Board/Class subject mapping unavailable. Do not retry in a loop.
 
 ## Facility

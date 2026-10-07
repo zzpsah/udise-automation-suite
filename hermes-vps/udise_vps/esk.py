@@ -141,9 +141,17 @@ def export_report(
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if proc.returncode != 0 or not out.is_file():
         diagnostics = "\n".join(part for part in (proc.stderr, proc.stdout) if part)
-        tail = re.sub(r"\s+", " ", diagnostics.strip())[-1600:]
-        raise RuntimeError(
-            f"eShikshaKosh export failed (exit {proc.returncode}). "
-            f"{tail or 'No diagnostic output was returned.'}"
-        )
+        flat = re.sub(r"\s+", " ", diagnostics.strip())
+        marker = "eShikshaKosh rejected the saved user ID/password."
+        if marker in flat:
+            detail = flat[flat.index(marker):]
+            detail = re.sub(r"\s*\(HTTP\s+\d+\).*", "", detail).strip()
+        else:
+            error_lines = [
+                re.sub(r"^.*?\[(?:ERROR|WARNING)\]\s*", "", line).strip()
+                for line in diagnostics.splitlines()
+                if "[ERROR]" in line or "[WARNING]" in line
+            ]
+            detail = error_lines[-1] if error_lines else flat[-600:]
+        raise RuntimeError(detail or "eShikshaKosh report fetch failed.")
     return out

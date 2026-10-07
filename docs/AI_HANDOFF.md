@@ -175,3 +175,24 @@ Known unrelated local modifications have existed in `.gitignore` and `hermes-vps
 ## Never commit
 
 Passwords, bearer tokens, cookies, JSESSIONID, XSRF-TOKEN, live CAPTCHA data, raw student payloads, completed private workbooks or eShikshaKosh credentials.
+
+## eShikshaKosh EP integration — current behavior
+
+Enrollment Profile uses eShikshaKosh as a **read-only source**, not as a UDISE write target.
+
+Purpose:
+- match the same student across portals;
+- obtain Admission Number when UDISE EP is blank;
+- provide Class XI stream when available;
+- retain source evidence in the EP preview/report.
+
+UI source choices:
+1. **Automatic fetch (recommended)** — temporary eShikshaKosh sign-in, then latest read-only report.
+2. **Upload existing Excel (fallback)** — use a previously exported workbook.
+
+The EP screen explicitly states that connecting eShikshaKosh does not write to UDISE.
+
+Current portal-login behavior:
+- eShikshaKosh encrypts the login form client-side and sends it to `/auth/login`;
+- the private exporter captures the exact login response and surfaces the portal message;
+- rejected credentials are reported as a reconnect/update-password action, not as a generic “no token captured” failure.
