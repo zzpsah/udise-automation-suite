@@ -1,5 +1,34 @@
 # UDISE Automation Suite
 
+
+## Current production architecture — 7 October 2026
+
+> **Current production is the Vercel + Oracle control-plane implementation under `hermes-vps/`.**
+>
+> The Colab notebook remains a historical/interactive fallback, not the best starting point for production work.
+
+**Production:** `https://udise-auto.vercel.app/`
+
+Current path:
+
+`Vercel UI → Oracle control API → Playwright Students Module login → authenticated runtime session → udise_vps runner → SDMS APIs`
+
+After login the UI is designed to show **Students Module connected**, school name, UDISE code and a live session countdown before Class + Workflow controls.
+
+### AI / developer start here
+
+1. [AI handoff](docs/AI_HANDOFF.md)
+2. [Architecture](docs/ARCHITECTURE.md)
+3. [Visual flows](docs/VISUAL_FLOWS.md)
+4. [API reference](docs/API_REFERENCE.md)
+5. [Login flow](docs/LOGIN_FLOW.md)
+6. [Workflow engine](docs/WORKFLOW_ENGINE.md)
+7. [Deployment / hosting](docs/DEPLOYMENT.md)
+8. [Troubleshooting](docs/TROUBLESHOOTING.md)
+9. [Security](docs/SECURITY.md)
+10. [Repository map](docs/REPOSITORY_MAP.md)
+
+
 This private repository is the **single source of truth** for the UDISE+ school automation notebook used for UMV Tetahali.
 
 ## Current baseline

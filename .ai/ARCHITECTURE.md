@@ -1,18 +1,7 @@
-# Architecture
+# AI Architecture Pointer
 
-The maintained artifact is a Colab notebook with the safe flow:
+Canonical architecture: `../docs/ARCHITECTURE.md`
+Visual flows: `../docs/VISUAL_FLOWS.md`
+Login flow: `../docs/LOGIN_FLOW.md`
 
-```text
-Setup -> Login -> detect school/roster -> choose module
--> fresh reads -> preview/validate -> explicitly enable write
--> one-shot POST where authorized -> fresh read-back
-```
-
-Primary modules:
-- General Profile
-- Enrollment Profile
-- Facility Profile
-- Completion Overview
-- Finalize / Complete Data
-
-Write safety is based on explicit toggles, fresh pre-write state, no blind POST retries, and fresh post-write confirmation.
+Do not rely on notebook-era architecture summaries when they conflict with canonical docs or current source.

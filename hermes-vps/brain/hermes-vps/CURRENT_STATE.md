@@ -226,3 +226,20 @@ Live verification completed with a fresh runtime session:
 - Class/workflow controls stay hidden until UDISE login succeeds.
 - Read stages use Run; write stages use Run & Save with the existing internal preview/approval/read-back safeguards.
 - Production Vercel deployment was refreshed manually and the project was reconnected to GitHub for future push-triggered deployments.
+
+## Production login/control-plane refresh — 2026-10-07
+
+Canonical architecture is now documented in `../../../docs/AI_HANDOFF.md`.
+
+Key updates:
+- browser-backed Playwright Students Module login
+- bootstrap from `/p0/oauth2/login`
+- OAuth client `udise-sdms-g0`
+- login success only after `/p0/check-session` HTTP 200
+- authenticated school scope from `/p0/api/user`
+- school login: `regionType=6` → `userRegionId` internal school context
+- school display metadata resolved from SDMS school APIs
+- UI shows Students Module connected, school name, UDISE code and session countdown
+- authenticated school scope overrides stale presets
+- Advanced/fallback browser-session login remains available
+- production: `https://udise-auto.vercel.app/`
