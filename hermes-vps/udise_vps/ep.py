@@ -906,6 +906,7 @@ class EpResult:
     language_plan: str = ""
     stream: str = ""
     stream_source: str = ""
+    current: dict = field(default_factory=dict)
 
     @property
     def confirmed(self) -> bool:
@@ -1054,6 +1055,7 @@ def run_ep(
             print(f"⚠️ {pen}: EP read failed — {result.detail}", flush=True)
             continue
 
+        result.current = {field: current.get(field) for field in COMPARE_FIELDS}
         updates: dict = {}
 
         # --------------------------------------------- admission number

@@ -234,7 +234,7 @@ export default function Page(){
     if(!sessionId){setMsg("Connect a secure UDISE session first.");return}
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
-    if(selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
+    if(selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
     setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");setAutoSavePreview(selected?.mode==="write");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
       session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true
@@ -330,12 +330,12 @@ export default function Page(){
                   <h3>Use eShikshaKosh to complete UDISE Enrollment Profile</h3>
                   <p>eShikshaKosh supplies the source data used to match students and fill eligible blank EP fields—primarily <strong>Admission Number</strong> and, for Class XI, <strong>stream</strong>. Connecting this source does not write anything to UDISE.</p>
                 </div>
-                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady)?"ready":"needed")}>{eshikshaReportReady?"Excel source ready":eshikshaReady?"Automatic source ready":"Source required"}</span>
+                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||klass==="X")?"ready":"needed")}>{eshikshaReportReady?"Excel source ready":eshikshaReady?"Automatic source ready":klass==="X"?"Optional for Class X":"Source required"}</span>
               </div>
 
               <div className="source-methods">
                 <div className="source-method recommended">
-                  <div className="method-title"><div><strong>Automatic fetch</strong><span>Recommended</span></div><small>Sign in once and fetch the latest read-only eShikshaKosh report for Class {klass}.</small></div>
+                  <div className="method-title"><div><strong>Automatic fetch</strong><span>{klass==="X"?"Optional":"Recommended"}</span></div><small>{klass==="X"?"Class X can run without eShikshaKosh. Connect it only when you want eShikshaKosh Admission Number data for matching.":`Sign in once and fetch the latest read-only eShikshaKosh report for Class ${klass}.`}</small></div>
                   {!eshikshaReady&&<button type="button" className="source-primary" onClick={connectEshiksha}>{eshikshaToken?"Update sign-in details":"Connect eShikshaKosh"}</button>}
                   {eshikshaReady&&<div className="method-actions"><button type="button" className="source-primary" onClick={downloadEshikshaReport}>Fetch latest report</button><button type="button" className="source-secondary" onClick={connectEshiksha}>Change sign-in</button></div>}
                   {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="credential-grid">
@@ -358,11 +358,11 @@ export default function Page(){
                 <a className="source-link" href={`/api/ep-template?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}&school=${encodeURIComponent(school)}`}>Download EP template</a>
               </div>
             </div>}
-            {selected.mode==="write"?<div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?" The masked eShikshaKosh source is used for the EP run.":""}</span></div></div>:<p>{selected.description}</p>}
+            {selected.mode==="write"?<div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?(eshikshaReady||eshikshaReportReady?" eShikshaKosh is used as the EP source.":klass==="X"?" Class X can use UDISE current values and built-in EP rules without eShikshaKosh.":""):""}</span></div></div>:<p>{selected.description}</p>}
           </div>}
 
           <div className="run-row">
-            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>
+            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>
           </div>
         </section>
         </>}

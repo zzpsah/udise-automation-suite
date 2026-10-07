@@ -196,3 +196,18 @@ Current portal-login behavior:
 - eShikshaKosh encrypts the login form client-side and sends it to `/auth/login`;
 - the private exporter captures the exact login response and surfaces the portal message;
 - rejected credentials are reported as a reconnect/update-password action, not as a generic “no token captured” failure.
+
+## EP source/template update — 2026-10-08
+
+- For **Class X**, eShikshaKosh is optional. The EP workflow may run from the current UDISE record plus built-in subject/admission fallback rules.
+- If an eShikshaKosh source is connected for Class X, it remains an optional Admission Number matching source.
+- The generated EP template is live and pre-filled from UDISE when the portal returns the EP record.
+- The workbook includes:
+  - `Enrollment Profile` — effective values for review/edit;
+  - `Current UDISE Values` — original saved portal values;
+  - hidden `Subject Lists` — dropdown sources;
+  - `Instructions`.
+- Existing UDISE values are preserved and shown; only eligible blanks are auto-filled.
+- Subject 1–6 cells have dropdown validation using the live UDISE subject catalogue when available, with the verified IX/X subject map as fallback.
+- EP preview output also includes an `Enrollment Profile Review` sheet with Current / Proposed / Effective values.
+- If every EP detail read fails, the workflow fails explicitly instead of reporting success with an empty/invalid review.

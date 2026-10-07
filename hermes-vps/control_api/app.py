@@ -915,18 +915,24 @@ def _run_job(job_id: str) -> None:
         elif stage == "gp":
             cmd += ["--class", row["class_name"], "--run-mode", "All students"]
         elif stage == "ep":
+            ep_class = str(row["class_name"] or "").upper()
             if is_preview:
                 if ESK_UPLOAD.exists():
-                    cmd += ["--class", row["class_name"], "--report", str(ESK_UPLOAD)]
+                    cmd += ["--class", ep_class, "--report", str(ESK_UPLOAD)]
+                elif ep_class == "X":
+                    cmd += ["--class", ep_class]
                 else:
                     eshiksha = _load_eshiksha_credentials()
-                    cmd += ["--class", row["class_name"], "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
+                    cmd += ["--class", ep_class, "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
             else:
                 source_dir = JOBS / str(row["approved_from"])
                 reports = sorted(source_dir.glob("eShikshaKosh_OTR_*.xlsx"))
-                if not reports:
+                if reports:
+                    cmd += ["--class", ep_class, "--report", str(reports[-1])]
+                elif ep_class == "X":
+                    cmd += ["--class", ep_class]
+                else:
                     raise RuntimeError("Approved eShikshaKosh source report is no longer available; generate a new preview")
-                cmd += ["--class", row["class_name"], "--report", str(reports[-1])]
         elif stage == "facility":
             cmd += ["--class", row["class_name"]]
         elif stage == "finalize":
@@ -1124,63 +1130,214 @@ def eshiksha_report_result(job_id: str, authorization: str | None = Header(defau
 
 @app.get("/api/v1/ep-template")
 def ep_template(class_name: str = "IX", session_id: str | None = None, school: str = "school", authorization: str | None = Header(default=None)):
-    """Return a blank, human-editable EP workbook for an offline source upload."""
+    """Return a live, pre-filled EP review workbook with subject dropdowns."""
     require_api(authorization)
-    from openpyxl import Workbook, load_workbook
+    from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
     from tempfile import NamedTemporaryFile
+    from udise_vps.session import connect
+    from udise_vps import ep as ep_mod
+    from udise_vps import subjects as subjects_mod
+
     safe_class = re.sub(r"[^A-Za-z0-9_-]", "", class_name.upper()) or "IX"
-    # If a live UDISE session is supplied, seed the template with the selected
-    # class roster. Without it, retain the useful blank template fallback.
-    roster = []
+    class_id = {"IX": 9, "X": 10, "XI": 11, "XII": 12}.get(safe_class)
+    if class_id is None:
+        raise HTTPException(400, "EP template supports Class IX, X, XI or XII")
+
+    rows: list[dict[str, Any]] = []
+    current_rows: list[dict[str, Any]] = []
+    subject_options: dict[int, list[str]] = {}
+    live_school_name = ""
+    live_udise_code = ""
+
+    fallback_options = {
+        1: ["HINDI", "URDU"],
+        2: ["SANSKRIT", "HIN (NLH)"],
+        3: ["MATHEMATICS"],
+        4: ["SCIENCE"],
+        5: ["SOCIAL SCIENCE"],
+        6: ["ENGLISH"],
+    }
+    fallback_code_labels = {
+        629: "HINDI", 638: "URDU", 637: "SANSKRIT", 1102: "HIN (NLH)",
+        401: "MATHEMATICS", 402: "SCIENCE", 404: "SOCIAL SCIENCE", 612: "ENGLISH",
+    }
+
     if session_id:
-        session = _load_session(session_id)
-        import tempfile, subprocess
-        with tempfile.TemporaryDirectory() as td:
-            env = os.environ.copy(); env["UDISE_COOKIE_HEADER"] = session["cookie"]
-            proc = subprocess.run([str(RUNNER), "students", "--school", school, "--out", td], cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=900)
-            if proc.returncode != 0:
-                raise HTTPException(502, "Could not load the current UDISE roster for the template")
-            files = sorted(Path(td).glob("*.xlsx"))
-            if files:
-                source = load_workbook(files[-1], read_only=True, data_only=True)
-                sheet = source.active
-                headers = [str(c.value or "") for c in next(sheet.iter_rows(min_row=1, max_row=1))]
-                for row in sheet.iter_rows(min_row=2, values_only=True):
-                    item = dict(zip(headers, row))
-                    if str(item.get("Class", "")).strip().upper() in {safe_class, {"IX":"9","X":"10","XI":"11","XII":"12"}.get(safe_class, safe_class)}:
-                        roster.append(item)
-                source.close()
+        session_data = _load_session(session_id)
+        effective_school = str(session_data.get("school_id") or school).strip()
+        try:
+            udise = connect(session_data["cookie"], effective_school)
+        except Exception as exc:
+            raise HTTPException(502, "Could not open the current UDISE session for the EP template: " + type(exc).__name__) from exc
+
+        live_school_name = udise.school_name
+        live_udise_code = udise.udise_code
+        rules = ep_mod.load_subject_rules(udise, {class_id})
+
+        for slot in range(1, 7):
+            field_name = "subject" + str(slot)
+            options = []
+            for rule in rules.get(class_id, []):
+                if rule.get("fieldName") != field_name:
+                    continue
+                for option in rule.get("options") or []:
+                    label = str((option or {}).get("subjectDesc") or "").strip()
+                    if label and label not in options:
+                        options.append(label)
+            subject_options[slot] = options or list(fallback_options[slot])
+
+        selected = [student for student in udise.students if int(student.get("classId") or -1) == class_id]
+        for student in selected:
+            sid = str(student.get("studentId") or student.get("id") or "").strip()
+            pen = str(student.get("studentCodeNat") or "").strip()
+            name = str(student.get("studentName") or "").strip()
+            roll_from_roster = str(student.get("rollNo") or student.get("rollNumber") or "").strip()
+            try:
+                current = udise.enrolment_detail(sid)
+            except Exception:
+                current = {}
+
+            try:
+                general = udise.student_detail(sid)
+                minority_id = general.get("minorityId")
+            except Exception:
+                minority_id = None
+
+            def label_for_subject(slot: int, value) -> str:
+                if value in (None, "", 0, "0", 9, "9"):
+                    return ""
+                label = ep_mod.subject_label(rules, class_id, "subject" + str(slot), value)
+                if label and label != str(value):
+                    return str(label)
+                try:
+                    return fallback_code_labels.get(int(float(str(value))), str(label or value))
+                except Exception:
+                    return str(label or value)
+
+            current_values = {
+                "Student Name": name,
+                "PEN": pen,
+                "Roll No.": current.get("rollNumber") or roll_from_roster or "",
+                "Admission No.": current.get("admnNumber") or "",
+                "Stream": current.get("academicStream") or "",
+            }
+            for slot in range(1, 7):
+                current_values["Subject " + str(slot)] = label_for_subject(slot, current.get("subject" + str(slot)))
+
+            effective = dict(current_values)
+            if not str(effective["Roll No."]).strip() and roll_from_roster:
+                effective["Roll No."] = roll_from_roster
+            if not str(effective["Admission No."]).strip() and safe_class in {"IX", "X"} and roll_from_roster:
+                effective["Admission No."] = roll_from_roster
+
+            if class_id in {9, 10}:
+                plan, _missing = ep_mod.resolve_language_codes(rules, class_id, minority_id)
+                for field_name, code in plan.get("codes", {}).items():
+                    slot = int(field_name.replace("subject", ""))
+                    if not str(effective["Subject " + str(slot)]).strip():
+                        effective["Subject " + str(slot)] = label_for_subject(slot, code)
+                for slot in subjects_mod.MANDATORY_SUBJECT_SLOTS:
+                    if not str(effective["Subject " + str(slot)]).strip():
+                        code = subjects_mod.SUBJECT_FIXED_CODES[slot]
+                        effective["Subject " + str(slot)] = fallback_code_labels.get(code, str(code))
+
+            rows.append(effective)
+            current_rows.append(current_values)
+    else:
+        for slot in range(1, 7):
+            subject_options[slot] = list(fallback_options[slot])
+        blank = {"Student Name": "", "PEN": "", "Roll No.": "", "Admission No.": "", "Stream": ""}
+        for slot in range(1, 7):
+            blank["Subject " + str(slot)] = ""
+        rows.append(dict(blank))
+        current_rows.append(dict(blank))
+
+    headers = ["Student Name", "PEN", "Roll No.", "Admission No.", "Stream"] + ["Subject " + str(i) for i in range(1, 7)]
     wb = Workbook()
     ws = wb.active
     ws.title = "Enrollment Profile"
-    headers = ["Student Name", "PEN", "Roll No.", "Admission No.", "Stream", "Subject 1", "Subject 2", "Subject 3", "Subject 4", "Subject 5", "Subject 6"]
-    ws.append(headers)
-    if roster:
-        for item in roster:
-            ws.append([item.get("Student Name", ""), item.get("PEN Number", ""), "", "", "", "", "", "", "", "", ""])
-    else:
-        ws.append(["", "", "", "", "", "", "", "", "", "", ""])
-    for cell in ws[1]:
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="1E3A8A")
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:K{max(2, len(roster) + 1)}"
-    widths = [28, 16, 12, 16, 16, 18, 18, 18, 18, 18, 18]
-    for i, width in enumerate(widths, 1):
-        ws.column_dimensions[chr(64 + i)].width = width
+    current_ws = wb.create_sheet("Current UDISE Values")
+    lists = wb.create_sheet("Subject Lists")
+
+    for target in (ws, current_ws):
+        target.append(headers)
+        for cell in target[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="1E3A8A")
+        target.freeze_panes = "A2"
+
+    for item in rows:
+        ws.append([item.get(h, "") for h in headers])
+    for item in current_rows:
+        current_ws.append([item.get(h, "") for h in headers])
+
+    current_fill = PatternFill("solid", fgColor="E2F0D9")
+    proposed_fill = PatternFill("solid", fgColor="FFF2CC")
+    for row_idx in range(2, ws.max_row + 1):
+        for col_idx, _header in enumerate(headers, 1):
+            current_value = current_ws.cell(row_idx, col_idx).value
+            effective_value = ws.cell(row_idx, col_idx).value
+            if effective_value not in (None, ""):
+                ws.cell(row_idx, col_idx).fill = current_fill if current_value not in (None, "") else proposed_fill
+
+    for slot in range(1, 7):
+        options = subject_options.get(slot) or fallback_options[slot]
+        lists.cell(1, slot, "Subject " + str(slot))
+        for ri, label in enumerate(options, 2):
+            lists.cell(ri, slot, label)
+        target_col = headers.index("Subject " + str(slot)) + 1
+        target_letter = get_column_letter(target_col)
+        source_letter = get_column_letter(slot)
+        formula = "'Subject Lists'!$" + source_letter + "$2:$" + source_letter + "$" + str(1 + len(options))
+        dv = DataValidation(type="list", formula1=formula, allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add(target_letter + "2:" + target_letter + str(max(2, ws.max_row)))
+
+    if class_id == 11:
+        stream_list = ["Arts", "Science", "Commerce"]
+        stream_col = 8
+        lists.cell(1, stream_col, "Stream")
+        for ri, label in enumerate(stream_list, 2):
+            lists.cell(ri, stream_col, label)
+        dv = DataValidation(type="list", formula1="'Subject Lists'!$H$2:$H$4", allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add("E2:E" + str(max(2, ws.max_row)))
+
+    lists.sheet_state = "hidden"
+
+    for target in (ws, current_ws):
+        target.auto_filter.ref = "A1:K" + str(max(2, target.max_row))
+        widths = [28, 16, 12, 16, 16, 20, 20, 20, 20, 20, 20]
+        for idx, width in enumerate(widths, 1):
+            target.column_dimensions[get_column_letter(idx)].width = width
+
     notes = wb.create_sheet("Instructions")
-    notes.append(["Manual Enrollment Profile template"])
-    notes.append([f"Class: {safe_class}"])
-    notes.append(["Fill only the fields you know: Roll No., Admission No., Stream and Subject 1–6."])
-    notes.append(["Existing values in UDISE remain untouched; blank fields are the only proposed updates."])
-    notes.append(["Upload this workbook in the eShikshaKosh Report tile, then review the preview before approval."])
-    notes.column_dimensions["A"].width = 110
-    for cell in notes[1]: cell.font = Font(bold=True, size=14)
-    with NamedTemporaryFile(suffix=f"-ep-{safe_class}-template.xlsx", delete=False) as tmp:
+    notes.append(["Enrollment Profile review template"])
+    notes.append(["Class: " + safe_class])
+    if live_school_name:
+        notes.append(["School: " + live_school_name])
+    if live_udise_code:
+        notes.append(["UDISE code: " + live_udise_code])
+    notes.append(["Green cells = values already saved in UDISE. Yellow cells = values auto-filled by the EP rules for currently blank fields."])
+    notes.append(["Subject 1–6 cells include dropdowns from the live UDISE subject catalogue when available."])
+    notes.append(["Class X does not require eShikshaKosh. It may still be connected as an optional Admission Number source."])
+    notes.append(["Current UDISE Values preserves the original portal values for comparison."])
+    notes.append(["Only eligible blank UDISE fields are written by automation; editing this workbook does not itself modify the portal."])
+    notes.column_dimensions["A"].width = 120
+    notes["A1"].font = Font(bold=True, size=14)
+
+    with NamedTemporaryFile(suffix="-ep-" + safe_class + "-template.xlsx", delete=False) as tmp:
         wb.save(tmp.name)
         path = Path(tmp.name)
-    return FileResponse(path, filename=f"Enrollment_Profile_{safe_class}_template.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return FileResponse(
+        path,
+        filename="Enrollment_Profile_" + safe_class + "_template.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
 
 @app.get("/api/v1/eshiksha-export")
 def eshiksha_export(class_name: str = "ALL", authorization: str | None = Header(default=None)):

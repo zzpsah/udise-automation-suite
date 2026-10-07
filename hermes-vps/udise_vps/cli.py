@@ -170,6 +170,11 @@ def cmd_ep(args) -> int:
         auto_not_studying=not args.no_auto_not_studying,
         ask_stream=ask_stream,
     )
+    if results and all(getattr(item, "status", "") == "READ_ERROR" for item in results):
+        raise RuntimeError(
+            "UDISE Enrollment Profile read failed for every selected student. "
+            "The portal did not return usable EP data; retry after the portal recovers."
+        )
     if not args.submit:
         path = out / preview_report.default_filename("ep", session.school_id, args.klass)
         preview_report.write_preview_workbook(

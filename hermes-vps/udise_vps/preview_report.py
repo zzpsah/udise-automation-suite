@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from .snapshot import _safe_value
@@ -86,6 +87,64 @@ def write_preview_workbook(
         "PEN", "Student ID (system)", "Name", "Class", "Status",
         "Field", "Proposed Value", "Reason",
     ])
+
+    if stage.lower() == "ep":
+        review = wb.create_sheet("Enrollment Profile Review")
+        ep_fields = [
+            "admnNumber", "admnStartDate", "rollNumber", "moiId", "academicStream",
+            "enrStatusPY", "classPY", "rteQuestion", "rteAmount", "examResultPy",
+            "examMarksPy", "attendancePy",
+        ] + [f"subject{i}" for i in range(1, 9)]
+        review_headers = ["PEN", "Name", "Class", "Status"]
+        for field in ep_fields:
+            review_headers += [f"{field} Current", f"{field} Proposed", f"{field} Effective"]
+        review_rows = []
+        for result in results:
+            current = getattr(result, "current", {}) or {}
+            changes = getattr(result, "changes", {}) or {}
+            row = {
+                "PEN": getattr(result, "pen", ""),
+                "Name": getattr(result, "name", ""),
+                "Class": getattr(result, "class_label", ""),
+                "Status": getattr(result, "status", ""),
+            }
+            for field in ep_fields:
+                cur = current.get(field, "")
+                proposed_value = changes.get(field, "")
+                effective = proposed_value if field in changes else cur
+                row[f"{field} Current"] = cur
+                row[f"{field} Proposed"] = proposed_value
+                row[f"{field} Effective"] = effective
+            review_rows.append(row)
+        _write_rows(review, review_rows, review_headers)
+
+        lists = wb.create_sheet("Subject Lists")
+        fallback = {
+            1: ["HINDI", "URDU"],
+            2: ["SANSKRIT", "HIN (NLH)"],
+            3: ["MATHEMATICS"],
+            4: ["SCIENCE"],
+            5: ["SOCIAL SCIENCE"],
+            6: ["ENGLISH"],
+        }
+        for slot in range(1, 7):
+            source_col = slot
+            lists.cell(1, source_col, f"Subject {slot}")
+            for ri, label in enumerate(fallback[slot], 2):
+                lists.cell(ri, source_col, label)
+            target_header = f"subject{slot} Effective"
+            target_col = review_headers.index(target_header) + 1
+            target_letter = review.cell(1, target_col).column_letter
+            source_letter = lists.cell(1, source_col).column_letter
+            dv = DataValidation(
+                type="list",
+                formula1=f"'Subject Lists'!${source_letter}$2:${source_letter}${1 + len(fallback[slot])}",
+                allow_blank=True,
+            )
+            review.add_data_validation(dv)
+            if review_rows:
+                dv.add(f"{target_letter}2:{target_letter}{len(review_rows) + 1}")
+        lists.sheet_state = "hidden"
 
     if eshiksha_rows is not None:
         source = wb.create_sheet("eShikshaKosh Source")
