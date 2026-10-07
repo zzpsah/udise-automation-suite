@@ -21,15 +21,7 @@ from typing import Any
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
-try:
-    from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-    PLAYWRIGHT_IMPORT_ERROR = ""
-except ImportError as _pw_exc:  # browser backend unavailable; http still works
-    async_playwright = None  # type: ignore[assignment]
-    PlaywrightTimeoutError = TimeoutError  # type: ignore[assignment,misc]
-    PLAYWRIGHT_IMPORT_ERROR = str(_pw_exc)
-
-from udise_vps import login_http
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
 from .capabilities import get_capabilities
 
@@ -47,12 +39,6 @@ ESK_UPLOAD = RUNTIME / "eshiksha-upload.xlsx"
 DB = STATE / "jobs.sqlite3"
 CONTROL_TOKEN_FILE = Path(os.environ.get("UDISE_CONTROL_TOKEN_FILE", Path.home() / ".config/udise-control/api-token"))
 RUNNER = Path(os.environ.get("UDISE_VPS_RUNNER", Path.home() / ".local/bin/udise-vps"))
-# Which driver the UDISE login uses. "http" needs only requests and runs
-# anywhere, including serverless. "browser" keeps the Chromium path.
-LOGIN_BACKEND = os.environ.get("UDISE_LOGIN_BACKEND", "http").strip().lower()
-if LOGIN_BACKEND not in {"http", "browser"}:
-    raise RuntimeError(f"UDISE_LOGIN_BACKEND must be http or browser, got {LOGIN_BACKEND!r}")
-
 SESSION_TTL = 8 * 60 * 60
 REQUEST_TTL = 10 * 60
 ESK_CREDENTIAL_TTL = 8 * 60 * 60
@@ -372,8 +358,6 @@ async def create_udise_login_request(authorization: str | None = Header(default=
     require_api(authorization)
     token = secrets.token_urlsafe(32)
     now = int(time.time())
-    if LOGIN_BACKEND == "http":
-        return await _create_login_http(token, now)
     playwright = None
     browser = None
     context = None
@@ -470,66 +454,6 @@ async def create_udise_login_request(authorization: str | None = Header(default=
         raise HTTPException(502, f"UDISE browser login unavailable: {type(exc).__name__}") from exc
 
 
-async def _create_login_http(token: str, now: int) -> dict:
-    """Browser-free login start: fetch the form and CAPTCHA over plain HTTP."""
-    try:
-        carried, captcha_png = await asyncio.to_thread(login_http.begin_login)
-    except login_http.LoginError as exc:
-        raise HTTPException(502, f"UDISE login service unavailable: {exc}") from exc
-
-    _json_write(LOGIN_REQUESTS / f"{token}.json", {
-        "created_at": now,
-        "expires_at": now + REQUEST_TTL,
-        "used": False,
-        "browser_backed": False,
-        "csrf": carried.csrf,
-        "login_txn_id": carried.login_txn_id,
-        "auth_url": carried.auth_url,
-        "state": carried.state,
-        "client_id": carried.client_id,
-        "cookies": carried.cookies,
-    })
-    captcha_path = LOGIN_REQUESTS / f"{token}.png"
-    captcha_path.write_bytes(captcha_png)
-    os.chmod(captcha_path, 0o600)
-    return {"token": token, "expires_in": REQUEST_TTL, "mode": "http"}
-
-
-async def _submit_login_http(token: str, data: dict, body: "UdiseLoginSubmitIn", now: int) -> dict:
-    """Browser-free login submit: POST the form and read the session cookies."""
-    carried = login_http.LoginSession(
-        csrf=str(data.get("csrf") or ""),
-        login_txn_id=str(data.get("login_txn_id") or ""),
-        auth_url=str(data.get("auth_url") or ""),
-        state=str(data.get("state") or ""),
-        client_id=str(data.get("client_id") or ""),
-        cookies=list(data.get("cookies") or []),
-    )
-    try:
-        cookie = await asyncio.to_thread(
-            login_http.submit_login, carried, body.username, body.password, body.captcha
-        )
-    except login_http.LoginError as exc:
-        status = {"captcha": 401, "credentials": 401, "locked": 423, "input": 400}.get(exc.kind, 502)
-        data.update({"used": True, "failed_at": now, "failure": str(exc)})
-        _json_write(LOGIN_REQUESTS / f"{token}.json", data)
-        (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
-        raise HTTPException(status, str(exc)) from exc
-
-    sid = secrets.token_urlsafe(32)
-    _json_write(SESSIONS / f"{sid}.json", {
-        "cookie": cookie,
-        "created_at": now,
-        "expires_at": now + SESSION_TTL,
-    })
-    data.update({"used": True, "ready": True, "session_id": sid, "used_at": now})
-    data.pop("csrf", None)
-    data.pop("cookies", None)
-    _json_write(LOGIN_REQUESTS / f"{token}.json", data)
-    (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
-    return {"ready": True, "session_id": sid, "expires_in": SESSION_TTL, "mode": "http"}
-
-
 @app.get("/api/v1/login-requests/{token}/captcha")
 def udise_login_captcha(token: str, authorization: str | None = Header(default=None)):
     require_api(authorization)
@@ -564,9 +488,6 @@ async def submit_udise_login(
         raise HTTPException(410, "Login request expired or already used")
     if not body.username.strip() or not body.password or not body.captcha.strip():
         raise HTTPException(400, "Username, password and CAPTCHA are required")
-
-    if LOGIN_BACKEND == "http" or not data.get("browser_backed"):
-        return await _submit_login_http(token, data, body, now)
 
     browser_state = LOGIN_BROWSERS.get(token)
     if not browser_state:
