@@ -289,9 +289,17 @@ def _cookie_header_from_playwright(items: list[dict[str, Any]]) -> tuple[str, di
 def _extract_school_context(value: Any) -> dict[str, str]:
     found: dict[str, str] = {}
     school_keys = {"schoolid", "school_id", "internalschoolid", "schoolpk", "schid", "schoolinternalid"}
-    udise_keys = {"udisecode", "schoolcode", "udiseid", "userid"}
+    udise_keys = {"udisecode", "schoolcode", "udiseid", "userid", "udiseschcode"}
+    name_keys = {"schoolname", "school_name"}
     def walk(obj: Any) -> None:
         if isinstance(obj, dict):
+            region_type = str(obj.get("regionType") or obj.get("region_type") or "").strip()
+            region_id = str(obj.get("userRegionId") or obj.get("user_region_id") or "").strip()
+            if region_type == "6" and re.fullmatch(r"\d{6,8}", region_id):
+                found.setdefault("school_id", region_id)
+                region_name = str(obj.get("userRegion") or obj.get("regionName") or "").strip()
+                if region_name:
+                    found.setdefault("school_name", region_name)
             for k, v in obj.items():
                 nk = re.sub(r"[^a-z0-9_]", "", str(k).lower())
                 sv = str(v).strip() if isinstance(v, (str, int)) else ""
@@ -299,6 +307,8 @@ def _extract_school_context(value: Any) -> dict[str, str]:
                     found.setdefault("school_id", sv)
                 if nk in udise_keys and re.fullmatch(r"\d{11}", sv):
                     found.setdefault("udise_code", sv)
+                if nk in name_keys and sv:
+                    found.setdefault("school_name", sv)
                 walk(v)
         elif isinstance(obj, list):
             for item in obj:
@@ -541,6 +551,27 @@ async def submit_udise_login(
             if user_response.status == 200:
                 user_json = await user_response.json()
                 school_context.update(_extract_school_context(user_json))
+                school_id = school_context.get("school_id")
+                if school_id:
+                    try:
+                        school_response = await context.request.get(
+                            f"https://sdms.udiseplus.gov.in/p0/api/v2/school/school-details/{school_id}",
+                            headers={
+                                "Accept": "application/json, text/plain, */*",
+                                "Referer": "https://sdms.udiseplus.gov.in/g0/",
+                                "X-XSRF-TOKEN": str(cookies.get("XSRF-TOKEN") or ""),
+                            },
+                            timeout=20_000,
+                            max_redirects=0,
+                        )
+                        if school_response.status == 200:
+                            school_json = await school_response.json()
+                            school_context.update({
+                                k: v for k, v in _extract_school_context(school_json).items()
+                                if v
+                            })
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -581,6 +612,7 @@ async def submit_udise_login(
             "expires_in": SESSION_TTL,
             "mode": "browser",
             "school_id": school_context.get("school_id"),
+            "school_name": school_context.get("school_name"),
             "udise_code": school_context.get("udise_code"),
         }
     except HTTPException:

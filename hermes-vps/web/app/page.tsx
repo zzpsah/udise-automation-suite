@@ -41,6 +41,10 @@ export default function Page(){
   const [klass,setKlass]=useState("IX");
   const [stage,setStage]=useState("completion");
   const [sessionId,setSessionId]=useState("");
+  const [sessionSchoolName,setSessionSchoolName]=useState("");
+  const [sessionUdiseCode,setSessionUdiseCode]=useState("");
+  const [sessionExpiresAt,setSessionExpiresAt]=useState(0);
+  const [sessionSeconds,setSessionSeconds]=useState(0);
   const [sessionToken,setSessionToken]=useState("");
   const [entryUrl,setEntryUrl]=useState("");
   const [loginToken,setLoginToken]=useState("");
@@ -115,12 +119,24 @@ export default function Page(){
     }
     setSessionId(d.session_id);
     if(d.school_id) setSchool(String(d.school_id));
+    setSessionSchoolName(String(d.school_name||""));
+    setSessionUdiseCode(String(d.udise_code||""));
+    const expiresAt=Date.now()+Number(d.expires_in||0)*1000;
+    setSessionExpiresAt(expiresAt);
+    setSessionSeconds(Math.max(0,Math.floor((expiresAt-Date.now())/1000)));
     setPassword("");
     setCaptcha("");
-    setMsg(d.school_id?"UDISE connected. School scope detected automatically. Select class and workflow.":"UDISE connected. School scope could not be detected automatically; use Advanced fallback if a workflow is denied.");
+    setMsg(d.school_id?"Students Module connected. Select class and workflow.":"UDISE connected, but Students Module school scope could not be resolved.");
   }
 
   useEffect(()=>{beginUdiseLogin()},[]);
+  useEffect(()=>{
+    if(!sessionId||!sessionExpiresAt){setSessionSeconds(0);return}
+    const tick=()=>setSessionSeconds(Math.max(0,Math.floor((sessionExpiresAt-Date.now())/1000)));
+    tick();
+    const t=setInterval(tick,1000);
+    return ()=>clearInterval(t);
+  },[sessionId,sessionExpiresAt]);
 
   async function connectExistingSession(){
     setMsg("Creating secure browser-session link…");
@@ -258,7 +274,7 @@ export default function Page(){
             <label>CAPTCHA<input value={captcha} onChange={e=>setCaptcha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitUdiseLogin()} autoComplete="off" placeholder="Enter CAPTCHA"/></label>
             <button type="button" className="run-button" onClick={submitUdiseLogin} disabled={loginBusy}>{loginBusy?"Please wait…":"Sign in"}</button>
             <details className="advanced-login"><summary>Advanced / fallback login</summary><button type="button" className="secondary-button" onClick={connectExistingSession}>Use existing browser session</button></details>
-          </div>:<div className="connected-row"><span className="badge ok">● UDISE connected</span><button type="button" className="secondary-button" onClick={()=>{setSessionId("");beginUdiseLogin()}}>Sign in again</button></div>}
+          </div>:<div className="connected-row"><div><span className="badge ok">● Students Module connected</span><div className="session-meta"><strong>{sessionSchoolName||"School"}</strong>{sessionUdiseCode&&<span>UDISE: {sessionUdiseCode}</span>}<span>Session: {String(Math.floor(sessionSeconds/3600)).padStart(2,"0")}:{String(Math.floor((sessionSeconds%3600)/60)).padStart(2,"0")}:{String(sessionSeconds%60).padStart(2,"0")}</span></div></div><button type="button" className="secondary-button" onClick={()=>{setSessionId("");setSessionSchoolName("");setSessionUdiseCode("");setSessionExpiresAt(0);beginUdiseLogin()}}>Sign in again</button></div>}
         </section>
 
         {sessionId&&<>
