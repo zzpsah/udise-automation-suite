@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import os
@@ -20,6 +21,7 @@ from typing import Any
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
 from .capabilities import get_capabilities
 
@@ -47,6 +49,7 @@ for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, LOGIN_REQUESTS, ESK_REQUESTS
     os.chmod(p, 0o700)
 
 app = FastAPI(title="UDISE Hermes Control API", version="0.2.0")
+LOGIN_BROWSERS: dict[str, dict[str, Any]] = {}
 
 
 def _db() -> sqlite3.Connection:
@@ -250,6 +253,65 @@ def _login_failure_detail(result: requests.Response) -> str:
     return "UDISE login was not completed. A fresh CAPTCHA has been loaded."
 
 
+def _login_failure_detail_text(final_url: str, text: str) -> str:
+    query = parse_qs(urlparse(final_url).query, keep_blank_values=True)
+    flags = {str(k).lower() for k in query}
+    plain = html.unescape(re.sub(r"<[^>]+>", " ", text or ""))
+    plain = re.sub(r"\s+", " ", plain).strip()
+    low = plain.lower()
+    if "captchaerror" in flags or "invalid captcha" in low:
+        return "CAPTCHA incorrect or expired. A fresh CAPTCHA has been loaded."
+    if "locked" in flags or "account is locked" in low or "login locked" in low:
+        return "UDISE has temporarily locked this login after failed attempts. Try again after the lock period."
+    if flags.intersection({"expired", "sessionexpired", "sessioninvalid", "flowwarning"}) or "login page has expired" in low or "link has expired" in low:
+        return "UDISE login session expired. A fresh CAPTCHA has been loaded; enter the credentials again."
+    if "error" in flags or "invalid credential" in low or "invalid username" in low or "incorrect password" in low:
+        return "UDISE did not accept the username/password for this login attempt."
+    return "UDISE login was not completed. A fresh CAPTCHA has been loaded."
+
+
+def _cookie_header_from_playwright(items: list[dict[str, Any]]) -> tuple[str, dict[str, str]]:
+    values: list[str] = []
+    by_name: dict[str, str] = {}
+    for item in items:
+        domain = str(item.get("domain") or "").lstrip(".").lower()
+        if domain and not domain.endswith("sdms.udiseplus.gov.in"):
+            continue
+        name = str(item.get("name") or "")
+        value = str(item.get("value") or "")
+        if not name or name in by_name:
+            continue
+        by_name[name] = value
+        values.append(f"{name}={value}")
+    return "; ".join(values), by_name
+
+
+async def _close_login_browser(token: str) -> None:
+    state = LOGIN_BROWSERS.pop(token, None)
+    if not state:
+        return
+    try:
+        await state["context"].close()
+    except Exception:
+        pass
+    try:
+        await state["browser"].close()
+    except Exception:
+        pass
+    try:
+        await state["playwright"].stop()
+    except Exception:
+        pass
+
+
+async def _expire_login_browser(token: str, created_at: int) -> None:
+    await asyncio.sleep(REQUEST_TTL + 5)
+    state = LOGIN_BROWSERS.get(token)
+    if state and int(state.get("created_at", 0)) == created_at:
+        await _close_login_browser(token)
+        (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "service": "udise-control", "version": app.version}
@@ -261,14 +323,18 @@ def capabilities() -> dict:
 
 
 @app.post("/api/v1/login-requests")
-def create_udise_login_request(authorization: str | None = Header(default=None)) -> dict:
+async def create_udise_login_request(authorization: str | None = Header(default=None)) -> dict:
     require_api(authorization)
     token = secrets.token_urlsafe(32)
     now = int(time.time())
-    session = requests.Session()
-    session.headers.update({"User-Agent": "Mozilla/5.0"})
+    playwright = None
+    browser = None
+    context = None
     try:
-        bootstrap = session.get(
+        bootstrap_session = requests.Session()
+        bootstrap_session.headers.update({"User-Agent": "Mozilla/5.0"})
+        bootstrap = await asyncio.to_thread(
+            bootstrap_session.get,
             UDISE_LOGIN_START,
             timeout=30,
             allow_redirects=False,
@@ -277,37 +343,84 @@ def create_udise_login_request(authorization: str | None = Header(default=None))
         auth_start = str(bootstrap.headers.get("Location") or "")
         if auth_start.startswith("http://auth.udiseplus.gov.in/"):
             auth_start = "https://" + auth_start[len("http://"):]
-        if not auth_start.startswith(UDISE_AUTH_BASE + "/oauth2/authorize?"):
-            raise RuntimeError("Students OAuth bootstrap did not provide the auth redirect")
-        login = session.get(auth_start, timeout=30, allow_redirects=True)
-        login.raise_for_status()
-        if not str(login.url).startswith(UDISE_AUTH_BASE + "/login?"):
-            raise RuntimeError("Students OAuth flow did not reach the UDISE login page")
-        csrf = _csrf_from_login_html(login.text)
-        login_txn_id = _hidden_input(login.text, "loginTxnId")
-        if not login_txn_id:
-            login_txn_id = str((parse_qs(urlparse(login.url).query).get("loginTxnId") or [""])[0])
-        state = str((parse_qs(urlparse(login.url).query).get("state") or [""])[0])
-        if not login_txn_id or not state:
-            raise RuntimeError("Students OAuth flow did not provide state/loginTxnId")
-        captcha = session.get(UDISE_AUTH_BASE + "/captcha-image", timeout=25)
-        captcha.raise_for_status()
+        parsed = urlparse(auth_start)
+        query = parse_qs(parsed.query)
+        if (
+            not auth_start.startswith(UDISE_AUTH_BASE + "/oauth2/authorize?")
+            or str((query.get("client_id") or [""])[0]) != "udise-sdms-g0"
+            or not str((query.get("state") or [""])[0])
+        ):
+            raise RuntimeError("Students OAuth bootstrap did not provide the expected client/state")
+
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(headless=True)
+        context = await browser.new_context()
+        browser_cookies = []
+        for cookie in bootstrap_session.cookies:
+            browser_cookies.append({
+                "name": cookie.name,
+                "value": cookie.value,
+                "domain": cookie.domain or "sdms.udiseplus.gov.in",
+                "path": cookie.path or "/",
+            })
+        if browser_cookies:
+            await context.add_cookies(browser_cookies)
+
+        page = await context.new_page()
+        await page.goto(auth_start, wait_until="domcontentloaded", timeout=35_000)
+        await page.locator("#username").wait_for(state="visible", timeout=15_000)
+        await page.locator("#password").wait_for(state="visible", timeout=15_000)
+        captcha = page.locator("#captchaImage")
+        await captcha.wait_for(state="visible", timeout=15_000)
+
+        final_url = page.url
+        final_query = parse_qs(urlparse(final_url).query)
+        login_txn_id = await page.locator('input[name="loginTxnId"]').get_attribute("value")
+        state = str((final_query.get("state") or [""])[0])
+        client_id = str((final_query.get("client_id") or [""])[0])
+        if client_id != "udise-sdms-g0" or not login_txn_id or not state:
+            raise RuntimeError("Students login page did not provide client/state/loginTxnId")
+
+        captcha_path = LOGIN_REQUESTS / f"{token}.png"
+        await captcha.screenshot(path=str(captcha_path))
+        os.chmod(captcha_path, 0o600)
+
+        LOGIN_BROWSERS[token] = {
+            "created_at": now,
+            "playwright": playwright,
+            "browser": browser,
+            "context": context,
+            "page": page,
+        }
+        _json_write(LOGIN_REQUESTS / f"{token}.json", {
+            "created_at": now,
+            "expires_at": now + REQUEST_TTL,
+            "used": False,
+            "browser_backed": True,
+            "client_id": client_id,
+            "state": state,
+            "login_txn_id": login_txn_id,
+        })
+        asyncio.create_task(_expire_login_browser(token, now))
+        return {"token": token, "expires_in": REQUEST_TTL, "mode": "browser"}
     except Exception as exc:
-        raise HTTPException(502, f"UDISE login service unavailable: {type(exc).__name__}") from exc
-    _json_write(LOGIN_REQUESTS / f"{token}.json", {
-        "created_at": now,
-        "expires_at": now + REQUEST_TTL,
-        "used": False,
-        "csrf": csrf,
-        "login_txn_id": login_txn_id,
-        "state": state,
-        "auth_url": login.url,
-        "cookies": _dump_cookies(session),
-    })
-    captcha_path = LOGIN_REQUESTS / f"{token}.png"
-    captcha_path.write_bytes(captcha.content)
-    os.chmod(captcha_path, 0o600)
-    return {"token": token, "expires_in": REQUEST_TTL}
+        if context is not None:
+            try:
+                await context.close()
+            except Exception:
+                pass
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                pass
+        if playwright is not None:
+            try:
+                await playwright.stop()
+            except Exception:
+                pass
+        (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+        raise HTTPException(502, f"UDISE browser login unavailable: {type(exc).__name__}") from exc
 
 
 @app.get("/api/v1/login-requests/{token}/captcha")
@@ -328,7 +441,7 @@ def udise_login_captcha(token: str, authorization: str | None = Header(default=N
 
 
 @app.post("/api/v1/login-requests/{token}/submit")
-def submit_udise_login(
+async def submit_udise_login(
     token: str,
     body: UdiseLoginSubmitIn,
     authorization: str | None = Header(default=None),
@@ -340,67 +453,75 @@ def submit_udise_login(
     data = _json_read(p)
     now = int(time.time())
     if data.get("used") or now > int(data.get("expires_at", 0)):
+        await _close_login_browser(token)
         raise HTTPException(410, "Login request expired or already used")
     if not body.username.strip() or not body.password or not body.captcha.strip():
         raise HTTPException(400, "Username, password and CAPTCHA are required")
 
-    session = _restore_http_session(list(data.get("cookies") or []))
-    form = {
-        "_csrf": str(data.get("csrf") or ""),
-        "loginTxnId": str(data.get("login_txn_id") or ""),
-        "username": body.username.strip(),
-        "password": body.password,
-        "captchaMode": "image",
-        "captcha": body.captcha.strip(),
-    }
+    browser_state = LOGIN_BROWSERS.get(token)
+    if not browser_state:
+        raise HTTPException(410, "Browser login session expired. Refresh CAPTCHA and try again.")
+
+    page = browser_state["page"]
+    context = browser_state["context"]
     try:
-        result = session.post(
-            UDISE_AUTH_BASE + "/login",
-            data=form,
-            headers={"Referer": str(data.get("auth_url") or UDISE_AUTH_BASE + "/login")},
-            timeout=40,
-            allow_redirects=True,
-        )
-    except Exception as exc:
-        raise HTTPException(502, f"UDISE login request failed: {type(exc).__name__}") from exc
-
-    cookie = _sdms_cookie_header(session)
-    cookies = {c.name: c.value for c in session.cookies if (c.domain or "").lstrip(".").lower().endswith("sdms.udiseplus.gov.in")}
-    authenticated = False
-    if "JSESSIONID=" in cookie and "XSRF-TOKEN=" in cookie:
+        await page.locator("#username").fill(body.username.strip())
+        await page.locator("#password").fill(body.password)
+        await page.locator('input[name="captchaMode"][value="image"]').check()
+        await page.locator('input[name="captcha"]').fill(body.captcha.strip())
         try:
-            check = session.get(
-                "https://sdms.udiseplus.gov.in/p0/check-session",
-                headers={
-                    "Accept": "application/json, text/plain, */*",
-                    "Referer": "https://sdms.udiseplus.gov.in/p0/",
-                    "User-Agent": "Mozilla/5.0",
-                    "X-XSRF-TOKEN": str(cookies.get("XSRF-TOKEN") or ""),
-                },
-                timeout=20,
-                allow_redirects=False,
-            )
-            authenticated = check.status_code == 200
-        except Exception:
-            authenticated = False
+            async with page.expect_navigation(wait_until="domcontentloaded", timeout=45_000):
+                await page.locator("#loginBtn").click()
+        except PlaywrightTimeoutError:
+            await page.wait_for_timeout(1_000)
 
-    if not authenticated:
-        raise HTTPException(401, _login_failure_detail(result))
+        final_url = page.url
+        page_html = await page.content()
+        items = await context.cookies()
+        cookie, cookies = _cookie_header_from_playwright(items)
 
-    sid = secrets.token_urlsafe(32)
-    _json_write(SESSIONS / f"{sid}.json", {
-        "cookie": cookie,
-        "created_at": now,
-        "expires_at": now + SESSION_TTL,
-    })
-    data.update({"used": True, "ready": True, "session_id": sid, "used_at": now})
-    data.pop("csrf", None)
-    data.pop("login_txn_id", None)
-    data.pop("state", None)
-    data.pop("cookies", None)
-    _json_write(p, data)
-    (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
-    return {"ready": True, "session_id": sid, "expires_in": SESSION_TTL}
+        authenticated = False
+        if "JSESSIONID=" in cookie and "XSRF-TOKEN=" in cookie:
+            try:
+                check = await context.request.get(
+                    "https://sdms.udiseplus.gov.in/p0/check-session",
+                    headers={
+                        "Accept": "application/json, text/plain, */*",
+                        "Referer": "https://sdms.udiseplus.gov.in/p0/",
+                        "X-XSRF-TOKEN": str(cookies.get("XSRF-TOKEN") or ""),
+                    },
+                    timeout=20_000,
+                    max_redirects=0,
+                )
+                authenticated = check.status == 200
+            except Exception:
+                authenticated = False
+
+        if not authenticated:
+            detail = _login_failure_detail_text(final_url, page_html)
+            data.update({"used": True, "failed_at": now, "failure": detail})
+            _json_write(p, data)
+            await _close_login_browser(token)
+            (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+            raise HTTPException(401, detail)
+
+        sid = secrets.token_urlsafe(32)
+        _json_write(SESSIONS / f"{sid}.json", {
+            "cookie": cookie,
+            "created_at": now,
+            "expires_at": now + SESSION_TTL,
+        })
+        data.update({"used": True, "ready": True, "session_id": sid, "used_at": now})
+        _json_write(p, data)
+        await _close_login_browser(token)
+        (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+        return {"ready": True, "session_id": sid, "expires_in": SESSION_TTL, "mode": "browser"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await _close_login_browser(token)
+        (LOGIN_REQUESTS / f"{token}.png").unlink(missing_ok=True)
+        raise HTTPException(502, f"UDISE browser login failed: {type(exc).__name__}") from exc
 
 
 @app.post("/api/v1/session-requests", dependencies=[])
