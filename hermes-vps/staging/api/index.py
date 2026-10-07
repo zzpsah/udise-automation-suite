@@ -59,7 +59,9 @@ except ImportError as exc:  # pragma: no cover - deployment misconfiguration
     ) from exc
 
 BACKEND = os.environ.get("UDISE_LOGIN_BACKEND", "http").strip().lower()
-CONTROL_TOKEN = os.environ.get("UDISE_CONTROL_TOKEN", "")
+# Strip surrounding whitespace: env vars pasted from a terminal or a file often
+# carry a trailing newline, and an exact compare would then reject a correct token.
+CONTROL_TOKEN = os.environ.get("UDISE_CONTROL_TOKEN", "").strip()
 COOKIE_SECRET = os.environ.get("UDISE_STAGE_COOKIE_SECRET", "")
 COOKIE_NAME = "udise_stage"
 REQUEST_TTL = 10 * 60
@@ -128,7 +130,12 @@ def require_token(authorization: str | None) -> None:
         raise HTTPException(401, "Unauthorized")
     got = authorization[7:].strip()
     if not secrets.compare_digest(got, CONTROL_TOKEN):
-        raise HTTPException(401, "Unauthorized")
+        # Help the operator without leaking either value.
+        raise HTTPException(
+            401,
+            "Unauthorized — token mismatch "
+            f"(sent {len(got)} chars, expected {len(CONTROL_TOKEN)})",
+        )
 
 
 class SubmitIn(BaseModel):
@@ -246,6 +253,31 @@ def _playwright_available() -> bool:
         return False
 
 
+@app.get("/api/v1/whoami")
+def whoami(authorization: str | None = Header(default=None)) -> dict:
+    """Diagnose a token mismatch without revealing either value.
+
+    Open this in the browser (or curl it) with the same Authorization header the
+    UI sends and it says whether the token matched and how long each side is.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return {
+            "matched": False,
+            "reason": "no Authorization header sent",
+            "hint": "enter the token in step 1 and click 'Use this token'",
+        }
+    got = authorization[7:].strip()
+    matched = secrets.compare_digest(got, CONTROL_TOKEN)
+    return {
+        "matched": matched,
+        "sent_length": len(got),
+        "expected_length": len(CONTROL_TOKEN),
+        "reason": "token matches" if matched else "length or content differs",
+        "sent_sha256_prefix": hashlib.sha256(got.encode()).hexdigest()[:12],
+        "expected_sha256_prefix": hashlib.sha256(CONTROL_TOKEN.encode()).hexdigest()[:12],
+    }
+
+
 @app.get("/api/v1/capabilities")
 def capabilities() -> dict:
     return {
@@ -342,88 +374,16 @@ def submit(
     }
 
 
+PAGE_FILE = Path(__file__).resolve().parent / "page.html"
+
+
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
-    return _PAGE
-
-
-_PAGE = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>UDISE Login Staging</title>
-<style>
- :root{color-scheme:light dark}
- body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:760px;
-      margin:32px auto;padding:0 18px;line-height:1.55}
- .card{border:1px solid #8884;border-radius:14px;padding:20px;margin-bottom:16px}
- h1{font-size:1.35rem;margin:0 0 4px} h2{font-size:1rem;margin:0 0 10px}
- .muted{opacity:.7;font-size:.875rem}
- input{width:100%;box-sizing:border-box;padding:10px;margin:6px 0 12px;
-       border:1px solid #8886;border-radius:9px;font-size:1rem;background:transparent;color:inherit}
- button{padding:11px 18px;border:0;border-radius:9px;background:#2563eb;color:#fff;
-        font-size:.95rem;cursor:pointer} button:disabled{opacity:.5;cursor:default}
- img#cap{border:1px solid #8886;border-radius:9px;background:#fff;display:block;margin:8px 0}
- pre{background:#8881;padding:12px;border-radius:9px;overflow:auto;font-size:.82rem}
- .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-</style></head><body>
-<h1>UDISE Login Staging</h1>
-<p class="muted">Browser-free login harness. Read-only, stateless, no write path.</p>
-
-<div class="card">
-  <h2>1 · Access token</h2>
-  <input id="tok" type="password" placeholder="staging control token" autocomplete="off">
-</div>
-
-<div class="card">
-  <h2>2 · Start login</h2>
-  <div class="row"><button id="start">Start &amp; fetch CAPTCHA</button>
-  <span id="startmsg" class="muted"></span></div>
-  <img id="cap" alt="" hidden>
-</div>
-
-<div class="card">
-  <h2>3 · Credentials</h2>
-  <input id="user" placeholder="UDISE username" autocomplete="off">
-  <input id="pass" type="password" placeholder="password" autocomplete="off">
-  <input id="capt" placeholder="CAPTCHA as shown" autocomplete="off">
-  <button id="go">Submit</button>
-</div>
-
-<div class="card">
-  <h2>Result</h2>
-  <pre id="out">idle</pre>
-</div>
-
-<script>
-const $ = id => document.getElementById(id);
-const tok = () => $('tok').value.trim();
-const hdr = () => ({'Content-Type':'application/json','Authorization':'Bearer '+tok()});
-const show = o => $('out').textContent = typeof o === 'string' ? o : JSON.stringify(o, null, 2);
-
-$('start').onclick = async () => {
-  $('start').disabled = true; $('startmsg').textContent = 'starting…';
-  try {
-    const r = await fetch('/api/v1/login-requests', {method:'POST', headers: hdr()});
-    const d = await r.json();
-    if (!r.ok) { show(d); $('startmsg').textContent = 'failed'; return; }
-    $('cap').src = 'data:image/png;base64,' + d.captcha_png;
-    $('cap').hidden = false;
-    $('startmsg').textContent = 'backend: ' + d.backend + ' · token ' + d.token.slice(0,10) + '…';
-    show({started:true, backend:d.backend, expires_in:d.expires_in});
-  } catch (e) { show('error: ' + e); $('startmsg').textContent = 'failed'; }
-  finally { $('start').disabled = false; }
-};
-
-$('go').onclick = async () => {
-  $('go').disabled = true;
-  try {
-    const r = await fetch('/api/v1/login-requests/submit', {
-      method:'POST', headers: hdr(),
-      body: JSON.stringify({username:$('user').value, password:$('pass').value, captcha:$('capt').value})
-    });
-    show(await r.json());
-  } catch (e) { show('error: ' + e); }
-  finally { $('go').disabled = false; }
-};
-</script></body></html>
-"""
+    """Serve the staging UI. Kept as a real file so it can be edited and linted."""
+    try:
+        return PAGE_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return (
+            "<h1>staging UI missing</h1>"
+            "<p>api/page.html was not bundled with this deployment.</p>"
+        )

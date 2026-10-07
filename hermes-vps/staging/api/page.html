@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UDISE Login Staging</title>
+<style>
+ :root{color-scheme:light dark}
+ body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:760px;
+      margin:32px auto;padding:0 18px;line-height:1.55}
+ .card{border:1px solid #8884;border-radius:14px;padding:20px;margin-bottom:16px}
+ h1{font-size:1.35rem;margin:0 0 4px} h2{font-size:1rem;margin:0 0 10px}
+ .muted{opacity:.7;font-size:.875rem}
+ input{width:100%;box-sizing:border-box;padding:10px;margin:6px 0 12px;
+       border:1px solid #8886;border-radius:9px;font-size:1rem;background:transparent;color:inherit}
+ button{padding:11px 18px;border:0;border-radius:9px;background:#2563eb;color:#fff;
+        font-size:.95rem;cursor:pointer} button:disabled{opacity:.5;cursor:default}
+ .ghost{background:transparent;border:1px solid #8886;color:inherit}
+ #capwrap{margin-top:12px}
+ #cap{border:1px solid #8886;border-radius:9px;background:#fff;display:block}
+ #placeholder{border:1px dashed #8887;border-radius:9px;padding:26px;text-align:center;
+              font-size:.9rem;opacity:.65}
+ pre{background:#8881;padding:12px;border-radius:9px;overflow:auto;font-size:.82rem}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+ .err{background:#dc262622;border:1px solid #dc262666;color:#dc2626;padding:11px 13px;
+      border-radius:9px;font-size:.9rem;margin-top:12px}
+ .ok{background:#16a34a22;border:1px solid #16a34a66;color:#16a34a;padding:11px 13px;
+     border-radius:9px;font-size:.9rem;margin-top:12px}
+ .hide{display:none}
+ code{background:#8882;padding:1px 5px;border-radius:4px}
+</style></head><body>
+<h1>UDISE Login Staging</h1>
+<p class="muted">Browser-free login harness. Read-only, stateless, no write path.</p>
+
+<div class="card">
+  <h2>1 · Access token</h2>
+  <input id="tok" type="password" placeholder="paste the staging control token" autocomplete="off">
+  <div class="row">
+    <button id="savetok" class="ghost">Use this token</button>
+    <span id="tokmsg" class="muted">not set</span>
+  </div>
+  <p class="muted">Tip: append <code>#token=YOUR_TOKEN</code> to this URL and it fills in automatically.</p>
+</div>
+
+<div class="card">
+  <h2>2 · Start login</h2>
+  <div class="row">
+    <button id="start" disabled>Start &amp; fetch CAPTCHA</button>
+    <button id="reload" class="ghost hide">New CAPTCHA</button>
+    <span id="startmsg" class="muted">enter a token first</span>
+  </div>
+  <div id="err1" class="err hide"></div>
+  <div id="capwrap">
+    <div id="placeholder">no CAPTCHA yet — click “Start &amp; fetch CAPTCHA”</div>
+    <img id="cap" alt="CAPTCHA" class="hide">
+  </div>
+</div>
+
+<div class="card">
+  <h2>3 · Credentials</h2>
+  <input id="user" placeholder="UDISE username" autocomplete="off">
+  <input id="pass" type="password" placeholder="password" autocomplete="off">
+  <input id="capt" placeholder="CAPTCHA as shown in the image above" autocomplete="off">
+  <button id="go" disabled>Submit</button>
+  <div id="err2" class="err hide"></div>
+  <div id="ok2" class="ok hide"></div>
+</div>
+
+<div class="card">
+  <h2>Result</h2>
+  <pre id="out">idle</pre>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let TOKEN = '';
+
+const show = o => $('out').textContent = typeof o === 'string' ? o : JSON.stringify(o, null, 2);
+const err = (el, msg) => {
+  const e = $(el);
+  if (!msg) { e.classList.add('hide'); e.textContent = ''; }
+  else { e.textContent = msg; e.classList.remove('hide'); }
+};
+const hdr = () => ({'Content-Type':'application/json','Authorization':'Bearer ' + TOKEN});
+
+function useToken(v, quiet) {
+  TOKEN = (v || '').trim();
+  const ok = TOKEN.length >= 16;
+  $('start').disabled = !ok;
+  $('go').disabled = !ok;
+  $('tokmsg').textContent = ok ? ('token accepted — ' + TOKEN.length + ' chars') : 'token looks too short';
+  if (ok) err('err1', '');
+  else if (!quiet) err('err1', 'Enter the staging control token from step 1 before starting.');
+  return ok;
+}
+
+// prefill from #token=... or ?token=... so a link can carry it
+(function () {
+  const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const q = new URLSearchParams(location.search);
+  const t = h.get('token') || q.get('token') || '';
+  if (t) { $('tok').value = t; useToken(t, true); }
+})();
+
+$('savetok').onclick = () => {
+  useToken($('tok').value, false);
+  $('startmsg').textContent = TOKEN ? 'ready' : 'enter a token first';
+};
+$('tok').addEventListener('keydown', e => { if (e.key === 'Enter') $('savetok').click(); });
+
+async function startLogin() {
+  if (!useToken(TOKEN, false)) { show('blocked: no token'); return; }
+  err('err1', ''); err('err2', ''); $('ok2').classList.add('hide');
+  $('start').disabled = true; $('startmsg').textContent = 'starting…';
+  $('cap').classList.add('hide'); $('placeholder').classList.remove('hide');
+  try {
+    const r = await fetch('/api/v1/login-requests', {method: 'POST', headers: hdr()});
+    let d;
+    try { d = await r.json(); } catch (_) { d = {detail: 'non-JSON response'}; }
+    if (!r.ok) {
+      const msg = (d && d.detail) ? d.detail : ('HTTP ' + r.status);
+      err('err1', 'Start failed: ' + msg + (r.status === 401 ? ' — check the token in step 1.' : ''));
+      $('startmsg').textContent = 'failed';
+      show(d);
+      return;
+    }
+    if (!d.captcha_png) {
+      err('err1', 'The server returned no CAPTCHA image.');
+      $('startmsg').textContent = 'failed'; show(d); return;
+    }
+    $('cap').src = 'data:image/png;base64,' + d.captcha_png;
+    $('cap').classList.remove('hide');
+    $('placeholder').classList.add('hide');
+    $('reload').classList.remove('hide');
+    $('startmsg').textContent = 'backend: ' + d.backend + ' · request ' + d.token.slice(0, 10) + '…';
+    $('capt').focus();
+    show({started: true, backend: d.backend, expires_in: d.expires_in, captcha_chars: d.captcha_png.length});
+  } catch (e) {
+    err('err1', 'Network error: ' + e);
+    $('startmsg').textContent = 'failed';
+    show('error: ' + e);
+  } finally { $('start').disabled = false; }
+}
+
+$('start').onclick = startLogin;
+$('reload').onclick = startLogin;
+
+$('go').onclick = async () => {
+  err('err2', ''); $('ok2').classList.add('hide');
+  if (!TOKEN) { err('err2', 'Enter the token in step 1 first.'); return; }
+  $('go').disabled = true;
+  try {
+    const r = await fetch('/api/v1/login-requests/submit', {
+      method: 'POST', headers: hdr(),
+      body: JSON.stringify({username: $('user').value, password: $('pass').value, captcha: $('capt').value})
+    });
+    let d; try { d = await r.json(); } catch (_) { d = {detail: 'non-JSON response'}; }
+    if (r.ok) {
+      $('ok2').textContent = 'Login succeeded. Session cookie captured.';
+      $('ok2').classList.remove('hide');
+      $('pass').value = '';
+    } else {
+      err('err2', (d && d.detail) ? d.detail : ('HTTP ' + r.status));
+      if (String(d.detail || '').toLowerCase().includes('captcha')) startLogin();
+    }
+    show(d);
+  } catch (e) { err('err2', 'Network error: ' + e); show('error: ' + e); }
+  finally { $('go').disabled = false; }
+};
+
+$('capt').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+</script></body></html>
