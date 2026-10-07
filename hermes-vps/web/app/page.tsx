@@ -50,6 +50,7 @@ export default function Page(){
   const [loginToken,setLoginToken]=useState("");
   const [username,setUsername]=useState("");
   const [password,setPassword]=useState("");
+  const [showPassword,setShowPassword]=useState(false);
   const [captcha,setCaptcha]=useState("");
   const [captchaNonce,setCaptchaNonce]=useState(0);
   const [loginBusy,setLoginBusy]=useState(false);
@@ -60,6 +61,7 @@ export default function Page(){
   const [eshikshaFile,setEshikshaFile]=useState<File|null>(null);
   const [eshikshaUdise,setEshikshaUdise]=useState("");
   const [eshikshaPassword,setEshikshaPassword]=useState("");
+  const [showEshikshaPassword,setShowEshikshaPassword]=useState(false);
   const [eshikshaYear,setEshikshaYear]=useState("2026-27");
   const [eshikshaSchoolName,setEshikshaSchoolName]=useState("");
   const [eshikshaConnectedUdise,setEshikshaConnectedUdise]=useState("");
@@ -307,7 +309,7 @@ export default function Page(){
           <div className="section-title"><span className="step">1</span><div><h2>UDISE Login</h2><p>Username, password and CAPTCHA</p></div></div>
           {!sessionId?<div className="login-form-grid">
             <label>Username<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" placeholder="UDISE username"/></label>
-            <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Password"/></label>
+            <label>Password<div className="password-field"><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Password"/><button type="button" className="password-toggle" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword?"Hide password":"Show password"} title={showPassword?"Hide password":"Show password"}>{showPassword?"🙈":"👁️"}</button></div></label>
             <div className="captcha-row">
               {loginToken?<img className="captcha-image" src={"/api/udise-login/captcha?token="+encodeURIComponent(loginToken)+"&v="+captchaNonce} alt="UDISE CAPTCHA"/>:<div className="captcha-placeholder">Loading CAPTCHA…</div>}
               <button type="button" className="secondary-button" onClick={beginUdiseLogin} disabled={loginBusy}>Refresh CAPTCHA</button>
@@ -362,7 +364,7 @@ export default function Page(){
                   {eshikshaReady&&<div className="method-actions"><button type="button" className="source-primary" onClick={downloadEshikshaReport}>Fetch latest report</button><button type="button" className="source-secondary" onClick={connectEshiksha}>Change sign-in</button></div>}
                   {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="credential-grid">
                     <label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label>
-                    <label>Password<input type="password" value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/></label>
+                    <label>Password<div className="password-field"><input type={showEshikshaPassword?"text":"password"} value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/><button type="button" className="password-toggle" onClick={()=>setShowEshikshaPassword(v=>!v)} aria-label={showEshikshaPassword?"Hide password":"Show password"} title={showEshikshaPassword?"Hide password":"Show password"}>{showEshikshaPassword?"🙈":"👁️"}</button></div></label>
                     <label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label>
                     <button type="button" className="source-primary" onClick={saveEshikshaCredentials}>Use for this EP session</button>
                   </div>}
