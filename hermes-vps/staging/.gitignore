@@ -1,0 +1,4 @@
+.vercel
+api/udise_login.py
+api/.udise_login.sha256
+api/__pycache__/
