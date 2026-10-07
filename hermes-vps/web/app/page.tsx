@@ -30,7 +30,7 @@ const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
   snapshot: {icon:"RA",short:"Export a full read-only audit workbook with class-wise pending counts",fills:["Class IX / X / XI / XII student totals","GP pending: blank eligible fields by class","EP pending: admission, language and subject gaps by class","Facility pending: blank measurements and Yes/No fields by class","Completion status and Issues sheets; read-only, no portal changes"]},
   gp: {icon:"P3",short:"Blank fields only; existing values are never overwritten",fills:["4.1.12 Mother Tongue → Hindi (42) or Bhojpuri (28)","Blood Group → Under Investigation (9)","4.1.14 BPL → No (2)","4.1.15 AAY → Not Applicable (9) when BPL is No","4.1.16 EWS → No (2)","4.1.17 CWSN → No (2); existing Yes is manual review","4.1.18 Indian National → Yes (1)","4.1.19 Out-of-School-Child → No (2)"]},
   ep: {icon:"P4",short:"Blank EP fields only; existing values are never overwritten",fills:["4.2.1 Admission No. → matched eShikshaKosh value, then Roll No. fallback","No match/ambiguous → temporary 0001, 0002… sequence shown for Excel review","4.2.9 language pair → Urdu/HIN or Hindi/Sanskrit by minority status","Subjects 3–6 → Mathematics 401, Science 402, Social Science 404, English 612","Invalid previous-year result → None / Not Studying with null dependent fields","Class XI stream → eShikshaKosh stream when the portal permits it"]},
-  facility: {icon:"P4",short:"Blank facility fields only; existing values are never overwritten",fills:["Height → seeded value 146–160 cm","Weight → seeded value 42–52 kg","4.3.6 Distance → seeded 1–3 km or 3–5 km","Parent education → Secondary","Blank Yes/No facility fields → No"]},
+  facility: {icon:"P4",short:"Blank facility fields only; existing values are never overwritten",fills:["Boys: Height → 150–170 cm; Weight → 42–60 kg","Girls: lower range → 146–166 cm; Weight → 38–56 kg","4.3.6 Distance → seeded 1–3 km or 3–5 km","Parent education → Secondary","Blank Yes/No facility fields → No"]},
   completion: {icon:"P5",short:"Export the current stage status",fills:["GP / EP / Facility status","Pending and completed records"]},
   finalize: {icon:"P5",short:"Review records eligible for Complete Data",fills:["Fresh status 3 only","Proposed transition to status 6"]},
 };
@@ -61,6 +61,8 @@ export default function Page(){
   const [eshikshaUdise,setEshikshaUdise]=useState("");
   const [eshikshaPassword,setEshikshaPassword]=useState("");
   const [eshikshaYear,setEshikshaYear]=useState("2026-27");
+  const [eshikshaSchoolName,setEshikshaSchoolName]=useState("");
+  const [eshikshaConnectedUdise,setEshikshaConnectedUdise]=useState("");
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
   const [autoSavePreview,setAutoSavePreview]=useState(false);
@@ -131,12 +133,26 @@ export default function Page(){
 
   useEffect(()=>{beginUdiseLogin()},[]);
   useEffect(()=>{
-    if(!sessionId||!sessionExpiresAt){setSessionSeconds(0);return}
-    const tick=()=>setSessionSeconds(Math.max(0,Math.floor((sessionExpiresAt-Date.now())/1000)));
-    tick();
-    const t=setInterval(tick,1000);
-    return ()=>clearInterval(t);
-  },[sessionId,sessionExpiresAt]);
+    if(!sessionId){setSessionSeconds(0);return}
+    let cancelled=false;
+    const verify=async(refresh=false)=>{
+      const r=await fetch(`/api/session-status-live?session_id=${encodeURIComponent(sessionId)}&refresh=${refresh?"1":"0"}`,{cache:"no-store"});
+      if(!r.ok){
+        if(!cancelled){setSessionId("");setMsg("UDISE portal session expired. Sign in again.")}
+        return;
+      }
+      const d=await r.json();
+      if(!cancelled){
+        const seconds=Number(d.expires_in||0);
+        setSessionSeconds(seconds);
+        setSessionExpiresAt(Date.now()+seconds*1000);
+      }
+    };
+    verify(true);
+    const heartbeat=setInterval(()=>{if(document.visibilityState==="visible") verify(true)},4*60*1000);
+    const tick=setInterval(()=>setSessionSeconds(v=>Math.max(0,v-1)),1000);
+    return ()=>{cancelled=true;clearInterval(heartbeat);clearInterval(tick)};
+  },[sessionId]);
 
   async function connectExistingSession(){
     setMsg("Creating secure browser-session link…");
@@ -163,8 +179,8 @@ export default function Page(){
 
   async function connectEshiksha(){
     setMsg("Preparing secure eShikshaKosh sign-in…");
-    setEshikshaReady(false);
-    const r=await fetch("/api/eshiksha-request",{method:"POST"});
+    setEshikshaReady(false);setEshikshaReportReady(false);
+    const r=await fetch("/api/eshiksha-request",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sessionId})});
     const d=await r.json();
     if(!r.ok){setMsg(d.error||"Could not create the secure eShikshaKosh sign-in");return}
     setEshikshaToken(d.token);setEshikshaUrl(d.entry_url);
@@ -182,9 +198,12 @@ export default function Page(){
   }
   async function saveEshikshaCredentials(){
     if(!eshikshaToken||!eshikshaUdise||!eshikshaPassword){setMsg("Enter eShikshaKosh UDISE code and password.");return}
-    const r=await fetch("/api/eshiksha-credentials",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:eshikshaToken,udise:eshikshaUdise,password:eshikshaPassword,year:eshikshaYear})});
-    const d=await r.json(); if(!r.ok){setMsg(d.detail||d.error||"Could not save eShikshaKosh credentials");return}
-    setEshikshaReady(true);setEshikshaUrl("");setEshikshaPassword("");setMsg("eShikshaKosh credentials saved temporarily for this page.");
+    const r=await fetch("/api/eshiksha-credentials",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:eshikshaToken,udise:eshikshaUdise,password:eshikshaPassword,year:eshikshaYear,session_id:sessionId})});
+    const d=await r.json(); setEshikshaPassword("");
+    if(!r.ok){setEshikshaReady(false);setMsg(d.detail||d.error||"eShikshaKosh login could not be verified");return}
+    setEshikshaReady(Boolean(d.verified));setEshikshaUrl("");
+    setEshikshaSchoolName(String(d.school_name||""));setEshikshaConnectedUdise(String(d.udise||eshikshaUdise));
+    setMsg(`eShikshaKosh connected${d.school_name?": "+d.school_name:""}.`);
   }
 
   async function downloadEshikshaReport(){
@@ -194,7 +213,7 @@ export default function Page(){
       return;
     }
     setMsg("Fetching the latest eShikshaKosh source report…");
-    const r=await fetch(`/api/eshiksha-export?class=${encodeURIComponent(klass)}`,{cache:"no-store"});
+    const r=await fetch(`/api/eshiksha-export?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}`,{cache:"no-store"});
     if(!r.ok){
       let detail="eShikshaKosh report fetch failed.";
       try{
@@ -215,7 +234,8 @@ export default function Page(){
     a.download=`eShikshaKosh_EP_Source_${klass}.xlsx`;
     document.body.appendChild(a);a.click();a.remove();
     URL.revokeObjectURL(url);
-    setMsg("eShikshaKosh source report downloaded.");
+    setEshikshaReportReady(true);setEshikshaReady(false);
+    setMsg("eShikshaKosh source fetched and attached to Enrollment Profile. Temporary password discarded.");
   }
 
   useEffect(()=>{
@@ -224,7 +244,7 @@ export default function Page(){
       const r=await fetch("/api/eshiksha-status?token="+encodeURIComponent(eshikshaToken),{cache:"no-store"});
       if(!r.ok) return;
       const d=await r.json();
-      if(d.ready){setEshikshaReady(true);setEshikshaUrl("");setMsg("eShikshaKosh is connected. The EP preview is ready to run.");clearInterval(t)}
+      if(d.ready&&d.verified){setEshikshaReady(true);setEshikshaUrl("");setEshikshaSchoolName(String(d.school_name||""));setEshikshaConnectedUdise(String(d.udise||""));setMsg(`eShikshaKosh connected${d.school_name?": "+d.school_name:""}. EP source is ready.`);clearInterval(t)}
       else if(eshikshaReady){setEshikshaReady(false);setMsg("The temporary eShikshaKosh connection is no longer available. Connect again before EP preview.");clearInterval(t)}
     },2000);
     return ()=>clearInterval(t);
@@ -263,7 +283,7 @@ export default function Page(){
       const r=await fetch("/api/jobs/"+jobId,{cache:"no-store"});
       if(!r.ok) return;
       const d=await r.json();setJob(d);
-      if(d.job.stage==="ep"&&d.job.status==="failed") setEshikshaReady(false);
+      if(d.job.stage==="ep"&&d.job.preview&&["completed","failed"].includes(d.job.status)) setEshikshaReady(false);
       if(d.job.status==="completed"&&autoSavePreview&&d.job.preview&&d.job.has_result){
         clearInterval(timer);
         await autoApproveWrite(d);
@@ -295,7 +315,7 @@ export default function Page(){
             <label>CAPTCHA<input value={captcha} onChange={e=>setCaptcha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitUdiseLogin()} autoComplete="off" placeholder="Enter CAPTCHA"/></label>
             <button type="button" className="run-button" onClick={submitUdiseLogin} disabled={loginBusy}>{loginBusy?"Please wait…":"Sign in"}</button>
             <details className="advanced-login"><summary>Advanced / fallback login</summary><button type="button" className="secondary-button" onClick={connectExistingSession}>Use existing browser session</button></details>
-          </div>:<div className="connected-row"><div><span className="badge ok">● Students Module connected</span><div className="session-meta"><strong>{sessionSchoolName||"School"}</strong>{sessionUdiseCode&&<span>UDISE: {sessionUdiseCode}</span>}<span>Session: {String(Math.floor(sessionSeconds/3600)).padStart(2,"0")}:{String(Math.floor((sessionSeconds%3600)/60)).padStart(2,"0")}:{String(sessionSeconds%60).padStart(2,"0")}</span></div></div><button type="button" className="secondary-button" onClick={()=>{setSessionId("");setSessionSchoolName("");setSessionUdiseCode("");setSessionExpiresAt(0);beginUdiseLogin()}}>Sign in again</button></div>}
+          </div>:<div className="connected-row"><div><span className="badge ok">● Students Module connected</span><div className="session-meta"><strong>{sessionSchoolName||"School"}</strong>{sessionUdiseCode&&<span>UDISE: {sessionUdiseCode}</span>}<span>Verified window: {String(Math.floor(sessionSeconds/3600)).padStart(2,"0")}:{String(Math.floor((sessionSeconds%3600)/60)).padStart(2,"0")}:{String(sessionSeconds%60).padStart(2,"0")}</span></div></div><button type="button" className="secondary-button" onClick={()=>{setSessionId("");setSessionSchoolName("");setSessionUdiseCode("");setSessionExpiresAt(0);beginUdiseLogin()}}>Sign in again</button></div>}
         </section>
 
         {sessionId&&<>
@@ -330,8 +350,10 @@ export default function Page(){
                   <h3>Use eShikshaKosh to complete UDISE Enrollment Profile</h3>
                   <p>eShikshaKosh supplies the source data used to match students and fill eligible blank EP fields—primarily <strong>Admission Number</strong> and, for Class XI, <strong>stream</strong>. Connecting this source does not write anything to UDISE.</p>
                 </div>
-                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||klass==="X")?"ready":"needed")}>{eshikshaReportReady?"Excel source ready":eshikshaReady?"Automatic source ready":klass==="X"?"Optional for Class X":"Source required"}</span>
+                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||klass==="X")?"ready":"needed")}>{eshikshaReportReady?"EP source ready":eshikshaReady?"Verified connection":klass==="X"?"Optional for Class X":"Source required"}</span>
               </div>
+              {eshikshaReady&&<div className="source-identity"><strong>Connected:</strong> {eshikshaSchoolName||"eShikshaKosh school"}{eshikshaConnectedUdise?` · UDISE ${eshikshaConnectedUdise}`:""}<small>Login verified. The password is temporary for this UDISE session and is discarded after the live source fetch.</small></div>}
+              {eshikshaReportReady&&<div className="source-identity"><strong>EP source ready.</strong> The fetched/uploaded eShikshaKosh report is passed automatically into Enrollment Profile.</div>}
 
               <div className="source-methods">
                 <div className="source-method recommended">

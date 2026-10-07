@@ -211,3 +211,26 @@ Current portal-login behavior:
 - Subject 1–6 cells have dropdown validation using the live UDISE subject catalogue when available, with the verified IX/X subject map as fallback.
 - EP preview output also includes an `Enrollment Profile Review` sheet with Current / Proposed / Effective values.
 - If every EP detail read fails, the workflow fails explicitly instead of reporting success with an empty/invalid review.
+
+## Session / eShikshaKosh / Facility refresh — 2026-10-08
+
+### eShikshaKosh connection semantics
+- Connected means the official eShikshaKosh login was actually verified; merely storing credentials is not enough.
+- The verified response exposes only safe identity metadata to the UI: school name and UDISE code.
+- Temporary eShikshaKosh credentials are bound to the current UDISE session.
+- The password is not shown as reusable/saved state. After a successful live source fetch, the temporary password record is deleted.
+- The resulting eShikshaKosh workbook is passed automatically into the EP preview. Approved EP writes reuse the preview source workbook and do not need the password again.
+- Class X keeps eShikshaKosh optional.
+
+### UDISE session lifecycle
+- The local safety TTL is 45 minutes, not an assumed eight-hour portal session.
+- /p0/check-session is authoritative.
+- While the page is visible, the browser verifies/refreshes the local window every 4 minutes.
+- While a workflow subprocess is running, Oracle independently verifies the real portal session every 3 minutes.
+- If the portal session expires mid-workflow, the runner is stopped and no blind retry is attempted.
+- The UI label is Verified window, not a promise of portal lifetime.
+
+### Facility measurements
+- Boys: height 150–170 cm; weight 42–60 kg.
+- Girls: height 146–166 cm; weight 38–56 kg.
+- Existing saved measurements are never overwritten.

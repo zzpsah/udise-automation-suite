@@ -14,6 +14,7 @@ a student, the caller falls back to Roll No. and then to a generated number.
 from __future__ import annotations
 
 import os
+import json
 import re
 import subprocess
 import sys
@@ -135,10 +136,11 @@ def export_report(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     python = find_fetch_python(script)
-    cmd = [str(python), str(script),
-           "--udise", udise, "--password", password,
-           "--year", year, "--output", str(out)]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    cmd = [str(python), str(script), "--year", year, "--output", str(out)]
+    env = os.environ.copy()
+    env["ESHIKSHAKOSH_USERNAME"] = udise
+    env["ESHIKSHAKOSH_PASSWORD"] = password
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
     if proc.returncode != 0 or not out.is_file():
         diagnostics = "\n".join(part for part in (proc.stderr, proc.stdout) if part)
         flat = re.sub(r"\s+", " ", diagnostics.strip())
@@ -155,3 +157,51 @@ def export_report(
             detail = error_lines[-1] if error_lines else flat[-600:]
         raise RuntimeError(detail or "eShikshaKosh report fetch failed.")
     return out
+
+def verify_credentials(*, udise: str, password: str, year: str = "2026-27", timeout: int = 120) -> dict:
+    """Verify a real eShikshaKosh login and return non-secret school identity."""
+    script = find_fetch_script()
+    if script is None:
+        raise RuntimeError("eShikshaKosh fetch script not found.")
+    if not udise or not password:
+        raise RuntimeError("eShikshaKosh user ID and password are required.")
+
+    python = find_fetch_python(script)
+    env = os.environ.copy()
+    env["ESHIKSHAKOSH_USERNAME"] = udise
+    env["ESHIKSHAKOSH_PASSWORD"] = password
+    proc = subprocess.run(
+        [str(python), str(script), "--year", year, "--verify-only"],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+    )
+    diagnostics = "\n".join(part for part in (proc.stdout, proc.stderr) if part)
+    if proc.returncode != 0:
+        flat = re.sub(r"\s+", " ", diagnostics.strip())
+        error_lines = [
+            re.sub(r"^.*?\[(?:ERROR|WARNING)\]\s*", "", line).strip()
+            for line in diagnostics.splitlines()
+            if "[ERROR]" in line or "[WARNING]" in line
+        ]
+        detail = error_lines[-1] if error_lines else flat[-500:]
+        raise RuntimeError(detail or "eShikshaKosh login verification failed.")
+
+    marker = "VERIFY_OK="
+    line = next((ln for ln in proc.stdout.splitlines() if ln.startswith(marker)), "")
+    if not line:
+        raise RuntimeError("eShikshaKosh login verification did not return school identity.")
+    try:
+        data = json.loads(line[len(marker):])
+    except Exception as exc:
+        raise RuntimeError("eShikshaKosh school identity response could not be read.") from exc
+    if not data.get("verified"):
+        raise RuntimeError("eShikshaKosh login could not be verified.")
+    return {
+        "verified": True,
+        "udise": str(data.get("udise") or udise),
+        "school_id": str(data.get("school_id") or ""),
+        "school_name": str(data.get("school_name") or "").strip(),
+        "student_count": int(data.get("student_count") or 0),
+    }

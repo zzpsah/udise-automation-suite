@@ -36,12 +36,13 @@ LOGIN_REQUESTS = RUNTIME / "login-requests"
 ESK_REQUESTS = RUNTIME / "eshiksha-requests"
 ESK_CREDENTIAL = RUNTIME / "eshiksha-credential.json"
 ESK_UPLOAD = RUNTIME / "eshiksha-upload.xlsx"
+ESK_UPLOAD_META = RUNTIME / "eshiksha-upload.json"
 DB = STATE / "jobs.sqlite3"
 CONTROL_TOKEN_FILE = Path(os.environ.get("UDISE_CONTROL_TOKEN_FILE", Path.home() / ".config/udise-control/api-token"))
 RUNNER = Path(os.environ.get("UDISE_VPS_RUNNER", Path.home() / ".local/bin/udise-vps"))
-SESSION_TTL = 8 * 60 * 60
+SESSION_TTL = 45 * 60
 REQUEST_TTL = 10 * 60
-ESK_CREDENTIAL_TTL = 8 * 60 * 60
+ESK_CREDENTIAL_TTL = 45 * 60
 RESULT_TTL = 24 * 60 * 60
 
 for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, LOGIN_REQUESTS, ESK_REQUESTS):
@@ -146,9 +147,46 @@ def _load_session(session_id: str) -> dict:
         raise HTTPException(401, "UDISE session expired")
     return data
 
+def _check_portal_session(session_id: str, *, extend: bool = False) -> dict:
+    """Validate the real SDMS session; optionally refresh only the local idle TTL."""
+    import requests
+    p = _session_path(session_id)
+    data = _load_session(session_id)
+    cookie = str(data.get("cookie") or "")
+    cookies = {}
+    for part in cookie.split(";"):
+        name, sep, value = part.strip().partition("=")
+        if sep and name:
+            cookies[name] = value
+    try:
+        r = requests.get(
+            "https://sdms.udiseplus.gov.in/p0/check-session",
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://sdms.udiseplus.gov.in/g0/",
+                "User-Agent": "Mozilla/5.0",
+                "X-XSRF-TOKEN": str(cookies.get("XSRF-TOKEN") or ""),
+                "Cookie": cookie,
+            },
+            timeout=20,
+            allow_redirects=False,
+        )
+    except Exception as exc:
+        raise HTTPException(503, "Could not verify the live UDISE session") from exc
+    if r.status_code != 200:
+        p.unlink(missing_ok=True)
+        raise HTTPException(401, "UDISE portal session is no longer active")
+    now = int(time.time())
+    if extend:
+        data["last_verified_at"] = now
+        data["expires_at"] = now + SESSION_TTL
+        _json_write(p, data)
+    return data
+
 
 class SessionRequestIn(BaseModel):
     return_url: str | None = None
+    session_id: str | None = None
 
 class UdiseLoginSubmitIn(BaseModel):
     username: str
@@ -160,6 +198,7 @@ class EshikshaCredentialIn(BaseModel):
     udise: str
     password: str
     year: str = "2026-27"
+    session_id: str | None = None
 
 
 class JobIn(BaseModel):
@@ -708,14 +747,31 @@ async def session_submit(token: str, request: Request):
 <h2>Session connected</h2><p>You may now return to the UDISE console or WhatsApp workflow.</p></body></html>""")
 
 
+@app.get("/api/v1/sessions/{session_id}/status")
+def session_status(session_id: str, refresh: bool = False, authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    data = _check_portal_session(session_id, extend=refresh)
+    now = int(time.time())
+    return {
+        "active": True,
+        "expires_in": max(0, int(data.get("expires_at", now)) - now),
+        "last_verified_at": int(data.get("last_verified_at") or now),
+        "school_name": data.get("school_name", ""),
+        "udise_code": data.get("udise_code", ""),
+    }
+
+
 @app.post("/api/v1/eshiksha-requests")
 def create_eshiksha_request(body: SessionRequestIn, authorization: str | None = Header(default=None)) -> dict:
     require_api(authorization)
     token = secrets.token_urlsafe(32)
     now = int(time.time())
+    if body.session_id:
+        _load_session(body.session_id)
     _json_write(ESK_REQUESTS / f"{token}.json", {
         "created_at": now, "expires_at": now + REQUEST_TTL,
         "used": False, "ready": False, "return_url": body.return_url or "",
+        "session_id": body.session_id or "",
     })
     base = os.environ.get("UDISE_CONTROL_PUBLIC_BASE", "").rstrip("/")
     return {
@@ -727,15 +783,53 @@ def create_eshiksha_request(body: SessionRequestIn, authorization: str | None = 
 def save_eshiksha_credentials(body: EshikshaCredentialIn, authorization: str | None = Header(default=None)) -> dict:
     require_api(authorization)
     p = _request_file(ESK_REQUESTS, body.token)
-    if not p.exists(): raise HTTPException(404, "eShikshaKosh request not found")
-    data = _json_read(p); now = int(time.time())
-    if data.get("used") or now > int(data.get("expires_at", 0)): raise HTTPException(410, "Link expired or already used")
+    if not p.exists():
+        raise HTTPException(404, "eShikshaKosh request not found")
+    data = _json_read(p)
+    now = int(time.time())
+    if data.get("used") or now > int(data.get("expires_at", 0)):
+        raise HTTPException(410, "Link expired or already used")
     if not body.udise.strip() or not body.password.strip() or not re.fullmatch(r"\d{4}-\d{2}", body.year):
         raise HTTPException(400, "UDISE, password and valid year are required")
-    _json_write(ESK_CREDENTIAL, {"udise": body.udise.strip(), "password": body.password, "year": body.year, "created_at": now, "expires_at": now + ESK_CREDENTIAL_TTL})
+    bound_session = body.session_id or data.get("session_id") or ""
+    session_data = _load_session(bound_session) if bound_session else {}
+    from udise_vps.esk import verify_credentials
+    try:
+        verified = verify_credentials(udise=body.udise.strip(), password=body.password, year=body.year)
+    except Exception as exc:
+        raise HTTPException(401, str(exc)[:500]) from exc
+    expires_at = min(
+        now + ESK_CREDENTIAL_TTL,
+        int(session_data.get("expires_at") or now + ESK_CREDENTIAL_TTL),
+    )
+    _json_write(ESK_CREDENTIAL, {
+        "udise": body.udise.strip(),
+        "password": body.password,
+        "year": body.year,
+        "created_at": now,
+        "expires_at": expires_at,
+        "session_id": bound_session,
+        "verified": True,
+        "school_name": verified.get("school_name", ""),
+        "school_id": verified.get("school_id", ""),
+        "student_count": verified.get("student_count", 0),
+    })
     ESK_UPLOAD.unlink(missing_ok=True)
-    data.update({"used": True, "ready": True, "used_at": now}); _json_write(p, data)
-    return {"ready": True}
+    ESK_UPLOAD_META.unlink(missing_ok=True)
+    data.update({
+        "used": True,
+        "ready": True,
+        "used_at": now,
+        "school_name": verified.get("school_name", ""),
+        "udise": verified.get("udise", body.udise.strip()),
+    })
+    _json_write(p, data)
+    return {
+        "ready": True,
+        "verified": True,
+        "school_name": verified.get("school_name", ""),
+        "udise": verified.get("udise", body.udise.strip()),
+    }
 
 
 @app.get("/api/v1/eshiksha-requests/{token}")
@@ -747,10 +841,26 @@ def eshiksha_request_status(token: str, authorization: str | None = Header(defau
     data = _json_read(p)
     if int(time.time()) > int(data.get("expires_at", 0)):
         raise HTTPException(410, "Expired")
-    credential_available = ESK_CREDENTIAL.exists()
-    return {"ready": bool(data.get("ready")) and credential_available,
-            "credential_available": credential_available,
-            "report_available": ESK_UPLOAD.exists()}
+    credential = _json_read(ESK_CREDENTIAL) if ESK_CREDENTIAL.exists() else {}
+    bound_session = str(data.get("session_id") or "")
+    credential_available = bool(
+        credential
+        and credential.get("verified")
+        and (not bound_session or credential.get("session_id") == bound_session)
+        and int(time.time()) <= int(credential.get("expires_at", 0))
+    )
+    report_meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
+    report_available = ESK_UPLOAD.exists() and (
+        not bound_session or report_meta.get("session_id") in {"", bound_session}
+    )
+    return {
+        "ready": bool(data.get("ready")) and credential_available,
+        "verified": credential_available,
+        "credential_available": credential_available,
+        "report_available": report_available,
+        "school_name": credential.get("school_name", "") if credential_available else "",
+        "udise": credential.get("udise", "") if credential_available else "",
+    }
 
 
 @app.post("/api/v1/eshiksha-upload")
@@ -763,6 +873,7 @@ async def eshiksha_upload(file: UploadFile = File(...), authorization: str | Non
         raise HTTPException(413, "Report is larger than the 20 MB limit")
     ESK_UPLOAD.write_bytes(data)
     os.chmod(ESK_UPLOAD, 0o600)
+    _json_write(ESK_UPLOAD_META, {"created_at": int(time.time()), "session_id": "", "source": "upload"})
     return {"ready": True, "report_available": True}
 
 
@@ -806,24 +917,54 @@ async def eshiksha_submit(token: str, request: Request):
     year = str(form.get("year") or "2026-27").strip()
     if not udise or not password or not re.fullmatch(r"\d{4}-\d{2}", year):
         raise HTTPException(400, "UDISE, password and valid year are required")
+    from udise_vps.esk import verify_credentials
+    try:
+        verified = verify_credentials(udise=udise, password=password, year=year)
+    except Exception as exc:
+        raise HTTPException(401, str(exc)[:500]) from exc
+    bound_session = str(data.get("session_id") or "")
+    session_data = _load_session(bound_session) if bound_session else {}
+    expires_at = min(
+        now + ESK_CREDENTIAL_TTL,
+        int(session_data.get("expires_at") or now + ESK_CREDENTIAL_TTL),
+    )
     _json_write(ESK_CREDENTIAL, {
-        "udise": udise, "password": password, "year": year,
-        "created_at": now, "expires_at": now + ESK_CREDENTIAL_TTL,
+        "udise": udise,
+        "password": password,
+        "year": year,
+        "created_at": now,
+        "expires_at": expires_at,
+        "session_id": bound_session,
+        "verified": True,
+        "school_name": verified.get("school_name", ""),
+        "school_id": verified.get("school_id", ""),
+        "student_count": verified.get("student_count", 0),
     })
-    data.update({"used": True, "ready": True, "used_at": now})
+    data.update({
+        "used": True,
+        "ready": True,
+        "used_at": now,
+        "school_name": verified.get("school_name", ""),
+        "udise": verified.get("udise", udise),
+    })
     _json_write(p, data)
-    return HTMLResponse("""<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">
+    school_name = html.escape(str(verified.get("school_name") or "eShikshaKosh school"))
+    return HTMLResponse(f"""<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="font-family:system-ui;max-width:560px;margin:50px auto;padding:20px;text-align:center">
-<h2>eShikshaKosh connected</h2><p>Close this panel and generate the EP preview workbook.</p></body></html>""")
+<h2>eShikshaKosh connected</h2><p>Login verified for <strong>{school_name}</strong>. Close this panel and return to Enrollment Profile.</p></body></html>""")
 
 
-def _load_eshiksha_credentials() -> dict:
+def _load_eshiksha_credentials(session_id: str | None = None) -> dict:
     if not ESK_CREDENTIAL.exists():
         raise RuntimeError("Connect eShikshaKosh securely before running EP preview")
     data = _json_read(ESK_CREDENTIAL)
     if int(time.time()) > int(data.get("expires_at", 0)):
         ESK_CREDENTIAL.unlink(missing_ok=True)
         raise RuntimeError("eShikshaKosh temporary credentials expired; connect again")
+    if not data.get("verified"):
+        raise RuntimeError("eShikshaKosh login has not been verified")
+    if session_id and data.get("session_id") != session_id:
+        raise RuntimeError("eShikshaKosh belongs to a different UDISE session; connect again")
     if not data.get("udise") or not data.get("password"):
         raise RuntimeError("eShikshaKosh temporary credentials are incomplete")
     return data
@@ -909,6 +1050,7 @@ def _run_job(job_id: str) -> None:
         os.chmod(out_dir, 0o700)
         stage = row["stage"]
         is_preview = bool(row["preview"])
+        eshiksha = None
         cmd = [str(RUNNER), stage, "--school", row["school"], "--out", str(out_dir)]
         if stage == "completion":
             cmd += ["--class", row["class_name"]]
@@ -917,12 +1059,13 @@ def _run_job(job_id: str) -> None:
         elif stage == "ep":
             ep_class = str(row["class_name"] or "").upper()
             if is_preview:
-                if ESK_UPLOAD.exists():
+                report_meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
+                if ESK_UPLOAD.exists() and report_meta.get("session_id") in {"", row["session_id"]}:
                     cmd += ["--class", ep_class, "--report", str(ESK_UPLOAD)]
                 elif ep_class == "X":
                     cmd += ["--class", ep_class]
                 else:
-                    eshiksha = _load_eshiksha_credentials()
+                    eshiksha = _load_eshiksha_credentials(row["session_id"])
                     cmd += ["--class", ep_class, "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
             else:
                 source_dir = JOBS / str(row["approved_from"])
@@ -945,7 +1088,7 @@ def _run_job(job_id: str) -> None:
 
         env = os.environ.copy()
         env["UDISE_COOKIE_HEADER"] = session["cookie"]
-        if stage == "ep" and is_preview and "eshiksha" in locals():
+        if stage == "ep" and is_preview and eshiksha:
             env["ESHIKSHAKOSH_UDISE"] = eshiksha["udise"]
             env["ESHIKSHAKOSH_PASSWORD"] = eshiksha["password"]
         with _db() as conn:
@@ -955,9 +1098,28 @@ def _run_job(job_id: str) -> None:
         if row["class_name"] and stage != "students":
             _event(job_id, f"Scope locked to Class {row['class_name']}; only matching students will be processed.")
 
+        _check_portal_session(row["session_id"], extend=True)
         proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 bufsize=1)
+        heartbeat_stop = threading.Event()
+        heartbeat_state = {"expired": False}
+        def _job_keepalive() -> None:
+            while not heartbeat_stop.wait(180):
+                try:
+                    _check_portal_session(row["session_id"], extend=True)
+                except HTTPException as exc:
+                    if exc.status_code == 401:
+                        heartbeat_state["expired"] = True
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                        break
+                except Exception:
+                    pass
+        heartbeat_thread = threading.Thread(target=_job_keepalive, daemon=True)
+        heartbeat_thread.start()
         report_path = None
         runner_error = None
         assert proc.stdout is not None
@@ -971,7 +1133,10 @@ def _run_job(job_id: str) -> None:
                 _event(job_id, msg)
                 _update_progress(job_id, cur, total)
         code = proc.wait()
+        heartbeat_stop.set()
         if code != 0:
+            if heartbeat_state.get("expired"):
+                raise RuntimeError("UDISE portal session expired during the workflow. No blind retry was attempted.")
             if code == -15:
                 raise RuntimeError("Runner was stopped before completion (SIGTERM); no remaining students were written.")
             raise RuntimeError(runner_error or f"Runner exited with code {code}")
@@ -980,6 +1145,9 @@ def _run_job(job_id: str) -> None:
         else:
             files = sorted(out_dir.glob("*.xlsx"))
             rp = str(files[-1].resolve()) if files else None
+        if stage == "ep" and is_preview and eshiksha:
+            ESK_CREDENTIAL.unlink(missing_ok=True)
+            _event(job_id, "eShikshaKosh source fetched and attached to this EP preview; temporary password discarded.")
         with _db() as conn:
             scoped_total = conn.execute("SELECT progress_total FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
             conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=?,result_path=? WHERE id=?",
@@ -1006,11 +1174,14 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
         raise HTTPException(400, "Unsupported stage")
     if stage["mode"] != "read" and not (stage.get("preview_enabled") and body.preview):
         raise HTTPException(409, "Actual saves require a separately approved write workflow")
-    if body.stage == "ep" and body.preview and not ESK_UPLOAD.exists():
-        try:
-            _load_eshiksha_credentials()
-        except RuntimeError as exc:
-            raise HTTPException(409, str(exc)) from exc
+    if body.stage == "ep" and body.preview and str(body.class_name or "").upper() != "X":
+        report_meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
+        matching_report = ESK_UPLOAD.exists() and report_meta.get("session_id") in {"", body.session_id}
+        if not matching_report:
+            try:
+                _load_eshiksha_credentials(body.session_id)
+            except RuntimeError as exc:
+                raise HTTPException(409, str(exc)) from exc
     if stage.get("requires_class"):
         if not body.class_name or body.class_name not in stage["classes"]:
             raise HTTPException(400, "Select a supported class")
@@ -1340,15 +1511,30 @@ def ep_template(class_name: str = "IX", session_id: str | None = None, school: s
 
 
 @app.get("/api/v1/eshiksha-export")
-def eshiksha_export(class_name: str = "ALL", authorization: str | None = Header(default=None)):
-    """Run the maintained eShikshaKosh exporter without starting a UDISE job."""
+def eshiksha_export(class_name: str = "ALL", session_id: str | None = None, authorization: str | None = Header(default=None)):
+    """Fetch once, attach the workbook to EP, then discard the temporary password."""
     require_api(authorization)
     from udise_vps.esk import export_report
     try:
-        creds = _load_eshiksha_credentials()
+        creds = _load_eshiksha_credentials(session_id)
         out = JOBS / f"eshiksha-download-{uuid.uuid4().hex}"
         out.mkdir(parents=True, exist_ok=True)
-        report = export_report(udise=creds["udise"], password=creds["password"], year=creds.get("year", "2026-27"), output=out / f"eShikshaKosh_OTR_{class_name.upper()}.xlsx")
+        report = export_report(
+            udise=creds["udise"],
+            password=creds["password"],
+            year=creds.get("year", "2026-27"),
+            output=out / f"eShikshaKosh_OTR_{class_name.upper()}.xlsx",
+        )
+        shutil.copy2(report, ESK_UPLOAD)
+        os.chmod(ESK_UPLOAD, 0o600)
+        _json_write(ESK_UPLOAD_META, {
+            "created_at": int(time.time()),
+            "session_id": session_id or creds.get("session_id", ""),
+            "source": "live",
+            "school_name": creds.get("school_name", ""),
+            "udise": creds.get("udise", ""),
+        })
+        ESK_CREDENTIAL.unlink(missing_ok=True)
     except Exception as exc:
         raise HTTPException(502, str(exc)[:1200]) from exc
     return FileResponse(report, filename=f"eShikshaKosh_OTR_{class_name.upper()}.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

@@ -63,7 +63,9 @@ def test_preview_lifecycle_and_write_lock() -> None:
                 return 0
 
         original_popen = api.subprocess.Popen
+        original_check = api._check_portal_session
         api.subprocess.Popen = SyntheticProcess
+        api._check_portal_session = lambda sid, extend=False: api._load_session(sid)
         try:
             authorization = "Bearer synthetic-token"
             capabilities = api.capabilities()
@@ -218,6 +220,7 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert ep_cmd[ep_cmd.index("--max") + 1] == "5"
         finally:
             api.subprocess.Popen = original_popen
+            api._check_portal_session = original_check
 
 
 if __name__ == "__main__":

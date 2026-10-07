@@ -78,8 +78,24 @@ def _():
     assert "weightInKg" in up, up
     h = int(up["heightInCm"])
     w = int(up["weightInKg"])
-    assert 146 <= h <= 160, h
-    assert 42 <= w <= 52, w
+    assert 150 <= h <= 170, h
+    assert 42 <= w <= 60, w
+
+
+
+@check("girls_use_lower_height_and_weight_ranges")
+def _():
+    current = {"heightInCm": 0, "weightInKg": 0}
+    boys = fac.build_facility_updates(current, cwsn=False, rng=random.Random(7), gender=1)
+    girls = fac.build_facility_updates(current, cwsn=False, rng=random.Random(7), gender=2)
+    bh, bw = int(boys["heightInCm"]), int(boys["weightInKg"])
+    gh, gw = int(girls["heightInCm"]), int(girls["weightInKg"])
+    assert 150 <= bh <= 170, bh
+    assert 42 <= bw <= 60, bw
+    assert 146 <= gh <= 166, gh
+    assert 38 <= gw <= 56, gw
+    assert gh < bh, (gh, bh)
+    assert gw < bw, (gw, bw)
 
 
 @check("saved_measurements_are_never_overwritten")

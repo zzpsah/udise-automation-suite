@@ -4,8 +4,8 @@ Ported from the notebook's Facility cells (19-22).
 
 Rules confirmed with the operator:
   - A saved measurement stays. Only blank fields are filled.
-  - Blank height  -> a whole number in 146..160 cm
-  - Blank weight  -> a whole number in 42..52 kg
+  - Boys: blank height -> 150..170 cm; blank weight -> 42..60 kg
+  - Girls: corresponding lower range -> 146..166 cm; 38..56 kg
   - Blank Yes/No  -> No
   - Blank distance -> "Between 1-3 Kms" (code 2)
   - Blank parent education -> "Secondary or Equivalent" (code 3)
@@ -30,10 +30,6 @@ from .constants import (
     FACILITY_DISTANCE,
     FACILITY_EDUCATION,
     FACILITY_YN,
-    GENERATE_HEIGHT_MAX,
-    GENERATE_HEIGHT_MIN,
-    GENERATE_WEIGHT_MAX,
-    GENERATE_WEIGHT_MIN,
     class_scope,
 )
 
@@ -112,7 +108,13 @@ class FacilityResult:
         return self.status == "SUCCESS_CONFIRMED_BY_READBACK"
 
 
-def build_facility_updates(current: dict, cwsn: bool, rng: random.Random) -> dict:
+BOY_HEIGHT_RANGE = (150, 170)
+BOY_WEIGHT_RANGE = (42, 60)
+GIRL_HEIGHT_RANGE = (146, 166)
+GIRL_WEIGHT_RANGE = (38, 56)
+
+
+def build_facility_updates(current: dict, cwsn: bool, rng: random.Random, gender=None) -> dict:
     """Blank-only updates. Saved values are never overwritten."""
     updates: dict = {}
 
@@ -125,10 +127,14 @@ def build_facility_updates(current: dict, cwsn: bool, rng: random.Random) -> dic
             updates[field_name] = 2  # No
 
     # ------------------------------------------------------------- measurements
+    gender_code = str(gender or "").strip().lower()
+    is_female = gender_code in {"2", "2.0", "female", "girl", "f"}
+    height_min, height_max = GIRL_HEIGHT_RANGE if is_female else BOY_HEIGHT_RANGE
+    weight_min, weight_max = GIRL_WEIGHT_RANGE if is_female else BOY_WEIGHT_RANGE
     if is_blank(current.get("heightInCm")):
-        updates["heightInCm"] = str(rng.randint(GENERATE_HEIGHT_MIN, GENERATE_HEIGHT_MAX))
+        updates["heightInCm"] = str(rng.randint(height_min, height_max))
     if is_blank(current.get("weightInKg")):
-        updates["weightInKg"] = str(rng.randint(GENERATE_WEIGHT_MIN, GENERATE_WEIGHT_MAX))
+        updates["weightInKg"] = str(rng.randint(weight_min, weight_max))
 
     # --------------------------------------------------------------- dropdowns
     if is_blank_code(current.get("distanceFrmSchool")):
@@ -238,6 +244,7 @@ def run_facility(
         try:
             general = session.student_detail(sid)
             cwsn = str(general.get("cwsnYN")) == "1"
+            gender = general.get("genderId") or general.get("gender") or general.get("sex")
         except Exception as exc:
             result.status = "READ_ERROR"
             result.detail = f"General Profile unreadable: {type(exc).__name__}"
@@ -258,7 +265,7 @@ def run_facility(
             print(f"⚠️ {pen}: FP read failed — {result.detail}", flush=True)
             continue
 
-        updates = build_facility_updates(current, cwsn, rng)
+        updates = build_facility_updates(current, cwsn, rng, gender=gender)
         if not updates:
             result.status = "SKIPPED_ALREADY_UP_TO_DATE"
             result.detail = "Nothing blank to fill."

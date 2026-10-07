@@ -959,7 +959,7 @@ def test_facility_blank_only_fill():
     assert updates["distanceFrmSchool"] == "2"
     assert updates["parentEducation"] == "3"
     assert updates["olympdsNlc"] == 2
-    assert 42 <= int(updates["weightInKg"]) <= 52, updates["weightInKg"]
+    assert 42 <= int(updates["weightInKg"]) <= 60, updates["weightInKg"]
     print("PASS test_facility_blank_only_fill")
 
 
@@ -969,8 +969,8 @@ def test_facility_generated_ranges():
     for _ in range(50):
         updates = facility.build_facility_updates(
             {"heightInCm": "", "weightInKg": ""}, cwsn=False, rng=rng)
-        assert 146 <= int(updates["heightInCm"]) <= 160, updates["heightInCm"]
-        assert 42 <= int(updates["weightInKg"]) <= 52, updates["weightInKg"]
+        assert 150 <= int(updates["heightInCm"]) <= 170, updates["heightInCm"]
+        assert 42 <= int(updates["weightInKg"]) <= 60, updates["weightInKg"]
     print("PASS test_facility_generated_ranges")
 
 

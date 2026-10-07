@@ -117,3 +117,15 @@ flowchart TD
 - Subject 1–6 cells have dropdown validation using the live UDISE subject catalogue when available, with the verified IX/X subject map as fallback.
 - EP preview output also includes an `Enrollment Profile Review` sheet with Current / Proposed / Effective values.
 - If every EP detail read fails, the workflow fails explicitly instead of reporting success with an empty/invalid review.
+
+## Facility sex-aware measurement defaults — 2026-10-08
+
+When height/weight are blank:
+- male/boy students: height 150–170 cm, weight 42–60 kg;
+- female/girl students: height 146–166 cm, weight 38–56 kg.
+
+The student sex value is read from General Profile. The generator is used only for blank fields; saved measurements remain untouched.
+
+## Session keepalive during workflows
+
+Before a job starts, Oracle verifies the live SDMS session. While the job is running, Oracle checks /p0/check-session every 3 minutes and refreshes the local 45-minute safety window only when that portal check succeeds. If SDMS reports the session inactive, the subprocess is stopped and the job fails safely without a blind write retry.

@@ -99,8 +99,8 @@ def _():
     """The export invokes the bundled script with the right arguments."""
     calls = []
 
-    def fake_run(cmd, capture_output, text, timeout):
-        calls.append(cmd)
+    def fake_run(cmd, capture_output, text, timeout, env=None):
+        calls.append((cmd, env or {}))
         out = Path(cmd[cmd.index("--output") + 1])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("x", encoding="utf-8")
@@ -124,8 +124,11 @@ def _():
                                     year="2026-27", output=out)
             assert got == out, got
             assert out.is_file()
-            cmd = calls[0]
-            assert "--udise" in cmd and "10160203806" in cmd
+            cmd, env = calls[0]
+            assert "--udise" not in cmd
+            assert "--password" not in cmd
+            assert env.get("ESHIKSHAKOSH_USERNAME") == "10160203806"
+            assert env.get("ESHIKSHAKOSH_PASSWORD") == "pw"
             assert "--year" in cmd and "2026-27" in cmd
             assert "--output" in cmd
             assert cmd[0] == str(Path("/verified/venv/bin/python"))
