@@ -11,6 +11,8 @@
 - [ ] Discover the XI EP live form/API contract before any XI write.
 - [ ] Run a one-record reviewed live AUTO GP write test on the maintained baseline.
 - [ ] Live-verify corrected Facility persistence before claiming it verified.
+- [x] Document protected existing Facility Yes values and current IX/X blank measurement ranges (140–160 cm / 38–55 kg boys; 135–155 cm / 34–50 kg girls).
+- [x] Document browser-profile UDISE credential option and its Credential Management API boundary.
 - [ ] Live-verify XI/XII Facility writes separately.
 
 ## Ongoing
