@@ -794,6 +794,65 @@ def test_not_studying_needs_no_exam_result():
     print("PASS test_not_studying_needs_no_exam_result")
 
 
+
+def test_approved_ep_plan_writes_exact_preview_change():
+    """REGRESSION: durable EP writes must consume the approved preview plan.
+
+    The Class X incident could produce eligible preview rows but then skip them
+    during the server-side write because the write worker re-derived eligibility
+    instead of using the exact approved changes.
+    """
+    class FakeSession:
+        school_id = "2497128"
+        students = [{"studentId": "1", "studentCodeNat": "PEN1",
+                     "classId": 10, "studentName": "T"}]
+
+        def __init__(self):
+            self.record = {
+                "admnNumber": None, "enrStatusPY": 4, "examResultPy": 0,
+                "moiId": 4, "subject1": 629, "subject2": 637,
+                "subject3": 401, "subject4": 402, "subject5": 404,
+                "subject6": 612, "academicStream": 0, "classPY": 99,
+                "examMarksPy": 999, "attendancePy": 0,
+                "rollNumber": None, "admnStartDate": "01/01/2026",
+                "rteQuestion": False, "rteAmount": 0,
+            }
+            self.posts = []
+
+        def get_json(self, route, **kw):
+            if "enrolment" in route:
+                return {"status": True, "data": dict(self.record)}
+            raise RuntimeError(route)
+
+        def student_detail(self, sid):
+            return {"minorityId": 7, "studentName": "T",
+                    "fatherName": "F", "dob": "2012-01-01", "uuid": ""}
+
+        def _request(self, method, route, **kw):
+            body = kw.get("json") or {}
+            self.posts.append(body)
+            self.record.update({k: v for k, v in body.items()
+                                if k not in ("schoolId", "studentId")})
+            return 200, {"status": True}
+
+    sess = FakeSession()
+    approved = {
+        "PEN1": {
+            "pen": "PEN1",
+            "student_id": "1",
+            "changes": {"admnNumber": "18/2026"},
+        }
+    }
+    results = ep.run_ep(
+        sess, class_scope_name="X", limit=1,
+        allow_submit=True, max_submissions=1,
+        approved_plan=approved,
+    )
+    assert len(sess.posts) == 1, "approved eligible student must be posted once"
+    assert sess.posts[0]["admnNumber"] == "18/2026", sess.posts[0]
+    assert results[0].status == "SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK", results[0]
+    print("PASS test_approved_ep_plan_writes_exact_preview_change")
+
 def test_ep_payload_preserves_untouched_subjects():
     """Subjects 3-8 must be carried from the current record, not blanked."""
     current = {
