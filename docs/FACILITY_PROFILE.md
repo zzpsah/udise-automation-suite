@@ -85,7 +85,7 @@ The Control API now explicitly passes `--class <selected-class>` for every Full 
 
 ## Durable one-click save transition — 8 October 2026
 
-The write workflow no longer depends on the browser/mobile client to perform the approval transition. For GP, EP, Facility (FP) and Complete Data, the production UI submits `auto_save=true` with the read/preview request. After the preview completes successfully, the Control API creates exactly one bounded write child job (`approved_from=<preview job>`, maximum 500 submissions) and starts it server-side. The preview and write remain separate audit records, and the existing approval endpoint remains available as a recovery/manual path.
+The write workflow no longer depends on the browser/mobile client to perform the approval transition. For GP, EP, Facility (FP) and Complete Data, the production UI submits `auto_save=true` with the read/preview request and a user-selected save limit from 1 to 500. After the preview completes successfully, the Control API creates exactly one bounded write child job (`approved_from=<preview job>`) using that exact selected limit and starts it server-side. The preview and write remain separate audit records, and the existing approval endpoint remains available as a recovery/manual path.
 
 This prevents a phone/browser disconnect, refresh, background suspension, or polling interruption from leaving a completed preview permanently at **Preview only**. The write runner still performs its own fresh pre-write reads, sends only the permitted POSTs, and requires fresh read-back verification. Read-only stages never create a write child. A synthetic regression test verifies the automatic GP preview → write transition and the `--submit --max 500` command; the production web build also passes TypeScript and Next.js compilation.
 
@@ -100,3 +100,8 @@ The current academic-choice page displays a general 'Only GP Form Save is allowe
 Results are timestamped and checkpointed before POST. POST is not automatically retried. Success requires fresh read-back matching all submitted fields; ambiguous or mismatched outcomes stop the loop. Export Errors records unavailable profiles rather than hiding incomplete coverage.
 
 Implementation lives in tools/facility_cells.py and is embedded by tools/release_facility.py into the single maintained notebook. Keep both synchronized. The prior enrollment code is preserved in this release.
+
+
+## Selectable save limit — 8 October 2026
+
+Run & Save restores the operator-controlled processing count: the UI offers 1, 5, 10, 25, 50, 100, 250 or 500 students/records to save. The preview still reads and evaluates the full selected class so eligibility and proposed changes are visible, but the subsequent server-side write child receives the selected `--max` value and cannot exceed it. The selected limit is persisted on the preview job and inherited by the automatic write child, so browser disconnects do not reset it. Default is **1** for safe first-write verification. Manual approval continues to accept its own explicit limit.
