@@ -140,7 +140,7 @@ def finalize(
             print(f"👁️ {pen}: preview — eligible for Complete Data.", flush=True)
             continue
 
-        if submissions >= max_submissions:
+        if max_submissions > 0 and submissions >= max_submissions:
             result.status = "LIMIT_REACHED"
             result.detail = f"FINALIZE_MAX_SUBMISSIONS={max_submissions} reached."
             results.append(result)
