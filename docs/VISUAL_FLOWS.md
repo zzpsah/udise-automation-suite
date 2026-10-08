@@ -85,6 +85,24 @@ flowchart TD
 
 Existing **Yes** values and other saved values are never overwritten.
 
+## Remember UDISE credential
+
+```mermaid
+sequenceDiagram
+    participant U as Operator Browser
+    participant UI as UDISE UI
+    participant C as Chrome Credential Store
+    U->>UI: Enable Remember UDISE password
+    UI->>C: PasswordCredential / navigator.credentials.store
+    C-->>UI: Browser-managed credential result
+    U->>UI: Return to login
+    UI->>C: navigator.credentials.get
+    C-->>UI: Credential when browser permits
+    UI->>UI: Fill username/password
+```
+
+The application does not intentionally persist the password server-side.
+
 ## Deployment
 
 ```mermaid
