@@ -1042,6 +1042,62 @@ def _update_progress(job_id: str, current: int | None, total: int | None) -> Non
                      (current, total, int(time.time()), job_id))
 
 
+def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool = False) -> str:
+    """Build a compact machine-readable final message for the operator UI."""
+    with _db() as conn:
+        rows = conn.execute("SELECT message FROM events WHERE job_id=? ORDER BY id", (job_id,)).fetchall()
+    messages = [str(row["message"] or "") for row in rows]
+    counts: dict[str, int] = {}
+    patterns = {
+        "gp": r"GP(?:_APPROVED)?_RESULT status=([A-Z0-9_]+)",
+        "ep": r"EP(?:_APPROVED)?_RESULT status=([A-Z0-9_]+)",
+        "facility": r"FP_RESULT status=([A-Z0-9_]+)",
+        "finalize": r"FINALIZE_RESULT status=([A-Z0-9_]+)",
+        "snapshot": r"SNAPSHOT_RESULT status=([A-Z0-9_]+)",
+    }
+    pattern = patterns.get(stage)
+    if pattern:
+        for message in messages:
+            match = re.search(pattern, message)
+            if match:
+                status = match.group(1)
+                counts[status] = counts.get(status, 0) + 1
+    labels = {
+        "SUCCESS_CONFIRMED": "Saved + confirmed",
+        "SUCCESS_CONFIRMED_AFTER_POST_ERROR": "Saved + confirmed",
+        "NO_CHANGE": "Skipped",
+        "SKIPPED_ALREADY_UP_TO_DATE": "Skipped",
+        "SKIPPED_CWSN": "Skipped",
+        "SKIPPED_CWSN_UNEXPECTED": "Skipped",
+        "SKIPPED_NOT_IN_APPROVED_PLAN": "Skipped",
+        "SKIPPED_STATE_CHANGED": "Skipped",
+        "LIMIT_REACHED": "Skipped",
+        "MANUAL_REVIEW": "Manual review",
+        "FAILED": "Failed",
+        "UNCONFIRMED": "Not confirmed",
+        "READ_ERROR": "Read error",
+        "CWSN_CONFIRM_REQUIRED": "Confirmation required",
+        "PREVIEW": "Eligible",
+    }
+    grouped: dict[str, int] = {}
+    for status, count in counts.items():
+        label = labels.get(status, status.replace("_", " ").title())
+        grouped[label] = grouped.get(label, 0) + count
+    if awaiting_confirmation:
+        return (
+            "RESULT_TABLE\n"
+            "Status|Count\n"
+            f"Confirmation required|{sum(counts.values())}\n"
+            "Action|Review listed students and confirm CWSN=No"
+        )
+    if not grouped:
+        return "RESULT_TABLE\nStatus|Count\nCompleted|1"
+    lines = ["RESULT_TABLE", "Status|Count"]
+    for label, count in grouped.items():
+        lines.append(f"{label}|{count}")
+    return "\n".join(lines)
+
+
 def _cleanup_expired_results() -> None:
     """Remove private job files after 24 hours while retaining job audit rows."""
     cutoff = int(time.time()) - RESULT_TTL
@@ -1301,11 +1357,7 @@ def _run_job_unlocked(job_id: str) -> None:
         with _db() as conn:
             scoped_total = conn.execute("SELECT progress_total FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
             final_status = "awaiting_confirmation" if cwsn_waiting else "completed"
-            final_message = (
-                "Awaiting confirmation — review CWSN=Yes students before setting CWSN=No and continuing."
-                if cwsn_waiting else
-                "Completed successfully — review saved, skipped/already-filled, and other counts above."
-            )
+            final_message = _result_table_message(job_id, stage, awaiting_confirmation=cwsn_waiting)
             conn.execute("UPDATE jobs SET status=?,updated_at=?,message=?,result_path=? WHERE id=?",
                          (final_status, int(time.time()), final_message, rp, job_id))
         if scoped_total:
