@@ -74,7 +74,9 @@ def _db() -> sqlite3.Connection:
             error TEXT,
             approved_from TEXT,
             approved_at INTEGER,
-            max_submissions INTEGER NOT NULL DEFAULT 0
+            max_submissions INTEGER NOT NULL DEFAULT 0,
+            auto_save INTEGER NOT NULL DEFAULT 0,
+            auto_write_job_id TEXT
         )
     """)
     columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
@@ -82,6 +84,8 @@ def _db() -> sqlite3.Connection:
         ("approved_from", "TEXT"),
         ("approved_at", "INTEGER"),
         ("max_submissions", "INTEGER NOT NULL DEFAULT 0"),
+        ("auto_save", "INTEGER NOT NULL DEFAULT 0"),
+        ("auto_write_job_id", "TEXT"),
     ):
         if name not in columns:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {definition}")
@@ -207,6 +211,7 @@ class JobIn(BaseModel):
     stage: str
     class_name: str | None = None
     preview: bool = True
+    auto_save: bool = False
 
 
 class ApprovalIn(BaseModel):
@@ -1038,6 +1043,54 @@ def _cleanup_expired_results() -> None:
             )
 
 
+def _queue_automatic_write(preview_job_id: str) -> str:
+    """Queue the durable write half of an authorized one-click workflow.
+
+    The browser is not the approval authority. `auto_save` is set only by the
+    production one-click UI; the API records the preview as the parent and
+    creates exactly one bounded write child. The normal approve endpoint remains
+    available as a recovery/manual path.
+    """
+    with _db() as conn:
+        preview = conn.execute("SELECT * FROM jobs WHERE id=?", (preview_job_id,)).fetchone()
+        if not preview:
+            raise RuntimeError("Preview job disappeared before automatic save")
+        if preview["status"] != "completed" or not bool(preview["preview"]):
+            raise RuntimeError("Automatic save requires a completed preview")
+        stage = next((item for item in get_capabilities()["stages"] if item["id"] == preview["stage"]), None)
+        if not stage or stage["mode"] != "write":
+            raise RuntimeError("Automatic save is only available for write workflows")
+        if not preview["result_path"] or not Path(preview["result_path"]).is_file():
+            raise RuntimeError("Preview workbook is unavailable for automatic save")
+        existing = conn.execute(
+            "SELECT id FROM jobs WHERE approved_from=? LIMIT 1", (preview_job_id,)
+        ).fetchone()
+        if existing:
+            return str(existing["id"])
+        if preview["stage"] == "ep" and not list((JOBS / preview_job_id).glob("eShikshaKosh_OTR_*.xlsx")) and str(preview["class_name"]).upper() != "X":
+            raise RuntimeError("eShikshaKosh source is unavailable for automatic EP save; generate a new preview")
+        write_job_id = uuid.uuid4().hex
+        now = int(time.time())
+        conn.execute(
+            """INSERT INTO jobs(
+                   id,created_at,updated_at,status,stage,class_name,school,session_id,
+                   preview,message,approved_from,approved_at,max_submissions,auto_save
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                write_job_id, now, now, "queued", preview["stage"], preview["class_name"],
+                preview["school"], preview["session_id"], 0,
+                "Authorized automatic save queued", preview_job_id, now, 500, 0,
+            ),
+        )
+        conn.execute(
+            "UPDATE jobs SET auto_write_job_id=?,updated_at=? WHERE id=?",
+            (write_job_id, now, preview_job_id),
+        )
+    _event(preview_job_id, "🔐 Preview complete; authorized automatic save queued. Browser connection is no longer required.")
+    threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
+    return write_job_id
+
+
 def _run_job(job_id: str) -> None:
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -1166,6 +1219,13 @@ def _run_job(job_id: str) -> None:
         if scoped_total:
             _update_progress(job_id, scoped_total, scoped_total)
         _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
+        if is_preview and bool(row["auto_save"]):
+            if stage in {"gp", "ep", "facility", "finalize"}:
+                try:
+                    _queue_automatic_write(job_id)
+                except Exception as auto_exc:
+                    safe_auto = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(auto_exc))[:500]
+                    _event(job_id, f"FAILURE · Component: {stage.upper()} Automatic Save · Operation: queue write · Detail: {safe_auto}", "error")
     except Exception as exc:
         safe = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(exc))[:500]
         stage_label = str(row["stage"] or "unknown").upper()
@@ -1217,10 +1277,10 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
     job_id = uuid.uuid4().hex
     now = int(time.time())
     with _db() as conn:
-        conn.execute("""INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message)
-                        VALUES(?,?,?,?,?,?,?,?,?,?)""",
+        conn.execute("""INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,approved_from,approved_at,max_submissions,auto_save)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                      (job_id, now, now, "queued", body.stage, body.class_name, effective_school,
-                      body.session_id, 1, "Queued"))
+                      body.session_id, 1, "Queued", None, None, 0, int(bool(body.auto_save))))
     threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
     return {"job_id": job_id, "status": "queued"}
 

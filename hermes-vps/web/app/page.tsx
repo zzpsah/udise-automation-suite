@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires_class:boolean;description:string;preview_enabled?:boolean;approval_enabled?:boolean};
 type SchoolPreset={internal_id:string;udise_code:string;name:string};
 type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
-type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
+type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;auto_write_job_id?:string;error?:string};events:{id:number;message:string;level:string}[]};
 type EshikshaPreview={ready:boolean;source:string;school_name:string;udise:string;total:number;class_counts:Record<string,number>;preview_limit:number;rows:Array<Record<string,string>>};
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
@@ -74,7 +74,6 @@ export default function Page(){
   const [eshikshaConnectedUdise,setEshikshaConnectedUdise]=useState("");
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<JobState|null>(null);
-  const [autoSavePreview,setAutoSavePreview]=useState(false);
   const [infoStage,setInfoStage]=useState<string|null>(null);
   const [msg,setMsg]=useState("");
 
@@ -270,26 +269,13 @@ export default function Page(){
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
     if(selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
-    setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");setAutoSavePreview(selected?.mode==="write");
+    setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-      session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true
+      session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true,auto_save:selected?.mode==="write"
     })});
     const d=await r.json();
     if(!r.ok){setMsg(clientFailure(selected?.label||stage,"Start preview",d.detail||d.error||"Unknown error"));return}
     setJobId(d.job_id);setMsg("Workflow started.");
-  }
-
-  async function autoApproveWrite(previewJob:JobState){
-    setAutoSavePreview(false);
-    const phrase="SAVE "+previewJob.job.stage.toUpperCase()+" "+(previewJob.job.class_name||"ALL");
-    setMsg("Preview checked. Saving eligible changes…");
-    const r=await fetch(`/api/jobs/${previewJob.job.id}/approve`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-      confirmation:phrase,acknowledge_readback:true,max_submissions:500
-    })});
-    const d=await r.json();
-    if(!r.ok){setMsg(clientFailure(previewJob.job.stage.toUpperCase(),"Approve write",d.detail||d.error||"Unknown error"));return}
-    setJob(null);setJobId(d.job_id);
-    setMsg("Saving to UDISE. Fresh read-back will verify each change.");
   }
 
   useEffect(()=>{
@@ -297,21 +283,21 @@ export default function Page(){
     const poll=async()=>{
       const r=await fetch("/api/jobs/"+jobId,{cache:"no-store"});
       if(!r.ok) return;
-      const d=await r.json();setJob(d);
-      if(d.job.stage==="ep"&&d.job.preview&&["completed","failed"].includes(d.job.status)) setEshikshaReady(false);
-      if(d.job.status==="completed"&&autoSavePreview&&d.job.preview&&d.job.has_result){
-        clearInterval(timer);
-        await autoApproveWrite(d);
-        return;
+      const d=await r.json();
+      setJob(d);
+      if(d.job.stage==="ep"&&["completed","failed"].includes(d.job.status)) setEshikshaReady(false);
+      if(d.job.auto_write_job_id){
+        setMsg("Preview verified. Server-side save is queued; browser connection is no longer required.");
+        if(d.job.auto_write_job_id!==jobId){
+          setJobId(d.job.auto_write_job_id);
+          return;
+        }
       }
-      if(["completed","failed"].includes(d.job.status)){
-        clearInterval(timer);
-        if(d.job.status==="failed") setAutoSavePreview(false);
-      }
+      if(["completed","failed"].includes(d.job.status)) clearInterval(timer);
     };
     const timer=setInterval(poll,1800);poll();
     return ()=>clearInterval(timer);
-  },[jobId,autoSavePreview]);
+  },[jobId]);
 
   const pct=job?.job.progress_total?Math.min(100,Math.round(job.job.progress_current*100/job.job.progress_total)):0;
   return <main>

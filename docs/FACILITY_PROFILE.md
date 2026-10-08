@@ -83,6 +83,12 @@ The Control API previously did not forward the selected class when starting the 
 
 The Control API now explicitly passes `--class <selected-class>` for every Full Snapshot job. A synthetic control-plane regression test verifies that Class IX, X, XI and XII Snapshot jobs reach the runner with the exact selected `--class` value and remain read-only. Snapshot tests pass **2/2**, and the control-plane synthetic lifecycle test passes.
 
+## Durable one-click save transition — 8 October 2026
+
+The write workflow no longer depends on the browser/mobile client to perform the approval transition. For GP, EP, Facility (FP) and Complete Data, the production UI submits `auto_save=true` with the read/preview request. After the preview completes successfully, the Control API creates exactly one bounded write child job (`approved_from=<preview job>`, maximum 500 submissions) and starts it server-side. The preview and write remain separate audit records, and the existing approval endpoint remains available as a recovery/manual path.
+
+This prevents a phone/browser disconnect, refresh, background suspension, or polling interruption from leaving a completed preview permanently at **Preview only**. The write runner still performs its own fresh pre-write reads, sends only the permitted POSTs, and requires fresh read-back verification. Read-only stages never create a write child. A synthetic regression test verifies the automatic GP preview → write transition and the `--submit --max 500` command; the production web build also passes TypeScript and Next.js compilation.
+
 ## Verification and limitations
 
 Seven offline test methods cover exact payload keys, unanswered codes, conditional benefits, non-CWSN exclusion, measurement ranges, read-back normalization and mocked save outcomes (success, timeout then saved, rejection). Enrollment regression and class-selector tests also pass against the new notebook.

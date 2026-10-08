@@ -88,6 +88,43 @@ def test_preview_lifecycle_and_write_lock() -> None:
             else:
                 raise AssertionError("A non-preview write-stage job was accepted")
 
+            auto_queued = api.create_job(
+                api.JobIn(
+                    session_id=session_id,
+                    school="2497128",
+                    stage="gp",
+                    class_name="IX",
+                    preview=True,
+                    auto_save=True,
+                ),
+                authorization=authorization,
+            )
+            deadline = time.time() + 5
+            auto_state = None
+            while time.time() < deadline:
+                auto_state = api.get_job(auto_queued["job_id"], authorization=authorization)
+                if auto_state["job"].get("auto_write_job_id"):
+                    break
+                time.sleep(0.02)
+            assert auto_state is not None
+            assert auto_state["job"]["status"] == "completed", auto_state
+            auto_write_id = auto_state["job"]["auto_write_job_id"]
+            assert auto_write_id
+            deadline = time.time() + 5
+            auto_write_state = None
+            while time.time() < deadline:
+                auto_write_state = api.get_job(auto_write_id, authorization=authorization)
+                if auto_write_state["job"]["status"] in {"completed", "failed"}:
+                    break
+                time.sleep(0.02)
+            assert auto_write_state is not None
+            assert auto_write_state["job"]["status"] == "completed", auto_write_state
+            assert auto_write_state["job"]["preview"] == 0
+            assert auto_write_state["job"]["approved_from"] == auto_queued["job_id"]
+            auto_write_cmd = observed["commands"][-1]
+            assert "--submit" in auto_write_cmd
+            assert auto_write_cmd[auto_write_cmd.index("--max") + 1] == "500"
+
             queued = api.create_job(
                 api.JobIn(
                     session_id=session_id,
