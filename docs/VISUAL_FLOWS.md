@@ -31,21 +31,25 @@ flowchart TD
     I --> J[Workflow selector]
 ```
 
-## Write safety
+## Write safety — durable Preview → Write
 
 ```mermaid
 flowchart TD
-    A[Run & Save] --> B[Preview]
+    A[Run & Save] --> B[Preview Job]
     B --> C[Fresh reads]
     C --> D[Eligible changes]
-    D --> E[Bounded approval]
-    E --> F[Fresh pre-write read]
-    F --> G[POST once]
-    G --> H[Fresh read-back]
-    H --> I{Verified?}
-    I -->|yes| J[Confirmed]
-    I -->|no| K[Stop]
+    D --> E[One typed approval / bounded limit]
+    E --> F[Create Write Child Job]
+    F --> G[Fresh pre-write read]
+    G --> H[POST once per approved record]
+    H --> I[Fresh read-back]
+    I --> J{Persisted?}
+    J -->|yes| K[Confirmed result]
+    J -->|no| L[Stop / Manual Review]
+    X[Browser refresh / disconnect] -. does not cancel .-> F
 ```
+
+The write child is server-durable and independent of browser polling. Read-only stages never create a write child.
 
 ## eShikshaKosh → EP
 
@@ -62,8 +66,35 @@ flowchart LR
     I --> J[Fresh EP read-back]
 ```
 
+## Facility Profile — protected values
+
+```mermaid
+flowchart TD
+    A[Fresh Facility read] --> B{Existing saved value?}
+    B -->|Yes| C[KEEP unchanged]
+    C --> D{Dependent Yes?}
+    D -->|Yes| E[Protect + manual review]
+    B -->|Blank / unanswered| F[Generate permitted default]
+    F --> G[Preview]
+    E --> G
+    G --> H[Bounded approval]
+    H --> I[Fresh pre-write read]
+    I --> J[Write only approved blank fields]
+    J --> K[Fresh read-back]
+```
+
+Existing **Yes** values and other saved values are never overwritten.
+
 ## Deployment
 
+```mermaid
+flowchart LR
+    G[GitHub main] --> O[Oracle clone]
+    G --> V[Vercel Git project]
+    O --> S1[udise-control-api.service]
+    O --> S2[udise-web.service]
+    V --> P[udise-auto.vercel.app]
+    P --> Q[Production build verification]
 ```mermaid
 flowchart LR
     G[GitHub main] --> O[Oracle clone]
