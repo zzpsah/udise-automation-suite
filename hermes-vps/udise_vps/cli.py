@@ -126,10 +126,11 @@ def cmd_ep(args) -> int:
         from . import esk as esk_mod
         print("🔐 Fetching eShikshaKosh OTR report ...", flush=True)
         source_path = out / f"eShikshaKosh_OTR_{session.school_id}_{args.year}.xlsx"
+        class_map = {"IX": "9", "X": "10", "XI": "11", "XII": "12"}
         path = esk_mod.export_report(
             year=args.year,
             output=source_path,
-            class_filter="" if args.klass == "IX and X" else args.klass,
+            class_filter="" if args.klass == "IX and X" else class_map.get(args.klass, args.klass),
         )
         report_rows = ep_mod.read_esk_report(str(path))
         print(f"📄 Fetched and loaded {len(report_rows)} rows from {path}",
