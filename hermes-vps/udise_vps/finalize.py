@@ -35,6 +35,7 @@ class FinalizeResult:
     status: str
     detail: str = ""
     reason: str = ""
+    proposed: dict = field(default_factory=dict)
 
     @property
     def confirmed(self) -> bool:
@@ -64,6 +65,7 @@ def finalize(
     allow_finalize: bool = False,
     max_submissions: int = 1,
     get_attempts: int = 4,
+    approved_plan: dict | None = None,
 ) -> list[FinalizeResult]:
     """Finalize the given PENs after fresh status verification.
 
@@ -81,6 +83,7 @@ def finalize(
 
     results: list[FinalizeResult] = []
     submissions = 0
+    approved_plan = approved_plan or None
 
     if not allow_finalize:
         print("🔒 Preview only — ALLOW_FINALIZE is off. No POST will be sent.", flush=True)
@@ -132,8 +135,25 @@ def finalize(
 
         result.reason = "Fresh read confirms formStatus=3."
 
+        if approved_plan is not None:
+            plan_item = approved_plan.get(pen) or approved_plan.get(sid)
+            if not plan_item:
+                result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
+                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                results.append(result)
+                print(f"📋 FINALIZE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                continue
+            expected = plan_item.get("expected_form_status", 3)
+            if int(before) != int(expected):
+                result.status = "SKIPPED_STATE_CHANGED"
+                result.detail = f"Fresh formStatus={before}; approved preview expected {expected}."
+                results.append(result)
+                print(f"📋 FINALIZE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                continue
+
         if not allow_finalize:
             result.status = "PREVIEW"
+            result.proposed = {"expected_form_status": 3}
             result.detail = "Eligible: fresh formStatus=3."
             results.append(result)
             print(f"📋 FINALIZE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
