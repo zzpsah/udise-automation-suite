@@ -374,7 +374,7 @@ def run_auto_gp(
                 continue
             updates = dict(changes)
             result.changes = updates
-            if submissions >= max_submissions:
+            if max_submissions > 0 and submissions >= max_submissions:
                 result.status = "LIMIT_REACHED"
                 result.detail = "AUTO_GP_MAX_SUBMISSIONS=%s reached." % max_submissions
                 results.append(result)
@@ -468,7 +468,7 @@ def run_auto_gp(
             print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
 
-        if submissions >= max_submissions:
+        if max_submissions > 0 and submissions >= max_submissions:
             result.status = "LIMIT_REACHED"
             result.detail = f"AUTO_GP_MAX_SUBMISSIONS={max_submissions} reached."
             results.append(result)
