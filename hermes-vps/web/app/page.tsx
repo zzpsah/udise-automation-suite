@@ -77,6 +77,7 @@ export default function Page(){
   const [infoStage,setInfoStage]=useState<string|null>(null);
   const [msg,setMsg]=useState("");
   const [saveLimit,setSaveLimit]=useState(1);
+  const [customSaveLimit,setCustomSaveLimit]=useState("");
   const [cwsnConfirmBusy,setCwsnConfirmBusy]=useState(false);
 
   async function loadCaps(){
@@ -288,9 +289,10 @@ export default function Page(){
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
     if(selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
+    if(selected?.mode==="write" && saveLimit===-1){const n=Number.parseInt(customSaveLimit,10);if(!Number.isInteger(n)||n<1||n>10000){setMsg("Enter a custom save limit from 1 to 10000.");return}setSaveLimit(n)}
     setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-      session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true,auto_save:selected?.mode==="write",max_submissions:selected?.mode==="write"?saveLimit:1
+      session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true,auto_save:selected?.mode==="write",max_submissions:selected?.mode==="write"?(saveLimit===-1?Number.parseInt(customSaveLimit,10):saveLimit):1
     })});
     const d=await r.json();
     if(!r.ok){setMsg(clientFailure(selected?.label||stage,"Start preview",d.detail||d.error||"Unknown error"));return}
@@ -306,7 +308,7 @@ export default function Page(){
       setJob(d);
       if(d.job.stage==="ep"&&["completed","failed"].includes(d.job.status)) setEshikshaReady(false);
       if(d.job.auto_write_job_id){
-        const limit=Number(d.job.max_submissions||saveLimit||1); setMsg(`Preview verified. Server-side save is queued for up to ${limit} record(s); browser connection is no longer required.`);
+        const limit=Number(d.job.max_submissions); setMsg(`Preview verified. Server-side save is queued for ${limit===0?"all eligible":`up to ${limit}`} record(s); browser connection is no longer required.`);
         if(d.job.auto_write_job_id!==jobId){
           setJobId(d.job.auto_write_job_id);
           return;
@@ -406,7 +408,7 @@ export default function Page(){
                 <a className="source-link" href={`/api/ep-template?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}&school=${encodeURIComponent(school)}`}>Download EP template</a>
               </div>
             </div>}
-            {selected.mode==="write"?<><div className="save-limit-control"><label><strong>Students to save</strong><select value={saveLimit} onChange={e=>setSaveLimit(Number(e.target.value))}>{[1,5,10,25,50,100,250,500].map(n=><option key={n} value={n}>{n} student{n===1?"":"s"}</option>)}</select></label><small>Preview checks the full selected class. After preview, the server will save at most the selected number of eligible records.</small></div><div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?(eshikshaReady||eshikshaReportReady?" eShikshaKosh is used as the EP source.":klass==="X"?" Class X can use UDISE current values and built-in EP rules without eShikshaKosh.":""):""}</span></div></div></>:<p>{selected.description}</p>}
+            {selected.mode==="write"?<><div className="save-limit-control"><label><strong>Students to save</strong><select value={saveLimit} onChange={e=>setSaveLimit(Number(e.target.value))}><option value={0}>All students</option><option value={1}>1 student</option><option value={5}>5 students</option><option value={10}>10 students</option><option value={-1}>Custom</option></select></label>{saveLimit===-1&&<label className="custom-save-limit"><span>Custom number</span><input type="number" min="1" max="10000" step="1" inputMode="numeric" value={customSaveLimit} onChange={e=>setCustomSaveLimit(e.target.value)} placeholder="e.g. 100, 200, 1000"/></label>}<small>Preview checks the full selected class. After preview, the server saves at most the selected number of eligible records. “All students” means no save limit.</small></div><div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?(eshikshaReady||eshikshaReportReady?" eShikshaKosh is used as the EP source.":klass==="X"?" Class X can use UDISE current values and built-in EP rules without eShikshaKosh.":""):""}</span></div></div></>:<p>{selected.description}</p>}
           </div>}
 
           <div className="run-row">
@@ -427,7 +429,7 @@ export default function Page(){
             <span>Students with CWSN=Yes are listed below with PEN, Name and Father&apos;s Name. Verify them before confirming. The system will set CWSN=No, save each record, and perform a fresh read-back verification.</span>
             <button type="button" className="run-button" onClick={confirmCwsn} disabled={cwsnConfirmBusy}>{cwsnConfirmBusy?"Confirming…":"Confirm CWSN = No & Continue"}</button>
           </div>}
-          <ul className="events" aria-live="polite">{job.events.slice(-12).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{e.message}</li>)}</ul>
+          <ul className="events" aria-live="polite">{job.events.slice(-12).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{String(e.message||"").replace(/^LIVE\s*[·•:-]\s*/i,"")}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}
