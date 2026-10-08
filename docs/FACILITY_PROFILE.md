@@ -81,7 +81,7 @@ The implementation is in `hermes-vps/udise_vps/facility.py`; the focused regress
 
 The Control API previously did not forward the selected class when starting the `snapshot` stage. This allowed the snapshot runner to use its default scope instead of the class selected in the portal UI; in particular, a requested Class X snapshot could run against Class IX/default scope.
 
-The Control API now explicitly passes `--class <selected-class>` for every Full Snapshot job. A synthetic control-plane regression test verifies that a Class X Snapshot job reaches the runner with `--class X` and remains read-only. Snapshot tests pass **2/2**, and the control-plane synthetic lifecycle test passes.
+The Control API now explicitly passes `--class <selected-class>` for every Full Snapshot job. A synthetic control-plane regression test verifies that Class IX, X, XI and XII Snapshot jobs reach the runner with the exact selected `--class` value and remain read-only. Snapshot tests pass **2/2**, and the control-plane synthetic lifecycle test passes.
 
 ## Verification and limitations
 
