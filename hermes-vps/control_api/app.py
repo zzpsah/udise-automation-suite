@@ -51,6 +51,10 @@ for p in (STATE, RUNTIME, JOBS, SESSIONS, REQUESTS, LOGIN_REQUESTS, ESK_REQUESTS
 
 app = FastAPI(title="UDISE Hermes Control API", version="0.2.0")
 LOGIN_BROWSERS: dict[str, dict[str, Any]] = {}
+# Serialize workflows that use the same authenticated UDISE session. The portal
+# session is shared, so concurrent runners can invalidate/race each other.
+_SESSION_JOB_LOCKS: dict[str, threading.Lock] = {}
+_SESSION_JOB_LOCKS_GUARD = threading.Lock()
 
 
 def _db() -> sqlite3.Connection:
@@ -1104,7 +1108,7 @@ def _queue_automatic_write(preview_job_id: str) -> str:
     return write_job_id
 
 
-def _run_job(job_id: str) -> None:
+def _run_job_unlocked(job_id: str) -> None:
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not row:
@@ -1211,8 +1215,14 @@ def _run_job(job_id: str) -> None:
         heartbeat_thread.start()
         report_path = None
         runner_error = None
+        runner_tail: list[str] = []
         assert proc.stdout is not None
         for raw in proc.stdout:
+            clean_raw = raw.strip()
+            if clean_raw:
+                runner_tail.append(clean_raw)
+                if len(runner_tail) > 20:
+                    runner_tail.pop(0)
             if raw.startswith("REPORT_READY="):
                 report_path = raw.split("=", 1)[1].strip()
             if raw.strip().startswith("ERROR:"):
@@ -1228,7 +1238,12 @@ def _run_job(job_id: str) -> None:
                 raise RuntimeError("UDISE portal session expired during the workflow. No blind retry was attempted.")
             if code == -15:
                 raise RuntimeError("Runner was stopped before completion (SIGTERM); no remaining students were written.")
-            raise RuntimeError(runner_error or f"Runner exited with code {code}")
+            if runner_error:
+                raise RuntimeError(runner_error)
+            tail = " | ".join(runner_tail[-8:])
+            tail = re.sub(r"(?:Bearer\s+)[A-Za-z0-9._-]+", "Bearer [redacted]", tail)
+            tail = re.sub(r"[A-Za-z0-9_-]{32,}", "[redacted]", tail)[:1200]
+            raise RuntimeError(f"Runner exited with code {code}" + (f"; last output: {tail}" if tail else ""))
         if report_path and Path(report_path).is_file():
             rp = str(Path(report_path).resolve())
         else:
@@ -1324,6 +1339,23 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
 
 def _approval_phrase(stage: str, class_name: str | None) -> str:
     return f"SAVE {stage.upper()} {class_name or 'ALL'}"
+
+
+def _run_job(job_id: str) -> None:
+    """Run one workflow at a time per authenticated UDISE session."""
+    with _SESSION_JOB_LOCKS_GUARD:
+        lock = _SESSION_JOB_LOCKS.setdefault(str(job_id and _job_session_id(job_id)), threading.Lock())
+    lock.acquire()
+    try:
+        _run_job_unlocked(job_id)
+    finally:
+        lock.release()
+
+
+def _job_session_id(job_id: str) -> str:
+    with _db() as conn:
+        row = conn.execute("SELECT session_id FROM jobs WHERE id=?", (job_id,)).fetchone()
+    return str(row[0]) if row else str(job_id)
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")
