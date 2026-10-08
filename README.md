@@ -1,7 +1,7 @@
 # UDISE Automation Suite
 
 
-## Current production architecture — 7 October 2026
+## Current production architecture — 8 October 2026
 
 > **Current production is the Vercel + Oracle control-plane implementation under `hermes-vps/`.**
 >
@@ -14,6 +14,29 @@ Current path:
 `Vercel UI → Oracle control API → Playwright Students Module login → authenticated runtime session → udise_vps runner → SDMS APIs`
 
 After login the UI is designed to show **Students Module connected**, school name, UDISE code and a live session countdown before Class + Workflow controls.
+
+### Production write model — 8 October 2026
+
+For write-capable workflows (**GP, EP, Facility/FP, Complete Data**), **Run & Save is now server-durable**. The UI requests a preview with `auto_save=true`; after a successful preview, the Oracle Control API creates exactly one bounded write child job (maximum 500 submissions) and runs it server-side. A browser refresh, background suspension, or disconnect therefore does not cancel the Preview → Write transition.
+
+The write child still performs its own fresh pre-write read, sends only permitted POSTs, and requires fresh read-back verification. Read-only stages (**Students, Full Snapshot, Completion Overview**) never create a write child. The manual approval endpoint remains available as a recovery path.
+
+The current production class/write capability boundary is:
+
+| Workflow | Classes | Mode |
+|---|---|---|
+| Student Roster | IX–XII | Read |
+| Full Snapshot | IX–XII | Read, class-scoped |
+| General Profile | IX–XII | Write |
+| Enrollment Profile | IX–X | Write |
+| Facility Profile | IX–XII | Write |
+| Completion Overview | IX–XII | Read |
+| Complete Data / Finalize | IX–XII | Write |
+
+EP XI/XII is intentionally excluded until the portal's stream/subject mapping is independently discovered and verified; this is a portal contract limitation, not a disabled write permission.
+
+A Full Snapshot class-selection regression is also fixed: the Control API now forwards the selected `--class` to the runner, so a Class X request cannot silently fall back to the Class IX/default scope.
+
 
 ### AI / developer start here
 
@@ -110,7 +133,7 @@ The maintained Enrollment workflow remains **IX/X**. XI/XII enrollment requires 
 
 ### Facility Profile
 
-The notebook now exposes IX–XII class scopes. Historical route/payload discovery was performed on the IX/X workflow. **XI/XII Facility writes are not yet live-verified.** Actual height/weight measurements must be used; never invent values.
+The notebook now exposes IX–XII class scopes. The maintained server runner uses these blank-only generation ranges for IX/X: boys 140–155 cm and 38–52 kg; girls 135–150 cm and 34–48 kg. XI/XII retains the previous ranges. Existing saved measurements are never overwritten. **XI/XII Facility writes are not yet live-verified.** Actual measured values remain the authoritative input; generated values are only workflow defaults for unset fields.
 
 ### Completion Overview
 
@@ -141,9 +164,10 @@ Do not confuse these evidence types:
 
 Current important limits:
 
-- AUTO GP behavior is implemented but has not yet had a new live write test in this v2.7.3 baseline.
-- Corrected Facility POST behavior has historical source/offline evidence; live acceptance remains unverified.
-- XI/XII Facility selector support is present but XI/XII writes are unverified.
+- AUTO GP behavior is implemented and its durable Preview → Write transition is covered by synthetic Control API tests; this does not by itself constitute a new live GP write test.
+- Facility IX/X measurement generation is live in the server runner for blank fields only; the requested IX/X ranges are 140–155 cm / 38–52 kg for boys and 135–150 cm / 34–48 kg for girls. Existing saved values are never overwritten.
+- Facility live write acceptance remains a separate verification boundary; XI/XII Facility writes remain unverified.
+- Full Snapshot is class-scoped end-to-end; the selected IX/X/XI/XII class is forwarded explicitly to the runner.
 - Enrollment remains IX/X only.
 - Finalize status 3 → 6 has live proof.
 
