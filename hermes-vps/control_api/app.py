@@ -212,6 +212,7 @@ class JobIn(BaseModel):
     class_name: str | None = None
     preview: bool = True
     auto_save: bool = False
+    max_submissions: int = Field(default=1, ge=1, le=500)
 
 
 class ApprovalIn(BaseModel):
@@ -1079,7 +1080,7 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             (
                 write_job_id, now, now, "queued", preview["stage"], preview["class_name"],
                 preview["school"], preview["session_id"], 0,
-                "Authorized automatic save queued", preview_job_id, now, 500, 0,
+                "Authorized automatic save queued", preview_job_id, now, int(preview["max_submissions"] or 1), 0,
             ),
         )
         conn.execute(
@@ -1280,7 +1281,7 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
         conn.execute("""INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,approved_from,approved_at,max_submissions,auto_save)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                      (job_id, now, now, "queued", body.stage, body.class_name, effective_school,
-                      body.session_id, 1, "Queued", None, None, 0, int(bool(body.auto_save))))
+                      body.session_id, 1, "Queued", None, None, int(body.max_submissions), int(bool(body.auto_save))))
     threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
     return {"job_id": job_id, "status": "queued"}
 
