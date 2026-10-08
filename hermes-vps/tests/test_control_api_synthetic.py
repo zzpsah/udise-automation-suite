@@ -131,6 +131,8 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert auto_write_state["job"]["approved_from"] == auto_queued["job_id"]
             auto_write_cmd = observed["commands"][-1]
             assert "--submit" in auto_write_cmd
+            assert "--plan" in auto_write_cmd
+            assert Path(auto_write_cmd[auto_write_cmd.index("--plan") + 1]).is_file()
             assert auto_write_cmd[auto_write_cmd.index("--max") + 1] == "7"
 
             queued = api.create_job(
@@ -205,6 +207,8 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert write_state["job"]["approved_from"] == queued["job_id"]
             write_cmd = observed["commands"][-1]
             assert "--submit" in write_cmd
+            assert "--plan" in write_cmd
+            assert Path(write_cmd[write_cmd.index("--plan") + 1]).is_file()
             assert write_cmd[write_cmd.index("--max") + 1] == "1"
 
             try:
