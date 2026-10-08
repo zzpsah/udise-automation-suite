@@ -1,5 +1,7 @@
 # UDISE Students Module Login Flow
 
+Last updated: **2026-10-08**
+
 Last updated: **2026-10-07**
 
 ## Bootstrap
@@ -65,3 +67,10 @@ Portal may expire earlier, so workflow requests must still handle auth rejection
 ## Fallback
 
 `Advanced / fallback login → Use existing browser session`
+
+
+## Remember UDISE password
+
+The login page provides **Remember UDISE password on this Chrome profile**. When the browser supports the Credential Management API, the UI stores/retrieves the credential through `PasswordCredential` / `navigator.credentials`. This is browser-profile credential storage, not an application-side password database.
+
+The option does not bypass UDISE CAPTCHA or session authentication. On a successful login the password is cleared from React state after the optional browser credential-store call. Browser/Chrome policy may still prevent storage.
