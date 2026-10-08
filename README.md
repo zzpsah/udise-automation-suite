@@ -23,6 +23,16 @@ The write child still performs its own fresh pre-write read, sends only permitte
 
 The current production class/write capability boundary is:
 
+### Facility Profile protected-value rule
+
+Facility automation is **blank-only**. Existing saved values are preserved. In particular, an existing **Yes** in a Facility Yes/No field is never changed to No; it remains protected and is reported for manual review when it conflicts with a proposed dependent state.
+
+For Classes IX–X, the current operator-approved blank measurement defaults are:
+- Boys: **140–160 cm / 38–55 kg**
+- Girls: **135–155 cm / 34–50 kg**
+
+Girls' ranges are intentionally lower than the corresponding boys' ranges. These are workflow defaults for unset fields, not a substitute for actual measured values. XI–XII retains **150–170 cm / 42–60 kg** for boys and **146–166 cm / 38–56 kg** for girls.
+
 | Workflow | Classes | Mode |
 |---|---|---|
 | Student Roster | IX–XII | Read |
@@ -98,7 +108,7 @@ Normal notebook flow:
 
 `Setup environment → Login → choose module → preview/validate → explicitly enable write → fresh read-back`
 
-Login authenticates the runtime, detects the school, and fetches the current roster. Credentials/cookies remain runtime-only.
+Login authenticates the runtime, detects the school, and fetches the current roster. Credentials/cookies remain runtime-only. The optional **Remember UDISE password on this Chrome profile** control uses the browser Credential Management API (`PasswordCredential`) when supported; the application does not intentionally persist the password server-side. Browser/Chrome policy ultimately controls whether the credential can be stored.
 
 ## Modules
 
@@ -133,7 +143,7 @@ The maintained Enrollment workflow remains **IX/X**. XI/XII enrollment requires 
 
 ### Facility Profile
 
-The notebook now exposes IX–XII class scopes. The maintained server runner uses these blank-only generation ranges for IX/X: boys 140–155 cm and 38–52 kg; girls 135–150 cm and 34–48 kg. XI/XII retains the previous ranges. Existing saved measurements are never overwritten. **XI/XII Facility writes are not yet live-verified.** Actual measured values remain the authoritative input; generated values are only workflow defaults for unset fields.
+The notebook now exposes IX–XII class scopes. The maintained server runner uses these blank-only generation ranges for IX/X: boys 140–160 cm and 38–55 kg; girls 135–155 cm and 34–50 kg. Existing saved values, including existing Yes values, are never overwritten. XI/XII retains the previous ranges. Existing saved measurements are never overwritten. **XI/XII Facility writes are not yet live-verified.** Actual measured values remain the authoritative input; generated values are only workflow defaults for unset fields.
 
 ### Completion Overview
 
@@ -165,7 +175,7 @@ Do not confuse these evidence types:
 Current important limits:
 
 - AUTO GP behavior is implemented and its durable Preview → Write transition is covered by synthetic Control API tests; this does not by itself constitute a new live GP write test.
-- Facility IX/X measurement generation is live in the server runner for blank fields only; the requested IX/X ranges are 140–155 cm / 38–52 kg for boys and 135–150 cm / 34–48 kg for girls. Existing saved values are never overwritten.
+- Facility IX/X measurement generation is implemented in the server runner for blank fields only: 140–160 cm / 38–55 kg for boys and 135–155 cm / 34–50 kg for girls. Existing saved values, including Yes values, are never overwritten. Live write acceptance remains a separate verification boundary.
 - Facility live write acceptance remains a separate verification boundary; XI/XII Facility writes remain unverified.
 - Full Snapshot is class-scoped end-to-end; the selected IX/X/XI/XII class is forwarded explicitly to the runner.
 - Enrollment remains IX/X only.
