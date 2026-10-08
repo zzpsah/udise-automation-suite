@@ -1524,6 +1524,7 @@ def eshiksha_export(class_name: str = "ALL", session_id: str | None = None, auth
             password=creds["password"],
             year=creds.get("year", "2026-27"),
             output=out / f"eShikshaKosh_OTR_{class_name.upper()}.xlsx",
+            class_filter="" if class_name.upper() == "IX AND X" else class_name.upper(),
         )
         shutil.copy2(report, ESK_UPLOAD)
         os.chmod(ESK_UPLOAD, 0o600)

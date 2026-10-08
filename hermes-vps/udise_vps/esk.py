@@ -98,6 +98,9 @@ def export_report(
     year: str = "2026-27",
     output: str | os.PathLike | None = None,
     timeout: int = 900,
+    class_filter: str = "",
+    section_filter: str = "",
+    stream_filter: str = "",
 ) -> Path:
     """Log in to eShikshaKosh and export the OTR report workbook.
 
@@ -137,6 +140,12 @@ def export_report(
 
     python = find_fetch_python(script)
     cmd = [str(python), str(script), "--year", year, "--output", str(out)]
+    if class_filter:
+        cmd += ["--class", str(class_filter)]
+    if section_filter:
+        cmd += ["--section", str(section_filter)]
+    if stream_filter:
+        cmd += ["--stream", str(stream_filter)]
     env = os.environ.copy()
     env["ESHIKSHAKOSH_USERNAME"] = udise
     env["ESHIKSHAKOSH_PASSWORD"] = password
