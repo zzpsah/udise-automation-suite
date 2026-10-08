@@ -307,7 +307,7 @@ export default function Page(){
     const ok=window.confirm("Confirm CWSN = No for every listed student? The system will set CWSN to No and then save and fresh-read each record.");
     if(!ok) return;
     setCwsnConfirmBusy(true);
-    setMsg("CWSN confirmation received. Queuing verified GP saves…");
+    setMsg("CWSN confirmation received. Starting verified GP saves…");
     const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/confirm-cwsn",{method:"POST"});
     const d=await r.json().catch(()=>({}));
     setCwsnConfirmBusy(false);
@@ -447,14 +447,14 @@ export default function Page(){
           </div>}
 
           <div className="run-row">
-            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>{job&&["running","queued","awaiting_confirmation"].includes(job.job.status)&&<button type="button" className="secondary-button" onClick={cancelJob}>Cancel</button>}
+            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>{job&&["running","awaiting_confirmation"].includes(job.job.status)&&<button type="button" className="secondary-button" onClick={cancelJob}>Cancel</button>}
           </div>
         </section>
         </>}
       </div>
 
       <aside className="card output-card">
-        <div className="output-title"><div><span className="eyebrow">ACTIVITY &amp; RESULT</span><h2>{job?"Workflow progress":"Ready to begin"}</h2></div>{job&&<span className="badge">{job.job.status==="running"?"Running":job.job.status==="awaiting_confirmation"?"Awaiting confirmation":job.job.status==="cancelled"?"Cancelled":job.job.status}</span>}</div>
+        <div className="output-title"><div><span className="eyebrow">ACTIVITY &amp; RESULT</span><h2>{job?"Workflow progress":"Ready to begin"}</h2></div>{job&&<span className="badge">{job.job.status==="running"?"Running":job.job.status==="awaiting_confirmation"?"Awaiting confirmation":job.job.status==="cancelled"?"Cancelled":job.job.status==="queued"?"Starting":job.job.status}</span>}</div>
         {!job&&<div className="empty-output"><span className="status-mark">STATUS</span><strong>{msg||"Connect UDISE and choose a workflow."}</strong><p>Progress and downloadable results will appear here.</p></div>}
         {job&&<div className="job-output">
           {String(job.job.message||msg).startsWith("RESULT_TABLE") ? (()=>{const rows=String(job.job.message||"").split("\n").slice(1).filter(Boolean).map(x=>x.split("|")); return <table className="result-table"><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=>i===0?<th key={j}>{c}</th>:<td key={j}>{c}</td>)}</tr>)}</tbody></table>})() : <div className="friendly-message">{job.job.message||msg}</div>}
