@@ -324,8 +324,27 @@ def run_facility(
         if approved_plan is not None:
             plan_item = approved_plan.get(pen) or approved_plan.get(sid)
             if not plan_item:
+                # "Not in approved plan" is an internal write-safety state, not
+                # an operator-useful explanation. Re-evaluate the current live
+                # record with the same eligibility rules so the result tells the
+                # operator whether the student is actually complete or whether
+                # the saved preview is stale/missing this student.
+                fresh_eligible = build_facility_updates(
+                    current, cwsn, rng, gender=gender, class_label=class_label
+                )
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
-                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                if fresh_eligible:
+                    fields = ", ".join(sorted(fresh_eligible))
+                    result.detail = (
+                        "Current FP still has eligible blank/unanswered field(s): "
+                        f"{fields}. Student was not included in the saved preview plan; "
+                        "refresh Preview before Save. No POST sent."
+                    )
+                else:
+                    result.detail = (
+                        "Current FP has no eligible blank/unanswered fields. "
+                        "Nothing to save; no POST sent."
+                    )
                 results.append(result)
                 print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
