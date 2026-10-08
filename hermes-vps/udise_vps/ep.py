@@ -1106,7 +1106,7 @@ def run_ep(
                 continue
             updates = dict(changes)
             result.changes = updates
-            if submissions >= max_submissions:
+            if max_submissions > 0 and submissions >= max_submissions:
                 result.status = "LIMIT_REACHED"
                 result.detail = "max submissions (%s) reached." % max_submissions
                 results.append(result)
@@ -1322,7 +1322,7 @@ def run_ep(
             )
             continue
 
-        if submissions >= max_submissions:
+        if max_submissions > 0 and submissions >= max_submissions:
             result.status = "LIMIT_REACHED"
             result.detail = f"max submissions ({max_submissions}) reached."
             results.append(result)
