@@ -1519,13 +1519,14 @@ def eshiksha_export(class_name: str = "ALL", session_id: str | None = None, auth
         creds = _load_eshiksha_credentials(session_id)
         out = JOBS / f"eshiksha-download-{uuid.uuid4().hex}"
         out.mkdir(parents=True, exist_ok=True)
-        class_map = {"IX": "9", "X": "10", "XI": "11", "XII": "12"}
+        # eShikshaKosh is the single source of truth for the OTR data.
+        # Fetch the complete school roster once; the selected UDISE class is
+        # applied later by the EP matcher against this workbook.
         report = export_report(
             udise=creds["udise"],
             password=creds["password"],
             year=creds.get("year", "2026-27"),
-            output=out / f"eShikshaKosh_OTR_{class_name.upper()}.xlsx",
-            class_filter="" if class_name.upper() == "IX AND X" else class_map.get(class_name.upper(), class_name.upper()),
+            output=out / "eShikshaKosh_OTR_ALL.xlsx",
         )
         shutil.copy2(report, ESK_UPLOAD)
         os.chmod(ESK_UPLOAD, 0o600)
@@ -1539,4 +1540,4 @@ def eshiksha_export(class_name: str = "ALL", session_id: str | None = None, auth
         ESK_CREDENTIAL.unlink(missing_ok=True)
     except Exception as exc:
         raise HTTPException(502, str(exc)[:1200]) from exc
-    return FileResponse(report, filename=f"eShikshaKosh_OTR_{class_name.upper()}.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return FileResponse(report, filename="eShikshaKosh_OTR_ALL.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

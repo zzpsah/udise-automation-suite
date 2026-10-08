@@ -214,7 +214,7 @@ export default function Page(){
       setMsg("Connect eShikshaKosh first, then fetch the source report.");
       return;
     }
-    setMsg("Fetching the latest eShikshaKosh source report…");
+    setMsg("Fetching the complete eShikshaKosh OTR report…");
     const r=await fetch(`/api/eshiksha-export?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}`,{cache:"no-store"});
     if(!r.ok){
       let detail="eShikshaKosh report fetch failed.";
@@ -233,11 +233,11 @@ export default function Page(){
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url;
-    a.download=`eShikshaKosh_EP_Source_${klass}.xlsx`;
+    a.download=`eShikshaKosh_OTR_ALL.xlsx`;
     document.body.appendChild(a);a.click();a.remove();
     URL.revokeObjectURL(url);
     setEshikshaReportReady(true);setEshikshaReady(false);
-    setMsg("eShikshaKosh source fetched and attached to Enrollment Profile. Temporary password discarded.");
+    setMsg("Complete eShikshaKosh OTR report fetched and attached to Enrollment Profile. UDISE class matching will use this single source. Temporary password discarded.");
   }
 
   useEffect(()=>{
