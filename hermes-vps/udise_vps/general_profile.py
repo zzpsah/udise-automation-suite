@@ -284,6 +284,7 @@ def run_auto_gp(
     allow_submit: bool = False,
     max_submissions: int = 1,
     get_attempts: int = 2,
+    approved_plan: dict | None = None,
 ) -> list[GpResult]:
     """Preview (and optionally submit) AUTO GP blank defaults.
 
@@ -330,6 +331,62 @@ def run_auto_gp(
             result.detail = f"{type(exc).__name__}: {exc}"
             results.append(result)
             print(f"⚠️ {pen}: read failed — {result.detail}", flush=True)
+            continue
+
+        # ------------------------------------------------ approved plan
+        if approved_plan is not None:
+            plan = approved_plan.get(pen) or approved_plan.get(sid)
+            changes = plan.get("changes") if isinstance(plan, dict) else None
+            if not isinstance(changes, dict) or not changes:
+                result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
+                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                results.append(result)
+                continue
+            conflicts = [f for f, v in changes.items() if not is_blank(fresh.get(f)) and str(fresh.get(f)) != str(v)]
+            if conflicts:
+                result.status = "SKIPPED_STATE_CHANGED"
+                result.detail = "Live GP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
+                results.append(result)
+                continue
+            updates = dict(changes)
+            result.changes = updates
+            if submissions >= max_submissions:
+                result.status = "LIMIT_REACHED"
+                result.detail = "AUTO_GP_MAX_SUBMISSIONS=%s reached." % max_submissions
+                results.append(result)
+                continue
+            payload = build_gp_payload(fresh, updates)
+            try:
+                status_code, body = session.post_once("/p0/api/cy/students/%s" % sid, json_body=payload)
+                if status_code != 200 or body.get("status") is not True:
+                    result.status = "FAILED"
+                    result.detail = "HTTP %s; %s" % (status_code, body.get("message") or body.get("error") or "rejected")
+                    results.append(result)
+                    break
+            except Exception as exc:
+                result.status = "UNCONFIRMED"
+                result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
+                results.append(result)
+                break
+            submissions += 1
+            time.sleep(2)
+            try:
+                verify = session.student_detail(sid)
+            except Exception as exc:
+                result.status = "UNCONFIRMED"
+                result.detail = "Read-back failed: %s: %s" % (type(exc).__name__, exc)
+                results.append(result)
+                break
+            mismatches = read_back_matches(verify, updates)
+            if mismatches:
+                result.status = "UNCONFIRMED"
+                result.detail = "Fresh GP does not confirm: " + ", ".join(mismatches) + "."
+                results.append(result)
+                break
+            result.read_back = "All approved fields confirmed"
+            result.status = "SUCCESS_CONFIRMED"
+            result.detail = "Approved preview values saved and confirmed by fresh GP read-back."
+            results.append(result)
             continue
 
         # ---------------------------------------------------------- CWSN safety
