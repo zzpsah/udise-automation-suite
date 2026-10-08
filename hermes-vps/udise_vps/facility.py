@@ -219,6 +219,7 @@ def run_facility(
     allow_submit: bool = False,
     max_submissions: int = 1,
     seed: int | None = None,
+    approved_plan: dict | None = None,
 ) -> list[FacilityResult]:
     """Preview (and optionally submit) Facility blank-only fills."""
     classes = class_scope(class_scope_name)
@@ -243,6 +244,7 @@ def run_facility(
 
     rng = random.Random(seed)
     results: list[FacilityResult] = []
+    approved_plan = approved_plan or None
     submissions = 0
 
     for position, student in enumerate(selected, 1):
@@ -281,9 +283,31 @@ def run_facility(
             print(f"⚠️ {pen}: FP read failed — {result.detail}", flush=True)
             continue
 
-        updates = build_facility_updates(
-            current, cwsn, rng, gender=gender, class_label=class_label
-        )
+        plan_item = None
+        if approved_plan is not None:
+            plan_item = approved_plan.get(pen) or approved_plan.get(sid)
+            if not plan_item:
+                result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
+                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                results.append(result)
+                print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                continue
+            updates = dict(plan_item.get("changes") or {})
+            conflicts = []
+            for field, proposed in updates.items():
+                live = current.get(field)
+                if not is_blank(live) and text(live) != text(proposed):
+                    conflicts.append(field)
+            if conflicts:
+                result.status = "SKIPPED_STATE_CHANGED"
+                result.detail = "Fresh FP differs from approved preview for: " + ", ".join(conflicts)
+                results.append(result)
+                print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                continue
+        else:
+            updates = build_facility_updates(
+                current, cwsn, rng, gender=gender, class_label=class_label
+            )
         if not updates:
             result.status = "SKIPPED_ALREADY_UP_TO_DATE"
             result.detail = "Nothing blank to fill."
