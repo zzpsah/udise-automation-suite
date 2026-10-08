@@ -1194,14 +1194,14 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             (
                 write_job_id, now, now, "queued", preview["stage"], preview["class_name"],
                 preview["school"], preview["session_id"], 0,
-                "Authorized automatic save queued", preview_job_id, now, int(preview["max_submissions"] if preview["max_submissions"] is not None else 0), 0,
+                "Authorized automatic save starting", preview_job_id, now, int(preview["max_submissions"] if preview["max_submissions"] is not None else 0), 0,
             ),
         )
         conn.execute(
             "UPDATE jobs SET auto_write_job_id=?,updated_at=? WHERE id=?",
             (write_job_id, now, preview_job_id),
         )
-    _event(preview_job_id, "🔐 Preview complete; authorized automatic save queued. Browser connection is no longer required.")
+    _event(preview_job_id, "🔐 Preview complete; authorized automatic save started. Browser connection is no longer required.")
     if preview["stage"] == "gp":
         plan = _json_read(JOBS / preview_job_id / "approved-plan.json") if (JOBS / preview_job_id / "approved-plan.json").is_file() else {}
         if isinstance(plan, dict):
