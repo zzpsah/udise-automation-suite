@@ -372,7 +372,29 @@ def run_auto_gp(
             changes = plan.get("changes") if isinstance(plan, dict) else None
             if not isinstance(changes, dict) or not changes:
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
-                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                gp_reason, gp_changes = build_auto_gp_changes(fresh, pen)
+                if gp_changes:
+                    fields = ", ".join(sorted(gp_changes))
+                    result.detail = (
+                        f"Reason: Current GP has eligible blank field(s): {fields}, "
+                        "but they were not included in the saved Preview plan. "
+                        "Action: Refresh Preview, review the new GP save plan, and Save again. No POST sent."
+                    )
+                elif gp_reason == "CWSN_CONFIRM_REQUIRED":
+                    result.detail = (
+                        "Reason: CWSN is currently Yes and requires explicit confirmation before GP can be changed. "
+                        "Action: Review and confirm CWSN=No in the Preview workflow, then Save. No POST sent."
+                    )
+                elif gp_reason == "SKIPPED_CWSN_UNEXPECTED":
+                    result.detail = (
+                        "Reason: CWSN has an unexpected saved value, so automatic GP update is blocked. "
+                        "Action: Verify the CWSN value manually and correct it in the portal if required. No POST sent."
+                    )
+                else:
+                    result.detail = (
+                        "Reason: Current GP has no eligible blank fields to save. "
+                        "Action: No action required; refresh Preview if you expected a change. No POST sent."
+                    )
                 results.append(result)
                 print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue

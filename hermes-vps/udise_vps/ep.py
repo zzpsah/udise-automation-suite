@@ -1083,7 +1083,11 @@ def run_ep(
             changes = plan.get("changes") if isinstance(plan, dict) else None
             if not isinstance(changes, dict) or not changes:
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
-                result.detail = "Student was not in the save plan; no POST sent."
+                result.detail = (
+                    "Reason: No approved EP changes exist for this student in the saved Preview plan. "
+                    "Action: Refresh Preview, review the student's current EP fields, and run Save again if changes are eligible. "
+                    "No POST sent."
+                )
                 results.append(result)
                 print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue

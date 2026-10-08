@@ -1090,7 +1090,8 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "SKIPPED_ALREADY_UP_TO_DATE": "Skipped",
         "SKIPPED_CWSN": "Skipped",
         "SKIPPED_CWSN_UNEXPECTED": "Skipped",
-        "SKIPPED_NOT_IN_APPROVED_PLAN": "Not in save plan",
+        "SKIPPED_NOT_IN_APPROVED_PLAN": "Needs fresh preview",
+        "NEEDS_FRESH_PREVIEW": "Needs fresh preview",
         "SKIPPED_STATE_CHANGED": "Live value changed",
         "LIMIT_REACHED": "Save limit reached",
         "MANUAL_REVIEW": "Manual review",
@@ -1111,27 +1112,30 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
             f"Confirmation required|{sum(counts.values())}\n"
             "Action|Review listed students and confirm CWSN=No"
         )
-    # EP needs student-level visibility: an aggregate count is not enough to
-    # tell the operator which student's Enrollment Profile was actually saved.
-    # Keep other stages on the compact summary table.
-    if stage in {"ep", "finalize"}:
-        ep_rows = []
-        result_prefix = "FINALIZE" if stage == "finalize" else "EP(?:_APPROVED|_SAVE)?"
-        ep_pattern = re.compile(
-            rf"{result_prefix}_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$"
-        )
+    # Write workflows need student-level visibility so an operator can see
+    # the actual reason and required action instead of an opaque aggregate
+    # such as "Other" or "Not in save plan".
+    if stage in {"gp", "ep", "facility", "finalize"}:
+        result_rows = []
+        result_patterns = {
+            "gp": r"GP(?:_APPROVED)?_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$",
+            "ep": r"EP(?:_APPROVED|_SAVE)?_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$",
+            "facility": r"FP_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$",
+            "finalize": r"FINALIZE_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$",
+        }
+        result_pattern = re.compile(result_patterns[stage])
         for message in messages:
-            match = ep_pattern.search(message)
+            match = result_pattern.search(message)
             if not match:
                 continue
             status, pen, name, detail = match.groups()
             label = labels.get(status, status.replace("_", " ").title())
             safe_name = re.sub(r"\s+", " ", name).strip().replace("|", "/")
             safe_detail = re.sub(r"\s+", " ", detail).strip().replace("|", "/")
-            ep_rows.append((label, pen, safe_name, safe_detail))
-        if ep_rows:
-            lines = ["RESULT_TABLE", "Status|PEN|Student|Detail"]
-            lines.extend("|".join(row) for row in ep_rows)
+            result_rows.append((label, pen, safe_name, safe_detail))
+        if result_rows:
+            lines = ["RESULT_TABLE", "Status|PEN|Student|Reason / Action"]
+            lines.extend("|".join(row) for row in result_rows)
             return "\n".join(lines)
 
 

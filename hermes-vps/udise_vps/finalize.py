@@ -202,7 +202,11 @@ def finalize(
             plan_item = approved_plan.get(pen) or approved_plan.get(sid)
             if not plan_item:
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
-                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                result.detail = (
+                    "Reason: This student has no approved Finalize action in the saved Preview plan. "
+                    "Action: Refresh Completion Preview and review the student's current readiness before saving. "
+                    "No POST sent."
+                )
                 results.append(result)
                 print(f"📋 FINALIZE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
