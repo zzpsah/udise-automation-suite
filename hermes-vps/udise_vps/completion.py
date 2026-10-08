@@ -98,9 +98,11 @@ def scan_completion(
                 last_modified=data.get("lastModifiedOn"),
             )
             report.rows.append(row)
+            status = "COMPLETED" if form_status == 6 else ("READY" if form_status == 3 else ("ISSUE" if form_status not in {0, 1, 2} else "PENDING"))
+            detail = row.guidance
             print(
-                f"[COMPLETION] {position}/{total} {pen}: OK "
-                f"(formStatus={form_status}, {row.stage})",
+                f"📋 COMPLETION_RESULT status={status} pen={pen} name={row.name} "
+                f"detail={detail}",
                 flush=True,
             )
 
@@ -115,8 +117,8 @@ def scan_completion(
                 status_desc=str(exc),
             ))
             print(
-                f"[COMPLETION] {position}/{total} {pen}: ⚠️ "
-                f"{type(exc).__name__}: {exc}",
+                f"📋 COMPLETION_RESULT status=FAILED pen={pen} name={student.get('studentName', '')} "
+                f"detail=Could not read status: {type(exc).__name__}: {exc}",
                 flush=True,
             )
 
