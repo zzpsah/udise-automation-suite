@@ -51,7 +51,7 @@ def _write_plan(path: str | None, results) -> None:
     cwsn_pending = {}
     for result in results:
         status = str(getattr(result, "status", ""))
-        changes = getattr(result, "changes", {}) or {}
+        changes = getattr(result, "proposed", None) or getattr(result, "changes", {}) or {}
         pen = str(getattr(result, "pen", "") or "")
         sid = str(getattr(result, "student_id", "") or "")
         name = str(getattr(result, "name", "") or "")
@@ -238,8 +238,10 @@ def cmd_facility(args) -> int:
         allow_submit=args.submit,
         max_submissions=args.max,
         seed=args.seed,
+        approved_plan=_load_plan(args.plan) if args.submit and args.plan else None,
     )
     if not args.submit:
+        _write_plan(args.plan_out, results)
         out = _output_dir(args)
         path = out / preview_report.default_filename("facility", session.school_id, args.klass)
         preview_report.write_preview_workbook("facility", results, str(path))
@@ -408,7 +410,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--submit", action="store_true",
                    help="Actually POST. Without this, preview only.")
     p.add_argument("--max", type=int, default=1,
-                   help="Maximum writes in this run")
+                   help="Maximum writes in this run (0 = all)")
+    p.add_argument("--plan-out", default=None, help="Write preview write plan JSON")
+    p.add_argument("--plan", default=None, help="Use approved preview write plan with --submit")
     p.set_defaults(func=cmd_facility)
 
     return parser
