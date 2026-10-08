@@ -1096,6 +1096,14 @@ def run_ep(
                 result.detail = "Live EP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
                 results.append(result)
                 continue
+            # The portal rejects an EP write when an existing admission number
+            # has no admission-start date. Never invent that date; route the
+            # record to manual review and continue to the next approved item.
+            if class_id in {9, 10} and clean_text(current.get("admnNumber")) and is_blank(current.get("admnStartDate")):
+                result.status = "MANUAL_REVIEW"
+                result.detail = "Admission number exists but admission start date is blank; no POST sent."
+                results.append(result)
+                continue
             updates = dict(changes)
             result.changes = updates
             if submissions >= max_submissions:
