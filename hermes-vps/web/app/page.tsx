@@ -17,6 +17,11 @@ const HERMES_FLOW_REFERENCE: Record<string,string> = {
   finalize: "Phase 5 · Fresh status read → status 3 eligibility → one approved submission → status 6 read-back",
 };
 const LOGIN_REFERENCE = "Phase 1 · Secure session and roster access";
+
+function clientFailure(component:string, operation:string, detail:string):string {
+  const clean=String(detail||"Unknown error").replace(/\\s+/g," ").trim().slice(0,700);
+  return `FAILURE · Component: ${component} · Operation: ${operation} · Detail: ${clean}`;
+}
 const WORKFLOW_INFO: Record<string,{title:string;steps:string[]}> = {
   students:{title:"Student roster",steps:["Read current UDISE student roster","Mask Aadhaar in output","Generate downloadable Excel","No portal data is changed"]},
   snapshot:{title:"Full read snapshot",steps:["Read Students, GP, EP, Facility and Completion","Collect issues in a separate sheet","Generate one audit workbook","No portal data is changed"]},
@@ -186,7 +191,7 @@ export default function Page(){
     setEshikshaReady(false);setEshikshaReportReady(false);setEshikshaPreview(null);
     const r=await fetch("/api/eshiksha-request",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sessionId})});
     const d=await r.json();
-    if(!r.ok){setMsg(d.error||"Could not create the secure eShikshaKosh sign-in");return}
+    if(!r.ok){setMsg(clientFailure("eShikshaKosh Connector","Create secure sign-in",d.error||d.detail||"Unknown error"));return}
     setEshikshaToken(d.token);setEshikshaUrl(d.entry_url);
     setMsg("Enter the eShikshaKosh details in the secure panel.");
   }
@@ -197,14 +202,14 @@ export default function Page(){
     const form=new FormData(); form.append("file",eshikshaFile);
     const r=await fetch("/api/eshiksha-upload",{method:"POST",body:form});
     const d=await r.json();
-    if(!r.ok){setMsg(d.error||"Report upload failed");return}
+    if(!r.ok){setMsg(clientFailure("eShikshaKosh Source Upload","Upload workbook",d.error||d.detail||"Unknown error"));return}
     setEshikshaReportReady(true);setEshikshaFile(null);setMsg("eShikshaKosh report ready. Generate the EP preview.");
   }
   async function saveEshikshaCredentials(){
     if(!eshikshaToken||!eshikshaUdise||!eshikshaPassword){setMsg("Enter eShikshaKosh UDISE code and password.");return}
     const r=await fetch("/api/eshiksha-credentials",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:eshikshaToken,udise:eshikshaUdise,password:eshikshaPassword,year:eshikshaYear,session_id:sessionId})});
     const d=await r.json(); setEshikshaPassword("");
-    if(!r.ok){setEshikshaReady(false);setMsg(d.detail||d.error||"eShikshaKosh login could not be verified");return}
+    if(!r.ok){setEshikshaReady(false);setMsg(clientFailure("eShikshaKosh Authentication","Verify credentials",d.detail||d.error||"Unknown error"));return}
     setEshikshaReady(Boolean(d.verified));setEshikshaUrl("");
     setEshikshaSchoolName(String(d.school_name||""));setEshikshaConnectedUdise(String(d.udise||eshikshaUdise));
     setMsg(`eShikshaKosh connected${d.school_name?": "+d.school_name:""}.`);
@@ -228,7 +233,7 @@ export default function Page(){
         if(t) detail=t.slice(0,500);
       }
       setEshikshaReady(false);
-      setMsg(detail);
+      setMsg(clientFailure("eShikshaKosh Report Fetch","Fetch complete OTR workbook",detail));
       return;
     }
     const blob=await r.blob();
@@ -270,7 +275,7 @@ export default function Page(){
       session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true
     })});
     const d=await r.json();
-    if(!r.ok){setMsg(d.detail||d.error||"Job start failed");return}
+    if(!r.ok){setMsg(clientFailure(selected?.label||stage,"Start preview",d.detail||d.error||"Unknown error"));return}
     setJobId(d.job_id);setMsg("Workflow started.");
   }
 
@@ -282,7 +287,7 @@ export default function Page(){
       confirmation:phrase,acknowledge_readback:true,max_submissions:500
     })});
     const d=await r.json();
-    if(!r.ok){setMsg(d.detail||d.error||"Save could not start");return}
+    if(!r.ok){setMsg(clientFailure(previewJob.job.stage.toUpperCase(),"Approve write",d.detail||d.error||"Unknown error"));return}
     setJob(null);setJobId(d.job_id);
     setMsg("Saving to UDISE. Fresh read-back will verify each change.");
   }
