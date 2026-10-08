@@ -424,10 +424,10 @@ export default function Page(){
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           {job.events.some(e=>e.message.includes("GP_CWSN_CONFIRM_REQUIRED"))&&job.job.stage==="gp"&&job.job.status==="awaiting_confirmation"&&!job.job.auto_write_job_id&&<div className="error-box" role="alert">
             <strong>CWSN confirmation required</strong>
-            <span>One or more students currently have CWSN=Yes. Review the live Name + PEN entries below. If you have verified that these students should be CWSN=No, confirm once to set No and continue with fresh read-back verification.</span>
+            <span>Students with CWSN=Yes are listed below with PEN, Name and Father&apos;s Name. Verify them before confirming. The system will set CWSN=No, save each record, and perform a fresh read-back verification.</span>
             <button type="button" className="run-button" onClick={confirmCwsn} disabled={cwsnConfirmBusy}>{cwsnConfirmBusy?"Confirming…":"Confirm CWSN = No & Continue"}</button>
           </div>}
-          <ul className="events" aria-live="polite">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Live"}</b> · {e.message}</li>)}</ul>
+          <ul className="events" aria-live="polite">{job.events.slice(-12).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}
