@@ -216,7 +216,7 @@ class JobIn(BaseModel):
     class_name: str | None = None
     preview: bool = True
     auto_save: bool = False
-    max_submissions: int = Field(default=1, ge=1, le=500)
+    max_submissions: int = Field(default=0, ge=0, le=10000)
 
 
 class ApprovalIn(BaseModel):
@@ -1173,7 +1173,7 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             (
                 write_job_id, now, now, "queued", preview["stage"], preview["class_name"],
                 preview["school"], preview["session_id"], 0,
-                "Authorized automatic save queued", preview_job_id, now, int(preview["max_submissions"] or 1), 0,
+                "Authorized automatic save queued", preview_job_id, now, int(preview["max_submissions"] if preview["max_submissions"] is not None else 0), 0,
             ),
         )
         conn.execute(
