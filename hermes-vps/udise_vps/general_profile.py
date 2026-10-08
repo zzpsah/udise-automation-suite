@@ -315,6 +315,14 @@ def run_auto_gp(
     results: list[GpResult] = []
     submissions = 0
 
+    if approved_plan is not None:
+        pen_matches = sum(1 for student in selected if str(student.get("studentCodeNat") or "").strip() in approved_plan)
+        sid_matches = sum(1 for student in selected if str(student.get("studentId") or student.get("id") or "").strip() in approved_plan)
+        print(
+            f"📋 GP approved plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
+            flush=True,
+        )
+
     for position, student in enumerate(selected, 1):
         sid = str(student.get("studentId") or student.get("id") or "").strip()
         pen = str(student.get("studentCodeNat") or "").strip()
@@ -341,12 +349,14 @@ def run_auto_gp(
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
                 result.detail = "Student was not eligible in the approved preview plan; no POST sent."
                 results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 continue
             conflicts = [f for f, v in changes.items() if not is_blank(fresh.get(f)) and str(fresh.get(f)) != str(v)]
             if conflicts:
                 result.status = "SKIPPED_STATE_CHANGED"
                 result.detail = "Live GP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
                 results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 continue
             updates = dict(changes)
             result.changes = updates
@@ -354,6 +364,7 @@ def run_auto_gp(
                 result.status = "LIMIT_REACHED"
                 result.detail = "AUTO_GP_MAX_SUBMISSIONS=%s reached." % max_submissions
                 results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 continue
             payload = build_gp_payload(fresh, updates)
             try:
@@ -362,11 +373,13 @@ def run_auto_gp(
                     result.status = "FAILED"
                     result.detail = "HTTP %s; %s" % (status_code, body.get("message") or body.get("error") or "rejected")
                     results.append(result)
+                    print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                     break
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
                 results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 break
             submissions += 1
             time.sleep(2)
@@ -376,6 +389,7 @@ def run_auto_gp(
                 result.status = "UNCONFIRMED"
                 result.detail = "Read-back failed: %s: %s" % (type(exc).__name__, exc)
                 results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 break
             mismatches = read_back_matches(verify, updates)
             if mismatches:
@@ -387,6 +401,7 @@ def run_auto_gp(
             result.status = "SUCCESS_CONFIRMED"
             result.detail = "Approved preview values saved and confirmed by fresh GP read-back."
             results.append(result)
+            print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
             continue
 
         # ---------------------------------------------------------- CWSN safety
@@ -514,6 +529,17 @@ def run_auto_gp(
     no_change = sum(1 for r in results if r.status == "NO_CHANGE")
     previewed = sum(1 for r in results if r.status == "PREVIEW")
     other = len(results) - confirmed - no_change - previewed
+    if approved_plan is not None:
+        not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
+        state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
+        limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
+        failed = sum(1 for r in results if r.status == "FAILED")
+        unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
+        print(
+            f"📋 GP approved outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | "
+            f"limit-reached={limit_reached} | failed={failed} | unconfirmed={unconfirmed}",
+            flush=True,
+        )
 
     print("\n" + "━" * 30)
     print(f"✅ Saved + confirmed : {confirmed}")
