@@ -22,6 +22,24 @@ function clientFailure(component:string, operation:string, detail:string):string
   const clean=String(detail||"Unknown error").replace(/\\s+/g," ").trim().slice(0,700);
   return `FAILURE · Component: ${component} · Operation: ${operation} · Detail: ${clean}`;
 }
+async function storeBrowserCredential(kind:"udise"|"eshiksha",id:string,password:string){
+  try{
+    const C=globalThis.PasswordCredential as unknown as (new (data:{id:string;password:string;name?:string})=>Credential)|undefined;
+    if(!C||!navigator.credentials?.store) return false;
+    const credential=new C({id:`${kind}:${id}`,password,name:kind==="udise"?"UDISE Operations Console":"eShikshaKosh"});
+    await navigator.credentials.store(credential);
+    return true;
+  }catch{return false}
+}
+async function loadBrowserCredential(kind:"udise"|"eshiksha"){
+  try{
+    if(!navigator.credentials?.get) return null;
+    const credential=await navigator.credentials.get({password:true,mediation:"optional"}) as (Credential & {id?:string;password?:string})|null;
+    if(!credential?.id?.startsWith(`${kind}:`)||!credential.password) return null;
+    return {id:credential.id.slice(kind.length+1),password:credential.password};
+  }catch{return null}
+}
+
 const WORKFLOW_INFO: Record<string,{title:string;steps:string[]}> = {
   students:{title:"Student roster",steps:["Read current UDISE student roster","Mask Aadhaar in output","Generate downloadable Excel","No portal data is changed"]},
   snapshot:{title:"Full read snapshot",steps:["Read Students, GP, EP, Facility and Completion","Collect issues in a separate sheet","Generate one audit workbook","No portal data is changed"]},
@@ -57,6 +75,8 @@ export default function Page(){
   const [username,setUsername]=useState("");
   const [password,setPassword]=useState("");
   const [showPassword,setShowPassword]=useState(false);
+  const [rememberUdise,setRememberUdise]=useState(false);
+  const [savedUdiseAvailable,setSavedUdiseAvailable]=useState(false);
   const [captcha,setCaptcha]=useState("");
   const [captchaNonce,setCaptchaNonce]=useState(0);
   const [loginBusy,setLoginBusy]=useState(false);
@@ -69,6 +89,8 @@ export default function Page(){
   const [eshikshaUdise,setEshikshaUdise]=useState("");
   const [eshikshaPassword,setEshikshaPassword]=useState("");
   const [showEshikshaPassword,setShowEshikshaPassword]=useState(false);
+  const [rememberEshiksha,setRememberEshiksha]=useState(false);
+  const [savedEshikshaAvailable,setSavedEshikshaAvailable]=useState(false);
   const [eshikshaYear,setEshikshaYear]=useState("2026-27");
   const [eshikshaSchoolName,setEshikshaSchoolName]=useState("");
   const [eshikshaConnectedUdise,setEshikshaConnectedUdise]=useState("");
@@ -88,6 +110,7 @@ export default function Page(){
     if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
+  useEffect(()=>{let cancelled=false;(async()=>{const saved=await loadBrowserCredential("udise");if(!cancelled&&saved){setUsername(saved.id);setPassword(saved.password);setRememberUdise(true);setSavedUdiseAvailable(true)}const esSaved=await loadBrowserCredential("eshiksha");if(!cancelled&&esSaved){setEshikshaUdise(esSaved.id);setEshikshaPassword(esSaved.password);setRememberEshiksha(true);setSavedEshikshaAvailable(true)}})();return()=>{cancelled=true}},[]);
 
   const selected=useMemo(()=>caps?.stages.find(x=>x.id===stage),[caps,stage]);
   const selectedMeta=selected?STAGE_META[selected.id]:undefined;
@@ -137,6 +160,8 @@ export default function Page(){
     const expiresAt=Date.now()+Number(d.expires_in||0)*1000;
     setSessionExpiresAt(expiresAt);
     setSessionSeconds(Math.max(0,Math.floor((expiresAt-Date.now())/1000)));
+    if(rememberUdise) await storeBrowserCredential("udise",username.trim(),password);
+    setSavedUdiseAvailable(rememberUdise);
     setPassword("");
     setCaptcha("");
     setMsg(d.school_id?"Students Module connected. Select class and workflow.":"UDISE connected, but Students Module school scope could not be resolved.");
@@ -210,7 +235,10 @@ export default function Page(){
   async function saveEshikshaCredentials(){
     if(!eshikshaToken||!eshikshaUdise||!eshikshaPassword){setMsg("Enter eShikshaKosh UDISE code and password.");return}
     const r=await fetch("/api/eshiksha-credentials",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:eshikshaToken,udise:eshikshaUdise,password:eshikshaPassword,year:eshikshaYear,session_id:sessionId})});
-    const d=await r.json(); setEshikshaPassword("");
+    const d=await r.json();
+    if(r.ok&&rememberEshiksha) await storeBrowserCredential("eshiksha",eshikshaUdise.trim(),eshikshaPassword);
+    setSavedEshikshaAvailable(r.ok&&rememberEshiksha);
+    setEshikshaPassword("");
     if(!r.ok){setEshikshaReady(false);setMsg(clientFailure("eShikshaKosh Authentication","Verify credentials",d.detail||d.error||"Unknown error"));return}
     setEshikshaReady(Boolean(d.verified));setEshikshaUrl("");
     setEshikshaSchoolName(String(d.school_name||""));setEshikshaConnectedUdise(String(d.udise||eshikshaUdise));
@@ -329,7 +357,7 @@ export default function Page(){
           <div className="section-title"><span className="step">1</span><div><h2>UDISE Login</h2><p>Username, password and CAPTCHA</p></div></div>
           {!sessionId?<div className="login-form-grid">
             <label>Username<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" placeholder="UDISE username"/></label>
-            <label>Password<div className="password-field"><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Password"/><button type="button" className="password-toggle" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword?"Hide password":"Show password"} title={showPassword?"Hide password":"Show password"}>{showPassword?"🙈":"👁️"}</button></div></label>
+            <label>Password<div className="password-field"><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Password"/><button type="button" className="password-toggle" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword?"Hide password":"Show password"} title={showPassword?"Hide password":"Show password"}>{showPassword?"🙈":"👁️"}</button></div></label><label className="remember-row"><input type="checkbox" checked={rememberUdise} onChange={e=>setRememberUdise(e.target.checked)}/><span>Remember me on this Chrome profile</span></label>
             <div className="captcha-row">
               {loginToken?<img className="captcha-image" src={"/api/udise-login/captcha?token="+encodeURIComponent(loginToken)+"&v="+captchaNonce} alt="UDISE CAPTCHA"/>:<div className="captcha-placeholder">Loading CAPTCHA…</div>}
               <button type="button" className="secondary-button" onClick={beginUdiseLogin} disabled={loginBusy}>Refresh CAPTCHA</button>
@@ -390,7 +418,7 @@ export default function Page(){
                   {eshikshaReady&&<div className="method-actions"><button type="button" className="source-primary" onClick={downloadEshikshaReport}>Fetch latest report</button><button type="button" className="source-secondary" onClick={connectEshiksha}>Change sign-in</button></div>}
                   {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="credential-grid">
                     <label>UDISE code / username<input value={eshikshaUdise} onChange={e=>setEshikshaUdise(e.target.value)} autoComplete="username"/></label>
-                    <label>Password<div className="password-field"><input type={showEshikshaPassword?"text":"password"} value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/><button type="button" className="password-toggle" onClick={()=>setShowEshikshaPassword(v=>!v)} aria-label={showEshikshaPassword?"Hide password":"Show password"} title={showEshikshaPassword?"Hide password":"Show password"}>{showEshikshaPassword?"🙈":"👁️"}</button></div></label>
+                    <label>Password<div className="password-field"><input type={showEshikshaPassword?"text":"password"} value={eshikshaPassword} onChange={e=>setEshikshaPassword(e.target.value)} autoComplete="current-password"/><button type="button" className="password-toggle" onClick={()=>setShowEshikshaPassword(v=>!v)} aria-label={showEshikshaPassword?"Hide password":"Show password"} title={showEshikshaPassword?"Hide password":"Show password"}>{showEshikshaPassword?"🙈":"👁️"}</button></div></label><label className="remember-row"><input type="checkbox" checked={rememberEshiksha} onChange={e=>setRememberEshiksha(e.target.checked)}/><span>Remember eShikshaKosh separately on this Chrome profile</span></label>
                     <label>Academic year<input value={eshikshaYear} onChange={e=>setEshikshaYear(e.target.value)}/></label>
                     <button type="button" className="source-primary" onClick={saveEshikshaCredentials}>Use for this EP session</button>
                   </div>}
