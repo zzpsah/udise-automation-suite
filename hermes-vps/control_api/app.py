@@ -1070,6 +1070,18 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             return str(existing["id"])
         if preview["stage"] == "ep" and not list((JOBS / preview_job_id).glob("eShikshaKosh_OTR_*.xlsx")) and str(preview["class_name"]).upper() != "X":
             raise RuntimeError("eShikshaKosh source is unavailable for automatic EP save; generate a new preview")
+        # An empty approved plan means the preview found no eligible changes.
+        # Do not manufacture a write child that will mark every student as
+        # SKIPPED_NOT_IN_APPROVED_PLAN; that is misleading and produces the
+        # old "Skipped / other" count for a genuinely no-op preview.
+        plan_path = JOBS / preview_job_id / "approved-plan.json"
+        if preview["stage"] in {"gp", "ep"} and plan_path.is_file():
+            plan = _json_read(plan_path)
+            if not isinstance(plan, dict) or not plan:
+                _event(preview_job_id, "ℹ️ No eligible changes in the approved preview plan; no write job was created.")
+                with _db() as conn:
+                    conn.execute("UPDATE jobs SET updated_at=?,message=? WHERE id=?", (int(time.time()), "Completed — no changes to save.", preview_job_id))
+                return ""
         write_job_id = uuid.uuid4().hex
         now = int(time.time())
         conn.execute(
