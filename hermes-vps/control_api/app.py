@@ -1125,6 +1125,16 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             (write_job_id, now, preview_job_id),
         )
     _event(preview_job_id, "🔐 Preview complete; authorized automatic save queued. Browser connection is no longer required.")
+    if preview["stage"] == "gp":
+        plan = _json_read(JOBS / preview_job_id / "approved-plan.json") if (JOBS / preview_job_id / "approved-plan.json").is_file() else {}
+        if isinstance(plan, dict):
+            for item in plan.values():
+                changes = item.get("changes") if isinstance(item, dict) else {}
+                if isinstance(changes, dict) and str(changes.get("cwsnYN")) == "2":
+                    _event(
+                        write_job_id,
+                        f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmed CWSN=No - Saving and verifying",
+                    )
     threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
     return write_job_id
 
