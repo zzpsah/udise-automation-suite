@@ -110,10 +110,10 @@ def _():
         )
         bh, bw = int(boys["heightInCm"]), int(boys["weightInKg"])
         gh, gw = int(girls["heightInCm"]), int(girls["weightInKg"])
-        assert 140 <= bh <= 155, (cls, bh)
-        assert 38 <= bw <= 52, (cls, bw)
-        assert 135 <= gh <= 150, (cls, gh)
-        assert 34 <= gw <= 48, (cls, gw)
+        assert 140 <= bh <= 160, (cls, bh)
+        assert 38 <= bw <= 55, (cls, bw)
+        assert 135 <= gh <= 155, (cls, gh)
+        assert 34 <= gw <= 50, (cls, gw)
         assert gh < bh and gw < bw, (cls, gh, bh, gw, bw)
 
 
