@@ -108,7 +108,7 @@ export default function Page(){
     if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
-  useEffect(()=>{let cancelled=false;(async()=>{const saved=await loadBrowserCredential("udise");if(!cancelled&&saved){setUsername(saved.id);setPassword(saved.password);setRememberUdise(true)}const esSaved=await loadBrowserCredential("eshiksha");if(!cancelled&&esSaved){setEshikshaUdise(esSaved.id);setEshikshaPassword(esSaved.password);setRememberEshiksha(true);setSavedEshikshaAvailable(true)}})();return()=>{cancelled=true}},[]);
+  useEffect(()=>{let cancelled=false;(async()=>{const saved=await loadBrowserCredential("udise");if(!cancelled&&saved){setUsername(saved.id);setPassword(saved.password);setRememberUdise(true)}const esSaved=await loadBrowserCredential("eshiksha");if(!cancelled&&esSaved){setEshikshaUdise(esSaved.id);setEshikshaPassword(esSaved.password);setRememberEshiksha(true)}})();return()=>{cancelled=true}},[]);
 
   const selected=useMemo(()=>caps?.stages.find(x=>x.id===stage),[caps,stage]);
   const selectedMeta=selected?STAGE_META[selected.id]:undefined;
