@@ -50,6 +50,13 @@ def test_preview_lifecycle_and_write_lock() -> None:
                 sheet.append(["PEN", "Field", "Current", "Proposed"])
                 sheet.append(["SYNTHETIC-1", "motherTongue", "", "42"])
                 workbook.save(result)
+                if "--plan-out" in cmd:
+                    plan_path = Path(cmd[cmd.index("--plan-out") + 1])
+                    plan_path.parent.mkdir(parents=True, exist_ok=True)
+                    plan_path.write_text(
+                        '{"SYNTHETIC-1":{"pen":"SYNTHETIC-1","student_id":"synthetic-1","changes":{"motherTongue":42}}}\n',
+                        encoding="utf-8",
+                    )
                 self.stdout = iter(
                     [
                         "Authenticated synthetic session\n",
@@ -220,6 +227,10 @@ def test_preview_lifecycle_and_write_lock() -> None:
             ep_dir.mkdir(parents=True)
             ep_result = ep_dir / "UDISE_EP_Preview_2497128_IX.xlsx"
             ep_source = ep_dir / "eShikshaKosh_OTR_2497128_2026-27.xlsx"
+            (ep_dir / "approved-plan.json").write_text(
+                '{"SYNTHETIC-1":{"pen":"SYNTHETIC-1","student_id":"synthetic-1","changes":{"admnNumber":"1/2026"}}}\n',
+                encoding="utf-8",
+            )
             for path in (ep_result, ep_source):
                 book = Workbook()
                 book.save(path)
