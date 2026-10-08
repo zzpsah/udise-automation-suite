@@ -151,7 +151,8 @@ class GpResult:
     pen: str
     student_id: str
     name: str
-    class_label: str
+    father_name: str = ""
+    class_label: str = ""
     status: str
     detail: str = ""
     changes: dict = field(default_factory=dict)
