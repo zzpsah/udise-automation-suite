@@ -1060,8 +1060,12 @@ def _queue_automatic_write(preview_job_id: str) -> str:
         preview = conn.execute("SELECT * FROM jobs WHERE id=?", (preview_job_id,)).fetchone()
         if not preview:
             raise RuntimeError("Preview job disappeared before automatic save")
-        if preview["status"] != "completed" or not bool(preview["preview"]):
-            raise RuntimeError("Automatic save requires a completed preview")
+        if preview["status"] not in {"completed", "awaiting_confirmation"} or not bool(preview["preview"]):
+            raise RuntimeError("Automatic save requires a completed preview or an explicitly confirmed GP CWSN preview")
+        if preview["stage"] == "gp" and preview["status"] == "awaiting_confirmation":
+            pending_path = JOBS / preview_job_id / "cwsn-pending.json"
+            if pending_path.is_file() and _json_read(pending_path):
+                raise RuntimeError("GP CWSN confirmation is still pending")
         stage = next((item for item in get_capabilities()["stages"] if item["id"] == preview["stage"]), None)
         if not stage or stage["mode"] != "write":
             raise RuntimeError("Automatic save is only available for write workflows")
@@ -1399,11 +1403,12 @@ def confirm_cwsn(job_id: str, authorization: str | None = Header(default=None)) 
             "pen": str(item.get("pen") or ""),
             "student_id": str(item.get("student_id") or ""),
             "name": str(item.get("name") or ""),
+            "father_name": str(item.get("father_name") or ""),
             "changes": changes,
         }
     plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     pending_path.unlink(missing_ok=True)
-    _event(job_id, f"✅ CWSN confirmation received for {len(pending)} student(s). CWSN will be set to No and each change will require fresh read-back verification.")
+    _event(job_id, f"GP-UPDATE: CWSN confirmation received for {len(pending)} student(s). Confirmed CWSN=No; verified GP save is being queued.")
     try:
         write_job_id = _queue_automatic_write(job_id)
     except Exception as exc:
