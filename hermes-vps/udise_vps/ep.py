@@ -1048,7 +1048,7 @@ def run_ep(
         pen_matches = sum(1 for student in selected if str(student.get("studentCodeNat") or "").strip() in approved_plan)
         sid_matches = sum(1 for student in selected if str(student.get("studentId") or student.get("id") or "").strip() in approved_plan)
         print(
-            f"📋 eShikshaKosh approved plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
+            f"📋 eShikshaKosh save plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
             flush=True,
         )
 
@@ -1083,8 +1083,9 @@ def run_ep(
             changes = plan.get("changes") if isinstance(plan, dict) else None
             if not isinstance(changes, dict) or not changes:
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
-                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                result.detail = "Student was not in the save plan; no POST sent."
                 results.append(result)
+                print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
             conflicts = [
                 f for f, v in changes.items()
@@ -1095,6 +1096,7 @@ def run_ep(
                 result.status = "SKIPPED_STATE_CHANGED"
                 result.detail = "Live EP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
                 results.append(result)
+                print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
             # The portal rejects an EP write when an existing admission number
             # has no admission-start date. Never invent that date; route the
@@ -1103,13 +1105,15 @@ def run_ep(
                 result.status = "MANUAL_REVIEW"
                 result.detail = "Admission number exists but admission start date is blank; no POST sent."
                 results.append(result)
+                print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
             updates = dict(changes)
             result.changes = updates
             if max_submissions > 0 and submissions >= max_submissions:
                 result.status = "LIMIT_REACHED"
-                result.detail = "max submissions (%s) reached." % max_submissions
+                result.detail = "Save limit (%s) reached; no POST sent." % max_submissions
                 results.append(result)
+                print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
             payload = build_ep_payload(session.school_id, sid, current, updates, moi_id=moi_id)
             endpoint = "/p0/api/v2/students/enrolment/%s" % sid
@@ -1417,7 +1421,7 @@ def run_ep(
         state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
         limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
         print(
-            f"📋 eShikshaKosh approved outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
+            f"📋 eShikshaKosh save outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
             flush=True,
         )
 

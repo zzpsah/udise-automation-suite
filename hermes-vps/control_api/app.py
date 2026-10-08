@@ -1069,7 +1069,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
     counts: dict[str, int] = {}
     patterns = {
         "gp": r"GP(?:_APPROVED)?_RESULT status=([A-Z0-9_]+)",
-        "ep": r"EP(?:_APPROVED)?_RESULT status=([A-Z0-9_]+)",
+        "ep": r"EP(?:_APPROVED|_SAVE)?_RESULT status=([A-Z0-9_]+)",
         "facility": r"FP_RESULT status=([A-Z0-9_]+)",
         "finalize": r"FINALIZE_RESULT status=([A-Z0-9_]+)",
         "snapshot": r"SNAPSHOT_RESULT status=([A-Z0-9_]+)",
@@ -1090,9 +1090,9 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "SKIPPED_ALREADY_UP_TO_DATE": "Skipped",
         "SKIPPED_CWSN": "Skipped",
         "SKIPPED_CWSN_UNEXPECTED": "Skipped",
-        "SKIPPED_NOT_IN_APPROVED_PLAN": "Skipped",
-        "SKIPPED_STATE_CHANGED": "Skipped",
-        "LIMIT_REACHED": "Skipped",
+        "SKIPPED_NOT_IN_APPROVED_PLAN": "Not in save plan",
+        "SKIPPED_STATE_CHANGED": "Live value changed",
+        "LIMIT_REACHED": "Save limit reached",
         "MANUAL_REVIEW": "Manual review",
         "FAILED": "Failed",
         "UNCONFIRMED": "Not confirmed",
@@ -1117,7 +1117,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
     if stage == "ep":
         ep_rows = []
         ep_pattern = re.compile(
-            r"EP(?:_APPROVED)?_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$"
+            r"EP(?:_APPROVED|_SAVE)?_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$"
         )
         for message in messages:
             match = ep_pattern.search(message)
@@ -1483,7 +1483,7 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
         raise HTTPException(400, "Unsupported stage")
     if stage["mode"] != "read" and not (stage.get("preview_enabled") and body.preview):
         raise HTTPException(409, "Actual saves require a separately approved write workflow")
-    if body.stage == "ep" and body.preview and str(body.class_name or "").upper() != "X":
+    if body.stage == "ep" and body.preview and str(body.class_name or "").upper() not in {"X", "XII"}:
         report_meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
         matching_report = ESK_UPLOAD.exists() and report_meta.get("session_id") in {"", body.session_id}
         if not matching_report:

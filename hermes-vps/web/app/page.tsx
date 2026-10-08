@@ -370,7 +370,7 @@ export default function Page(){
     if(!sessionId){setMsg("Connect a secure UDISE session first.");return}
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
-    if(selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
+    if(selected?.id==="ep"&&!(["X","XII"].includes(klass))&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
     if(selected?.mode==="write" && saveLimit===-1){const n=Number.parseInt(customSaveLimit,10);if(!Number.isInteger(n)||n<1||n>10000){setMsg("Enter a custom save limit from 1 to 10000.");return}setSaveLimit(n)}
     setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
@@ -454,7 +454,7 @@ export default function Page(){
                   <h3>Use eShikshaKosh to complete UDISE Enrollment Profile</h3>
                   <p>eShikshaKosh supplies the source data used to match students and fill eligible blank EP fields—primarily <strong>Admission Number</strong> and, for Class XI, <strong>stream</strong>. Connecting this source does not write anything to UDISE.</p>
                 </div>
-                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||klass==="X")?"ready":"needed")}>{eshikshaReportReady?"EP source ready":eshikshaReady?"Verified connection":klass==="X"?"Optional for Class X":"Source required"}</span>
+                <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||["X","XII"].includes(klass))?"ready":"needed")}>{eshikshaReportReady?"EP source ready":eshikshaReady?"Verified connection":["X","XII"].includes(klass)?`Optional for Class ${klass}`:"Source required"}</span>
               </div>
               {eshikshaReady&&<div className="source-identity"><strong>Connected:</strong> {eshikshaSchoolName||"eShikshaKosh school"}{eshikshaConnectedUdise?` · UDISE ${eshikshaConnectedUdise}`:""}<small>Login verified. The password is temporary for this UDISE session and is discarded after the live source fetch.</small></div>}
               {eshikshaReportReady&&<div className="source-identity"><strong>EP source ready.</strong> The fetched/uploaded eShikshaKosh report is retained server-side and passed automatically into Enrollment Profile.</div>}
@@ -467,7 +467,7 @@ export default function Page(){
 
               <div className="source-methods">
                 <div className="source-method recommended">
-                  <div className="method-title"><div><strong>Automatic fetch</strong><span>{klass==="X"?"Optional":"Recommended"}</span></div><small>{klass==="X"?"Class X can run without eShikshaKosh. Connect it only when you want eShikshaKosh Admission Number data for matching.":`Sign in once and fetch the latest read-only eShikshaKosh report for Class ${klass}.`}</small></div>
+                  <div className="method-title"><div><strong>Automatic fetch</strong><span>{["X","XII"].includes(klass)?"Optional":"Recommended"}</span></div><small>{["X","XII"].includes(klass)?`Class ${klass} can run without eShikshaKosh. Connect it only when you want eShikshaKosh Admission Number data for matching.`:`Sign in once and fetch the latest read-only eShikshaKosh report for Class ${klass}.`}</small></div>
                   {!eshikshaReady&&<button type="button" className="source-primary" onClick={connectEshiksha}>{eshikshaToken?"Update sign-in details":"Connect eShikshaKosh"}</button>}
                   {eshikshaReady&&<div className="method-actions"><button type="button" className="source-primary" onClick={downloadEshikshaReport}>Fetch latest report</button><button type="button" className="source-secondary" onClick={connectEshiksha}>Change sign-in</button></div>}
                   {eshikshaToken&&!eshikshaReady&&!eshikshaReportReady&&<div className="credential-grid">

@@ -28,22 +28,24 @@ def test_ep_result_table_lists_students() -> None:
                 ) VALUES(?,?,?,?,?,?,?,?,?)""",
                 (job_id, now, now, "completed", "ep", "IX", "school", "session", 1),
             )
-            for pen, name in (("PEN001", "Ravi Kumar"), ("PEN002", "Sunita Devi")):
+            events = [
+                ("EP_RESULT", "SUCCESS_CONFIRMED", "PEN001", "Ravi Kumar", "Saved and verified"),
+                ("EP_SAVE_RESULT", "SKIPPED_NOT_IN_APPROVED_PLAN", "PEN002", "Sunita Devi", "Student was not in the save plan; no POST sent."),
+                ("EP_SAVE_RESULT", "LIMIT_REACHED", "PEN003", "Amit Kumar", "Save limit (1) reached; no POST sent."),
+                ("EP_SAVE_RESULT", "SKIPPED_STATE_CHANGED", "PEN004", "Pooja Devi", "Live EP values changed since preview: admnNumber. No POST sent."),
+            ]
+            for event, status, pen, name, detail in events:
                 conn.execute(
                     "INSERT INTO events(job_id,created_at,level,message) VALUES(?,?,?,?)",
-                    (
-                        job_id,
-                        now,
-                        "info",
-                        f"📋 EP_RESULT status=SUCCESS_CONFIRMED pen={pen} "
-                        f"name={name} detail=Saved and verified",
-                    ),
+                    (job_id, now, "info", f"📋 {event} status={status} pen={pen} name={name} detail={detail}"),
                 )
 
         output = app._result_table_message(job_id, "ep")
         assert "Status|PEN|Student|Detail" in output
         assert "Saved + confirmed|PEN001|Ravi Kumar|Saved and verified" in output
-        assert "Saved + confirmed|PEN002|Sunita Devi|Saved and verified" in output
+        assert "Not in save plan|PEN002|Sunita Devi|Student was not in the save plan; no POST sent." in output
+        assert "Save limit reached|PEN003|Amit Kumar|Save limit (1) reached; no POST sent." in output
+        assert "Live value changed|PEN004|Pooja Devi|Live EP values changed since preview: admnNumber. No POST sent." in output
 
 
 if __name__ == "__main__":
