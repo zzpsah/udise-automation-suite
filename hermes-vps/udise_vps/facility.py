@@ -4,8 +4,8 @@ Ported from the notebook's Facility cells (19-22).
 
 Rules confirmed with the operator:
   - A saved measurement stays. Only blank fields are filled.
-  - Classes IX-X boys: blank height -> 140..155 cm; blank weight -> 38..52 kg
-  - Classes IX-X girls: corresponding lower range -> 135..150 cm; 34..48 kg
+  - Classes IX-X boys: blank height -> 140..160 cm; blank weight -> 38..55 kg
+  - Classes IX-X girls: corresponding lower range -> 135..155 cm; 34..50 kg
   - Classes XI-XII retain the existing ranges: boys 150..170 cm / 42..60 kg;
     girls 146..166 cm / 38..56 kg
   - Blank Yes/No  -> No
@@ -146,8 +146,8 @@ def build_facility_updates(current: dict, cwsn: bool, rng: random.Random, gender
     if str(class_label).strip().upper() in {"CLASS IX", "CLASS X", "IX", "X"}:
         # Requested ranges for Classes IX-X only. Female ranges are lower
         # than the corresponding male ranges. XI-XII keep the legacy ranges.
-        height_range = (135, 150) if is_female else (140, 155)
-        weight_range = (34, 48) if is_female else (38, 52)
+        height_range = (135, 155) if is_female else (140, 160)
+        weight_range = (34, 50) if is_female else (38, 55)
     else:
         height_range = GIRL_HEIGHT_RANGE if is_female else BOY_HEIGHT_RANGE
         weight_range = GIRL_WEIGHT_RANGE if is_female else BOY_WEIGHT_RANGE
