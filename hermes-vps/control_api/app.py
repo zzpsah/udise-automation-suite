@@ -991,6 +991,17 @@ def _event(job_id: str, message: str, level: str = "info") -> None:
 
 def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
     line = line.strip()
+    completion = re.search(r"📋 COMPLETION_RESULT status=(\\S+) pen=(\\S+) name=(.*?) detail=(.*)$", line)
+    if completion:
+        status, pen, name, detail = completion.groups()
+        labels = {
+            "COMPLETED": "Completed",
+            "READY": "Ready for Complete Data",
+            "PENDING": "Pending",
+            "ISSUE": "Issue",
+            "FAILED": "Read error",
+        }
+        return f"Completion: {pen} - {name} - {labels.get(status, status.replace('_', ' ').title())} - {detail}", None, None
     gp = re.search(r"📋 GP(?:_APPROVED)?_RESULT status=(\\S+) pen=(\\S+) name=(.*?) detail=(.*)$", line)
     if gp:
         status, pen, name, detail = gp.groups()
@@ -1003,6 +1014,11 @@ def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
             "UNCONFIRMED": "Not confirmed",
             "READ_ERROR": "Skipped",
             "PREVIEW": "Eligible",
+        "COMPLETED": "Completed",
+        "READY": "Ready for Complete Data",
+        "PENDING": "Pending",
+        "ISSUE": "Issue",
+        "NOT_FOUND": "Not found",
             "LIMIT_REACHED": "Skipped",
             "CWSN_CONFIRM_REQUIRED": "Confirmation required",
         }
