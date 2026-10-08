@@ -1113,11 +1113,13 @@ def run_ep(
                     msg = err.get("message") if isinstance(err, dict) else err
                     result.status = "FAILED"
                     result.detail = "HTTP %s; %s" % (status_code, msg or body.get("message") or "rejected")
+                    print(f"⚠️ EP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                     results.append(result)
                     break
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
+                print(f"⚠️ EP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 results.append(result)
                 break
             submissions += 1
@@ -1140,6 +1142,7 @@ def run_ep(
             else:
                 result.status = "UNCONFIRMED"
                 result.detail = "Fresh EP read-back differs: " + ", ".join(mismatches or ["unknown"])
+                print(f"⚠️ EP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
                 results.append(result)
                 break
             continue
