@@ -48,16 +48,24 @@ def _write_plan(path: str | None, results) -> None:
     if not path:
         return
     payload = {}
+    cwsn_pending = {}
     for result in results:
         status = str(getattr(result, "status", ""))
         changes = getattr(result, "changes", {}) or {}
         pen = str(getattr(result, "pen", "") or "")
         sid = str(getattr(result, "student_id", "") or "")
+        name = str(getattr(result, "name", "") or "")
+        item = {"pen": pen, "student_id": sid, "name": name, "changes": changes}
         if status == "PREVIEW" and isinstance(changes, dict) and changes and (pen or sid):
-            payload[pen or sid] = {"pen": pen, "student_id": sid, "changes": changes}
+            payload[pen or sid] = item
+        elif status == "CWSN_CONFIRM_REQUIRED" and (pen or sid):
+            cwsn_pending[pen or sid] = item
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (target.parent / "cwsn-pending.json").write_text(
+        json.dumps(cwsn_pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def _load_plan(path: str | None) -> dict:

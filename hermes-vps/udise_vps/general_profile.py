@@ -349,14 +349,14 @@ def run_auto_gp(
                 result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
                 result.detail = "Student was not eligible in the approved preview plan; no POST sent."
                 results.append(result)
-                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
             conflicts = [f for f, v in changes.items() if not is_blank(fresh.get(f)) and str(fresh.get(f)) != str(v)]
             if conflicts:
                 result.status = "SKIPPED_STATE_CHANGED"
                 result.detail = "Live GP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
                 results.append(result)
-                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
             updates = dict(changes)
             result.changes = updates
@@ -364,7 +364,7 @@ def run_auto_gp(
                 result.status = "LIMIT_REACHED"
                 result.detail = "AUTO_GP_MAX_SUBMISSIONS=%s reached." % max_submissions
                 results.append(result)
-                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
             payload = build_gp_payload(fresh, updates)
             try:
@@ -373,13 +373,13 @@ def run_auto_gp(
                     result.status = "FAILED"
                     result.detail = "HTTP %s; %s" % (status_code, body.get("message") or body.get("error") or "rejected")
                     results.append(result)
-                    print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                    print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                     break
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
                 results.append(result)
-                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 break
             submissions += 1
             time.sleep(2)
@@ -389,7 +389,7 @@ def run_auto_gp(
                 result.status = "UNCONFIRMED"
                 result.detail = "Read-back failed: %s: %s" % (type(exc).__name__, exc)
                 results.append(result)
-                print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 break
             mismatches = read_back_matches(verify, updates)
             if mismatches:
@@ -401,22 +401,24 @@ def run_auto_gp(
             result.status = "SUCCESS_CONFIRMED"
             result.detail = "Approved preview values saved and confirmed by fresh GP read-back."
             results.append(result)
-            print(f"📋 GP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+            print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         # ---------------------------------------------------------- CWSN safety
         fresh_cwsn = str(fresh.get("cwsnYN"))
         if fresh_cwsn in CWSN_SKIP_CODES:
-            result.status = "SKIPPED_CWSN"
-            result.detail = "Fresh GP shows CWSN=Yes. No POST sent. Manual review."
+            result.status = "CWSN_CONFIRM_REQUIRED"
+            result.detail = "Fresh GP shows CWSN=Yes. User confirmation required before setting CWSN=No; no POST sent."
+            result.changes = {"cwsnYN": 2}
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_CWSN_CONFIRM_REQUIRED pen={pen} name={name} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
         if fresh_cwsn in CWSN_UNEXPECTED_SKIP:
             result.status = "SKIPPED_CWSN_UNEXPECTED"
             result.detail = f"Unexpected CWSN code {fresh_cwsn}. Manual review."
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         # ------------------------------------------------- blank-only diff

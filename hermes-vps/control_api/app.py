@@ -1012,7 +1012,7 @@ def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
         return "UDISE session authenticated", None, None
     if line.startswith("[") and "WAIT " in line:
         return "Portal is responding slowly; still working…", None, None
-    if any(k in line for k in ("Completed", "Ready to Complete", "Need FP", "Need EP + FP", "Need GP + EP + FP", "Read failures", "Saved + confirmed", "No change needed", "Nothing to fill", "Preview only", "Skipped / other", "Other", "eShikshaKosh", "EP_APPROVED_RESULT", "EP approved plan", "EP approved outcome", "GP_APPROVED_RESULT", "GP_RESULT", "GP approved plan", "GP approved outcome", "FP_RESULT", "FP outcome", "FINALIZE_RESULT", "FINALIZE outcome", "report rows", "scope:", "pending=", "students=")):
+    if any(k in line for k in ("Completed", "Ready to Complete", "Need FP", "Need EP + FP", "Need GP + EP + FP", "Read failures", "Saved + confirmed", "No change needed", "Nothing to fill", "Preview only", "Skipped / other", "Other", "eShikshaKosh", "EP_APPROVED_RESULT", "EP approved plan", "EP approved outcome", "GP_APPROVED_RESULT", "GP_RESULT", "GP approved plan", "GP approved outcome", "FP_RESULT", "FP outcome", "FINALIZE_RESULT", "FINALIZE outcome", "GP_CWSN_CONFIRM_REQUIRED", "ROSTER_STUDENT", "report rows", "scope:", "pending=", "students=")):
         return re.sub(r"\s+", " ", line), None, None
     return None, None, None
 
@@ -1273,11 +1273,19 @@ def _run_job_unlocked(job_id: str) -> None:
         _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
         if is_preview and bool(row["auto_save"]):
             if stage in {"gp", "ep", "facility", "finalize"}:
-                try:
-                    _queue_automatic_write(job_id)
-                except Exception as auto_exc:
-                    safe_auto = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(auto_exc))[:500]
-                    _event(job_id, f"FAILURE · Component: {stage.upper()} Automatic Save · Operation: queue write · Detail: {safe_auto}", "error")
+                pending_cwsn = out_dir / "cwsn-pending.json"
+                if stage == "gp" and pending_cwsn.is_file() and _json_read(pending_cwsn):
+                    pending = _json_read(pending_cwsn)
+                    _event(
+                        job_id,
+                        f"⚠️ GP_CWSN_CONFIRM_REQUIRED count={len(pending)} · Confirm CWSN=No for these students to continue the authorized save.",
+                    )
+                else:
+                    try:
+                        _queue_automatic_write(job_id)
+                    except Exception as auto_exc:
+                        safe_auto = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(auto_exc))[:500]
+                        _event(job_id, f"FAILURE · Component: {stage.upper()} Automatic Save · Operation: queue write · Detail: {safe_auto}", "error")
     except Exception as exc:
         safe = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(exc))[:500]
         stage_label = str(row["stage"] or "unknown").upper()
@@ -1358,6 +1366,45 @@ def _job_session_id(job_id: str) -> str:
     return str(row[0]) if row else str(job_id)
 
 
+@app.post("/api/v1/jobs/{job_id}/confirm-cwsn")
+def confirm_cwsn(job_id: str, authorization: str | None = Header(default=None)) -> dict:
+    """Explicitly authorize changing the pending CWSN=Yes records to No."""
+    require_api(authorization)
+    with _db() as conn:
+        preview = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not preview:
+        raise HTTPException(404, "Preview job not found")
+    if preview["stage"] != "gp" or not bool(preview["preview"]) or preview["status"] != "completed":
+        raise HTTPException(409, "Only a completed GP preview can receive CWSN confirmation")
+    pending_path = JOBS / job_id / "cwsn-pending.json"
+    plan_path = JOBS / job_id / "approved-plan.json"
+    if not pending_path.is_file():
+        raise HTTPException(409, "No pending CWSN confirmations are waiting")
+    pending = _json_read(pending_path)
+    if not isinstance(pending, dict) or not pending:
+        raise HTTPException(409, "No pending CWSN confirmations are waiting")
+    plan = _json_read(plan_path) if plan_path.is_file() else {}
+    if not isinstance(plan, dict):
+        plan = {}
+    for key, item in pending.items():
+        changes = dict(item.get("changes") or {})
+        changes["cwsnYN"] = 2
+        plan[key] = {
+            "pen": str(item.get("pen") or ""),
+            "student_id": str(item.get("student_id") or ""),
+            "name": str(item.get("name") or ""),
+            "changes": changes,
+        }
+    plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    pending_path.unlink(missing_ok=True)
+    _event(job_id, f"✅ CWSN confirmation received for {len(pending)} student(s). CWSN will be set to No and each change will require fresh read-back verification.")
+    try:
+        write_job_id = _queue_automatic_write(job_id)
+    except Exception as exc:
+        raise HTTPException(500, f"Could not queue the confirmed GP save: {exc}") from exc
+    return {"job_id": job_id, "write_job_id": write_job_id, "confirmed": len(pending)}
+
+
 @app.post("/api/v1/jobs/{job_id}/approve")
 def approve_job(job_id: str, body: ApprovalIn, authorization: str | None = Header(default=None)) -> dict:
     """Create one bounded write job from a completed preview."""
@@ -1381,6 +1428,10 @@ def approve_job(job_id: str, body: ApprovalIn, authorization: str | None = Heade
             raise HTTPException(400, f"Type {expected} and acknowledge fresh read-back")
         if not preview["result_path"] or not Path(preview["result_path"]).is_file():
             raise HTTPException(410, "Preview workbook expired; generate a new preview")
+        if preview["stage"] == "gp":
+            pending_path = JOBS / job_id / "cwsn-pending.json"
+            if pending_path.is_file() and _json_read(pending_path):
+                raise HTTPException(409, "CWSN confirmation is required before this GP preview can be approved")
         existing = conn.execute(
             "SELECT id FROM jobs WHERE approved_from=? AND status IN ('queued','running','completed') LIMIT 1",
             (job_id,),

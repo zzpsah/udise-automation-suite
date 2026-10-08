@@ -77,6 +77,7 @@ export default function Page(){
   const [infoStage,setInfoStage]=useState<string|null>(null);
   const [msg,setMsg]=useState("");
   const [saveLimit,setSaveLimit]=useState(1);
+  const [cwsnConfirmBusy,setCwsnConfirmBusy]=useState(false);
 
   async function loadCaps(){
     const r=await fetch("/api/capabilities",{cache:"no-store"});
@@ -265,6 +266,23 @@ export default function Page(){
     return ()=>clearInterval(t);
   },[eshikshaToken,eshikshaReady]);
 
+  async function confirmCwsn(){
+    if(!jobId||cwsnConfirmBusy) return;
+    const ok=window.confirm("Confirm CWSN = No for every listed student? The system will set CWSN to No and then save and fresh-read each record.");
+    if(!ok) return;
+    setCwsnConfirmBusy(true);
+    setMsg("CWSN confirmation received. Queuing verified GP saves…");
+    const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/confirm-cwsn",{method:"POST"});
+    const d=await r.json().catch(()=>({}));
+    setCwsnConfirmBusy(false);
+    if(!r.ok){
+      setMsg(clientFailure("UDISE General Profile","Confirm CWSN=No",d.detail||d.error||"Unknown error"));
+      return;
+    }
+    setMsg("CWSN=No confirmed. Verified GP save is now running.");
+    if(d.write_job_id) setJobId(d.write_job_id);
+  }
+
   async function startJob(){
     if(!sessionId){setMsg("Connect a secure UDISE session first.");return}
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
@@ -404,7 +422,12 @@ export default function Page(){
         {job&&<div className="job-output">
           <div className="friendly-message">{job.job.message||msg}</div>
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
-          <ul className="events">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Update"}</b> · {e.message}</li>)}</ul>
+          {job.events.some(e=>e.message.includes("GP_CWSN_CONFIRM_REQUIRED"))&&job.job.stage==="gp"&&job.job.status==="completed"&&!job.job.auto_write_job_id&&<div className="error-box" role="alert">
+            <strong>CWSN confirmation required</strong>
+            <span>One or more students currently have CWSN=Yes. Review the live Name + PEN entries below. If you have verified that these students should be CWSN=No, confirm once to set No and continue with fresh read-back verification.</span>
+            <button type="button" className="run-button" onClick={confirmCwsn} disabled={cwsnConfirmBusy}>{cwsnConfirmBusy?"Confirming…":"Confirm CWSN = No & Continue"}</button>
+          </div>}
+          <ul className="events" aria-live="polite">{job.events.slice(-12).map(e=><li key={e.id}><b>{e.level==="error"?"Error":"Live"}</b> · {e.message}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}

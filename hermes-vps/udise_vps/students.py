@@ -100,6 +100,10 @@ def export_students(session, path: str) -> str:
             c.font = font_norm
 
         written += 1
+        print(
+            f"📋 ROSTER_STUDENT {written}/{total} pen={pen} name={detail.get('studentName', '')}",
+            flush=True,
+        )
         if written % 25 == 0 or written == total:
             print(f"  {written}/{total} written…", flush=True)
         time.sleep(0.05)
