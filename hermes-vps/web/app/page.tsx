@@ -34,7 +34,7 @@ async function storeBrowserCredential(kind:"udise"|"eshiksha",id:string,password
 async function loadBrowserCredential(kind:"udise"|"eshiksha"){
   try{
     if(!navigator.credentials?.get) return null;
-    const credential=await navigator.credentials.get({password:true,mediation:"optional"}) as (Credential & {id?:string;password?:string})|null;
+    const credential=await (navigator.credentials.get as any)({password:true,mediation:"optional"}) as (Credential & {id?:string;password?:string})|null;
     if(!credential?.id?.startsWith(`${kind}:`)||!credential.password) return null;
     return {id:credential.id.slice(kind.length+1),password:credential.password};
   }catch{return null}
