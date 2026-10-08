@@ -1061,7 +1061,12 @@ def _run_job(job_id: str) -> None:
             if is_preview:
                 report_meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
                 if ESK_UPLOAD.exists() and report_meta.get("session_id") in {"", row["session_id"]}:
-                    cmd += ["--class", ep_class, "--report", str(ESK_UPLOAD)]
+                    # Keep a job-scoped copy so the exact source used for this
+                    # preview survives into the separately approved write job.
+                    job_report = out_dir / "eShikshaKosh_OTR_ALL.xlsx"
+                    shutil.copy2(ESK_UPLOAD, job_report)
+                    os.chmod(job_report, 0o600)
+                    cmd += ["--class", ep_class, "--report", str(job_report)]
                 elif ep_class == "X":
                     cmd += ["--class", ep_class]
                 else:
