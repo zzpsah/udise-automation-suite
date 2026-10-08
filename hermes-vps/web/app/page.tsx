@@ -5,6 +5,7 @@ type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires
 type SchoolPreset={internal_id:string;udise_code:string;name:string};
 type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
 type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;error?:string};events:{id:number;message:string;level:string}[]};
+type EshikshaPreview={ready:boolean;source:string;school_name:string;udise:string;total:number;class_counts:Record<string,number>;preview_limit:number;rows:Array<Record<string,string>>};
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
   students: "Phase 1 · Validate session and fetch the current roster",
@@ -58,6 +59,7 @@ export default function Page(){
   const [eshikshaUrl,setEshikshaUrl]=useState("");
   const [eshikshaReady,setEshikshaReady]=useState(false);
   const [eshikshaReportReady,setEshikshaReportReady]=useState(false);
+  const [eshikshaPreview,setEshikshaPreview]=useState<EshikshaPreview|null>(null);
   const [eshikshaFile,setEshikshaFile]=useState<File|null>(null);
   const [eshikshaUdise,setEshikshaUdise]=useState("");
   const [eshikshaPassword,setEshikshaPassword]=useState("");
@@ -181,7 +183,7 @@ export default function Page(){
 
   async function connectEshiksha(){
     setMsg("Preparing secure eShikshaKosh sign-in…");
-    setEshikshaReady(false);setEshikshaReportReady(false);
+    setEshikshaReady(false);setEshikshaReportReady(false);setEshikshaPreview(null);
     const r=await fetch("/api/eshiksha-request",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({session_id:sessionId})});
     const d=await r.json();
     if(!r.ok){setMsg(d.error||"Could not create the secure eShikshaKosh sign-in");return}
@@ -237,7 +239,13 @@ export default function Page(){
     document.body.appendChild(a);a.click();a.remove();
     URL.revokeObjectURL(url);
     setEshikshaReportReady(true);setEshikshaReady(false);
-    setMsg("Complete eShikshaKosh OTR report fetched and attached to Enrollment Profile. UDISE class matching will use this single source. Temporary password discarded.");
+    try {
+      const previewResponse = await fetch(`/api/eshiksha-preview?session_id=${encodeURIComponent(sessionId)}`,{cache:"no-store"});
+      const previewData = await previewResponse.json();
+      if(previewResponse.ok) setEshikshaPreview(previewData);
+      else setMsg(previewData.detail||previewData.error||"Report fetched, but the browser preview could not be loaded.");
+    } catch { setMsg("Report fetched and retained for EP, but the browser preview could not be loaded."); }
+    setMsg("Latest eShikshaKosh report fetched. The source is ready for Enrollment Profile processing.");
   }
 
   useEffect(()=>{
@@ -355,7 +363,13 @@ export default function Page(){
                 <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||klass==="X")?"ready":"needed")}>{eshikshaReportReady?"EP source ready":eshikshaReady?"Verified connection":klass==="X"?"Optional for Class X":"Source required"}</span>
               </div>
               {eshikshaReady&&<div className="source-identity"><strong>Connected:</strong> {eshikshaSchoolName||"eShikshaKosh school"}{eshikshaConnectedUdise?` · UDISE ${eshikshaConnectedUdise}`:""}<small>Login verified. The password is temporary for this UDISE session and is discarded after the live source fetch.</small></div>}
-              {eshikshaReportReady&&<div className="source-identity"><strong>EP source ready.</strong> The fetched/uploaded eShikshaKosh report is passed automatically into Enrollment Profile.</div>}
+              {eshikshaReportReady&&<div className="source-identity"><strong>EP source ready.</strong> The fetched/uploaded eShikshaKosh report is retained server-side and passed automatically into Enrollment Profile.</div>}
+              {eshikshaPreview&&<div className="source-preview">
+                <div className="source-preview-head"><div><strong>Latest eShikshaKosh data</strong><small>{eshikshaPreview.total} students loaded · showing first {eshikshaPreview.preview_limit}</small></div><span className="badge ok">Ready for EP</span></div>
+                <div className="source-counts">{Object.entries(eshikshaPreview.class_counts).sort().map(([k,v])=><span key={k}>Class {k.replace(/^Class\\s*/i,"")}: <strong>{v}</strong></span>)}</div>
+                <div className="source-table-wrap"><table className="source-table"><thead><tr><th>Student</th><th>Father</th><th>Class</th><th>Admission</th><th>OTR</th><th>Stream</th></tr></thead><tbody>{eshikshaPreview.rows.map((row,i)=><tr key={i}><td>{row["Student Name"]}</td><td>{row["Father's Name"]}</td><td>{row["Class"]}</td><td>{row["Admission No"]}</td><td>{row["OTR Number"]}</td><td>{row["Stream"]}</td></tr>)}</tbody></table></div>
+                <small className="source-preview-note">Preview is read-only. The complete retained workbook—not just these displayed rows—is used by the EP matcher.</small>
+              </div>}
 
               <div className="source-methods">
                 <div className="source-method recommended">
