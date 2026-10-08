@@ -1030,6 +1030,18 @@ def test_facility_blank_only_fill():
     print("PASS test_facility_blank_only_fill")
 
 
+def test_facility_yes_no_display_variants_are_not_treated_as_blank():
+    assert facility.yes_no_code("1 - Yes") == 1
+    assert facility.yes_no_code("Yes - 1") == 1
+    assert facility.yes_no_code("Yes (1)") == 1
+    assert facility.yes_no_code("2 - No") == 2
+    assert facility.yes_no_code("No - 2") == 2
+    assert facility.yes_no_code("9") is None
+    assert facility.approved_yn_conflict("1 - Yes", 2) is True
+    assert facility.approved_yn_conflict("2 - No", 2) is False
+    print("PASS test_facility_yes_no_display_variants_are_not_treated_as_blank")
+
+
 def test_facility_generated_ranges():
     import random
     rng = random.Random(7)

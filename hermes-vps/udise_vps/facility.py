@@ -80,17 +80,32 @@ def is_blank_code(value) -> bool:
 
 
 def yes_no_code(value) -> int | None:
-    """1 = Yes, 2 = No. None when blank or the 9 'not applicable' sentinel.
+    """Normalize every known UDISE Yes/No representation.
 
-    The portal writes 9 into nccYn/nssYn/scoutsYn/olympdsNlc for a record that
-    has never been answered, so 9 must read as unanswered rather than as a
-    saved value.
+    The portal can return a coded value as a number (1/2), a boolean, or a
+    display string such as "1 - Yes" / "2 - No". The preview and save-read
+    paths must interpret all of those identically; otherwise an existing Yes
+    can be mistaken for blank during preview and then appear as a state change
+    during the protected save step.
+
+    Code 9 (and blank/0) means unanswered for these fields. Code 1 is Yes and
+    code 2 is No, so a real Yes remains protected from an automatic No write.
     """
-    lowered = text(value).lower()
+    lowered = text(value).strip().lower()
     if lowered in {"yes", "1", "1.0", "true"}:
         return 1
     if lowered in {"no", "2", "2.0", "false"}:
         return 2
+
+    # Portal display/catalogue variants: "1 - Yes", "Yes - 1",
+    # "1: Yes", "Yes (1)", etc. Prefer an explicit Yes/No label over
+    # incidental digits elsewhere in the string.
+    if "yes" in lowered:
+        return 1
+    if "no" in lowered:
+        return 2
+    if lowered in {"0", "0.0", "9", "9.0"}:
+        return None
     return None
 
 
@@ -325,7 +340,7 @@ def run_facility(
                     conflicts.append(field)
             if conflicts:
                 result.status = "SKIPPED_STATE_CHANGED"
-                result.detail = "Fresh FP differs from approved preview for: " + ", ".join(conflicts)
+                result.detail = "Fresh FP differs from save preview for: " + ", ".join(conflicts)
                 results.append(result)
                 print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
