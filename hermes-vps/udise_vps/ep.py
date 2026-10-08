@@ -933,6 +933,7 @@ def run_ep(
     not_studying_override: bool = False,
     auto_not_studying: bool = True,
     ask_stream=None,
+    approved_plan: dict | None = None,
 ) -> list[EpResult]:
     """Preview (and optionally submit) Enrollment Profile updates.
 
@@ -1056,6 +1057,71 @@ def run_ep(
             continue
 
         result.current = {field: current.get(field) for field in COMPARE_FIELDS}
+
+        # ------------------------------------------------ approved plan
+        if approved_plan is not None:
+            plan = approved_plan.get(pen) or approved_plan.get(sid)
+            changes = plan.get("changes") if isinstance(plan, dict) else None
+            if not isinstance(changes, dict) or not changes:
+                result.status = "SKIPPED_NOT_IN_APPROVED_PLAN"
+                result.detail = "Student was not eligible in the approved preview plan; no POST sent."
+                results.append(result)
+                continue
+            conflicts = [f for f, v in changes.items() if not is_blank(current.get(f)) and str(current.get(f)) != str(v)]
+            if conflicts:
+                result.status = "SKIPPED_STATE_CHANGED"
+                result.detail = "Live EP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
+                results.append(result)
+                continue
+            updates = dict(changes)
+            result.changes = updates
+            if submissions >= max_submissions:
+                result.status = "LIMIT_REACHED"
+                result.detail = "max submissions (%s) reached." % max_submissions
+                results.append(result)
+                continue
+            payload = build_ep_payload(session.school_id, sid, current, updates, moi_id=moi_id)
+            endpoint = "/p0/api/v2/students/enrolment/%s" % sid
+            try:
+                status_code, body = session._request("POST", endpoint, attempts=1, read_timeout=300, connect_timeout=15, label="EP-POST", json=payload)
+                response_success = status_code == 200 and body.get("status") is True
+                if not response_success:
+                    err = body.get("error")
+                    msg = err.get("message") if isinstance(err, dict) else err
+                    result.status = "FAILED"
+                    result.detail = "HTTP %s; %s" % (status_code, msg or body.get("message") or "rejected")
+                    results.append(result)
+                    break
+            except Exception as exc:
+                result.status = "UNCONFIRMED"
+                result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
+                results.append(result)
+                break
+            submissions += 1
+            matched = False
+            mismatches = []
+            for delay in (2, 5, 10):
+                time.sleep(delay)
+                try:
+                    saved = session.get_json(endpoint, read_timeout=60).get("data")
+                    if isinstance(saved, dict):
+                        matched, mismatches = readback_matches(saved, payload)
+                        if matched:
+                            break
+                except Exception:
+                    continue
+            if matched:
+                result.status = "SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK"
+                result.detail = "Approved preview values saved and confirmed by fresh EP read-back."
+                results.append(result)
+            else:
+                result.status = "UNCONFIRMED"
+                result.detail = "Fresh EP read-back differs: " + ", ".join(mismatches or ["unknown"])
+                results.append(result)
+                break
+            continue
+
+
         updates: dict = {}
 
         # --------------------------------------------- admission number
