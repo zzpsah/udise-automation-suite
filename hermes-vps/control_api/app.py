@@ -1012,7 +1012,7 @@ def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
         return "UDISE session authenticated", None, None
     if line.startswith("[") and "WAIT " in line:
         return "Portal is responding slowly; still working…", None, None
-    if any(k in line for k in ("Completed", "Ready to Complete", "Need FP", "Need EP + FP", "Need GP + EP + FP", "Read failures", "Saved + confirmed", "No change needed", "Nothing to fill", "Preview only", "Skipped / other", "Other", "eShikshaKosh", "EP_APPROVED_RESULT", "EP approved plan", "EP approved outcome", "GP_APPROVED_RESULT", "GP_RESULT", "GP approved plan", "GP approved outcome", "FP_RESULT", "FP outcome", "FINALIZE_RESULT", "FINALIZE outcome", "GP_CWSN_CONFIRM_REQUIRED", "ROSTER_STUDENT", "report rows", "scope:", "pending=", "students=")):
+    if any(k in line for k in ("Completed", "Ready to Complete", "Need FP", "Need EP + FP", "Need GP + EP + FP", "Read failures", "Saved + confirmed", "No change needed", "Nothing to fill", "Preview only", "Skipped / other", "Other", "eShikshaKosh", "EP_APPROVED_RESULT", "EP approved plan", "EP approved outcome", "GP_APPROVED_RESULT", "GP_RESULT", "GP approved plan", "GP approved outcome", "FP_RESULT", "FP outcome", "FINALIZE_RESULT", "FINALIZE outcome", "GP_CWSN_CONFIRM_REQUIRED", "SNAPSHOT_RESULT", "ROSTER_STUDENT", "report rows", "scope:", "pending=", "students=")):
         return re.sub(r"\s+", " ", line), None, None
     return None, None, None
 
