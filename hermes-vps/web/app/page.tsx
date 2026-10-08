@@ -464,7 +464,7 @@ export default function Page(){
             <span>Students with CWSN=Yes are listed below with PEN, Name and Father&apos;s Name. Verify them before confirming. The system will set CWSN=No, save each record, and perform a fresh read-back verification.</span>
             <button type="button" className="run-button" onClick={confirmCwsn} disabled={cwsnConfirmBusy}>{cwsnConfirmBusy?"Confirming…":"Confirm CWSN = No & Continue"}</button>
           </div>}
-          <ul className="events" aria-live="polite">{job.events.slice(-12).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{String(e.message||"").replace(/^LIVE\s*[·•:-]\s*/i,"")}</li>)}</ul>
+          <ul className="events" aria-live="polite">{job.events.slice(-50).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{String(e.message||"").replace(/^LIVE\s*[·•:-]\s*/i,"")}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}
         </div>}
