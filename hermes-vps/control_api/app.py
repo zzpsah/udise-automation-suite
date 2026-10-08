@@ -1264,28 +1264,34 @@ def _run_job_unlocked(job_id: str) -> None:
             plan = _json_read(plan_path)
             if not isinstance(plan, dict):
                 raise RuntimeError(f"{stage.upper()} approved plan is invalid JSON; no write job was queued")
+        pending_cwsn = out_dir / "cwsn-pending.json"
+        pending_data = _json_read(pending_cwsn) if pending_cwsn.is_file() else {}
+        cwsn_waiting = bool(is_preview and stage == "gp" and isinstance(pending_data, dict) and pending_data)
         with _db() as conn:
             scoped_total = conn.execute("SELECT progress_total FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
-            conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=?,result_path=? WHERE id=?",
-                         (int(time.time()), "Completed successfully — review saved, skipped/already-filled, and other counts above.", rp, job_id))
+            final_status = "awaiting_confirmation" if cwsn_waiting else "completed"
+            final_message = (
+                "Awaiting confirmation — review CWSN=Yes students before setting CWSN=No and continuing."
+                if cwsn_waiting else
+                "Completed successfully — review saved, skipped/already-filled, and other counts above."
+            )
+            conn.execute("UPDATE jobs SET status=?,updated_at=?,message=?,result_path=? WHERE id=?",
+                         (final_status, int(time.time()), final_message, rp, job_id))
         if scoped_total:
             _update_progress(job_id, scoped_total, scoped_total)
-        _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
-        if is_preview and bool(row["auto_save"]):
-            if stage in {"gp", "ep", "facility", "finalize"}:
-                pending_cwsn = out_dir / "cwsn-pending.json"
-                if stage == "gp" and pending_cwsn.is_file() and _json_read(pending_cwsn):
-                    pending = _json_read(pending_cwsn)
-                    _event(
-                        job_id,
-                        f"⚠️ GP_CWSN_CONFIRM_REQUIRED count={len(pending)} · Confirm CWSN=No for these students to continue the authorized save.",
-                    )
-                else:
-                    try:
-                        _queue_automatic_write(job_id)
-                    except Exception as auto_exc:
-                        safe_auto = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(auto_exc))[:500]
-                        _event(job_id, f"FAILURE · Component: {stage.upper()} Automatic Save · Operation: queue write · Detail: {safe_auto}", "error")
+        if cwsn_waiting:
+            _event(
+                job_id,
+                f"⚠️ GP_CWSN_CONFIRM_REQUIRED count={len(pending_data)} · Confirm CWSN=No for these students to continue the authorized save.",
+            )
+        else:
+            _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
+        if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting:
+            try:
+                _queue_automatic_write(job_id)
+            except Exception as auto_exc:
+                safe_auto = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(auto_exc))[:500]
+                _event(job_id, f"FAILURE · Component: {stage.upper()} Automatic Save · Operation: queue write · Detail: {safe_auto}", "error")
     except Exception as exc:
         safe = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(exc))[:500]
         stage_label = str(row["stage"] or "unknown").upper()
@@ -1374,7 +1380,7 @@ def confirm_cwsn(job_id: str, authorization: str | None = Header(default=None)) 
         preview = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not preview:
         raise HTTPException(404, "Preview job not found")
-    if preview["stage"] != "gp" or not bool(preview["preview"]) or preview["status"] != "completed":
+    if preview["stage"] != "gp" or not bool(preview["preview"]) or preview["status"] != "awaiting_confirmation":
         raise HTTPException(409, "Only a completed GP preview can receive CWSN confirmation")
     pending_path = JOBS / job_id / "cwsn-pending.json"
     plan_path = JOBS / job_id / "approved-plan.json"

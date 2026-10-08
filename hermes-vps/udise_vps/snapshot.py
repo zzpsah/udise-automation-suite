@@ -140,6 +140,15 @@ def collect_snapshot(session, class_scope_name: str | None = None) -> dict[str, 
             "statusDesc": gp.get("statusDesc", "") if gp else "",
             "lastModifiedOn": gp.get("lastModifiedOn", "") if gp else "",
         })
+        student_issues = [
+            row for row in result["Issues"]
+            if row.get("PEN") == identity["PEN"] and row.get("S. No.") == position
+        ]
+        if student_issues:
+            detail = "; ".join(str(row.get("Stage")) + ": " + str(row.get("Error")) for row in student_issues)
+            print(f"📋 SNAPSHOT_RESULT status=FAILED pen={identity['PEN']} name={identity['Name']} detail={detail}", flush=True)
+        else:
+            print(f"📋 SNAPSHOT_RESULT status=SUCCESS_CONFIRMED pen={identity['PEN']} name={identity['Name']} detail=GP, EP and Facility read successfully.", flush=True)
         print(f"[SNAPSHOT] {position}/{total} students checked", flush=True)
 
     if class_scope_name:

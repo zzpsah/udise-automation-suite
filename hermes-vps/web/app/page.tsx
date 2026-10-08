@@ -422,7 +422,7 @@ export default function Page(){
         {job&&<div className="job-output">
           <div className="friendly-message">{job.job.message||msg}</div>
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
-          {job.events.some(e=>e.message.includes("GP_CWSN_CONFIRM_REQUIRED"))&&job.job.stage==="gp"&&job.job.status==="completed"&&!job.job.auto_write_job_id&&<div className="error-box" role="alert">
+          {job.events.some(e=>e.message.includes("GP_CWSN_CONFIRM_REQUIRED"))&&job.job.stage==="gp"&&job.job.status==="awaiting_confirmation"&&!job.job.auto_write_job_id&&<div className="error-box" role="alert">
             <strong>CWSN confirmation required</strong>
             <span>One or more students currently have CWSN=Yes. Review the live Name + PEN entries below. If you have verified that these students should be CWSN=No, confirm once to set No and continue with fresh read-back verification.</span>
             <button type="button" className="run-button" onClick={confirmCwsn} disabled={cwsnConfirmBusy}>{cwsnConfirmBusy?"Confirming…":"Confirm CWSN = No & Continue"}</button>
