@@ -24,7 +24,7 @@ function clientFailure(component:string, operation:string, detail:string):string
 }
 async function storeBrowserCredential(kind:"udise"|"eshiksha",id:string,password:string){
   try{
-    const C=globalThis.PasswordCredential as unknown as (new (data:{id:string;password:string;name?:string})=>Credential)|undefined;
+    const C=(globalThis as any).PasswordCredential as (new (data:{id:string;password:string;name?:string})=>Credential)|undefined;
     if(!C||!navigator.credentials?.store) return false;
     const credential=new C({id:`${kind}:${id}`,password,name:kind==="udise"?"UDISE Operations Console":"eShikshaKosh"});
     await navigator.credentials.store(credential);
@@ -76,7 +76,6 @@ export default function Page(){
   const [password,setPassword]=useState("");
   const [showPassword,setShowPassword]=useState(false);
   const [rememberUdise,setRememberUdise]=useState(false);
-  const [savedUdiseAvailable,setSavedUdiseAvailable]=useState(false);
   const [captcha,setCaptcha]=useState("");
   const [captchaNonce,setCaptchaNonce]=useState(0);
   const [loginBusy,setLoginBusy]=useState(false);
@@ -90,7 +89,6 @@ export default function Page(){
   const [eshikshaPassword,setEshikshaPassword]=useState("");
   const [showEshikshaPassword,setShowEshikshaPassword]=useState(false);
   const [rememberEshiksha,setRememberEshiksha]=useState(false);
-  const [savedEshikshaAvailable,setSavedEshikshaAvailable]=useState(false);
   const [eshikshaYear,setEshikshaYear]=useState("2026-27");
   const [eshikshaSchoolName,setEshikshaSchoolName]=useState("");
   const [eshikshaConnectedUdise,setEshikshaConnectedUdise]=useState("");
@@ -110,7 +108,7 @@ export default function Page(){
     if(data.school_presets?.length) setSchool(current=>current||data.school_presets![0].internal_id);
   }
   useEffect(()=>{loadCaps()},[]);
-  useEffect(()=>{let cancelled=false;(async()=>{const saved=await loadBrowserCredential("udise");if(!cancelled&&saved){setUsername(saved.id);setPassword(saved.password);setRememberUdise(true);setSavedUdiseAvailable(true)}const esSaved=await loadBrowserCredential("eshiksha");if(!cancelled&&esSaved){setEshikshaUdise(esSaved.id);setEshikshaPassword(esSaved.password);setRememberEshiksha(true);setSavedEshikshaAvailable(true)}})();return()=>{cancelled=true}},[]);
+  useEffect(()=>{let cancelled=false;(async()=>{const saved=await loadBrowserCredential("udise");if(!cancelled&&saved){setUsername(saved.id);setPassword(saved.password);setRememberUdise(true)}const esSaved=await loadBrowserCredential("eshiksha");if(!cancelled&&esSaved){setEshikshaUdise(esSaved.id);setEshikshaPassword(esSaved.password);setRememberEshiksha(true);setSavedEshikshaAvailable(true)}})();return()=>{cancelled=true}},[]);
 
   const selected=useMemo(()=>caps?.stages.find(x=>x.id===stage),[caps,stage]);
   const selectedMeta=selected?STAGE_META[selected.id]:undefined;
@@ -161,7 +159,6 @@ export default function Page(){
     setSessionExpiresAt(expiresAt);
     setSessionSeconds(Math.max(0,Math.floor((expiresAt-Date.now())/1000)));
     if(rememberUdise) await storeBrowserCredential("udise",username.trim(),password);
-    setSavedUdiseAvailable(rememberUdise);
     setPassword("");
     setCaptcha("");
     setMsg(d.school_id?"Students Module connected. Select class and workflow.":"UDISE connected, but Students Module school scope could not be resolved.");
@@ -237,7 +234,6 @@ export default function Page(){
     const r=await fetch("/api/eshiksha-credentials",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:eshikshaToken,udise:eshikshaUdise,password:eshikshaPassword,year:eshikshaYear,session_id:sessionId})});
     const d=await r.json();
     if(r.ok&&rememberEshiksha) await storeBrowserCredential("eshiksha",eshikshaUdise.trim(),eshikshaPassword);
-    setSavedEshikshaAvailable(r.ok&&rememberEshiksha);
     setEshikshaPassword("");
     if(!r.ok){setEshikshaReady(false);setMsg(clientFailure("eShikshaKosh Authentication","Verify credentials",d.detail||d.error||"Unknown error"));return}
     setEshikshaReady(Boolean(d.verified));setEshikshaUrl("");
