@@ -1237,6 +1237,18 @@ def _run_job(job_id: str) -> None:
         if stage == "ep" and is_preview and eshiksha:
             ESK_CREDENTIAL.unlink(missing_ok=True)
             _event(job_id, "eShikshaKosh source fetched and attached to this EP preview; temporary password discarded.")
+        # GP/EP approval depends on the exact plan produced by the preview.
+        # Never mark such a preview completed (or queue a write child) if the
+        # plan artifact was not actually persisted by the runner.
+        if is_preview and stage in {"gp", "ep"}:
+            plan_path = out_dir / "approved-plan.json"
+            if not plan_path.is_file():
+                raise RuntimeError(
+                    f"{stage.upper()} preview completed without approved-plan.json; no write job was queued"
+                )
+            plan = _json_read(plan_path)
+            if not isinstance(plan, dict):
+                raise RuntimeError(f"{stage.upper()} approved plan is invalid JSON; no write job was queued")
         with _db() as conn:
             scoped_total = conn.execute("SELECT progress_total FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
             conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=?,result_path=? WHERE id=?",
