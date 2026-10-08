@@ -352,7 +352,20 @@ def run_auto_gp(
                 results.append(result)
                 print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
-            conflicts = [f for f, v in changes.items() if not is_blank(fresh.get(f)) and str(fresh.get(f)) != str(v)]
+            # CWSN confirmation is an explicit operator authorization to
+            # change the live Yes value to No. It is expected that the fresh
+            # read still shows Yes immediately before the POST, so this
+            # authorized transition must not be treated as a state conflict.
+            conflicts = [
+                f for f, v in changes.items()
+                if not (
+                    f == "cwsnYN"
+                    and str(v) == "2"
+                    and str(fresh.get(f)) in CWSN_SKIP_CODES
+                )
+                and not is_blank(fresh.get(f))
+                and str(fresh.get(f)) != str(v)
+            ]
             if conflicts:
                 result.status = "SKIPPED_STATE_CHANGED"
                 result.detail = "Live GP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
