@@ -142,7 +142,7 @@ EP XI/XII is intentionally excluded because the portal's stream/subject mapping 
 
 Write workflows now use a server-side durable transition. The UI sends auto_save=true with the preview request. After a successful preview, the Control API creates exactly one write child job linked by approved_from, caps it at 500 submissions, and starts it independently of the browser polling lifecycle. A browser refresh/disconnect therefore cannot strand a successful preview at Preview-only.
 
-The write child performs a fresh pre-write read, one permitted POST per eligible record, and fresh read-back verification. The existing manual approval endpoint remains available as a recovery path. Read-only jobs never create a write child.
+The write child performs a fresh pre-write read, one permitted POST per eligible record, and fresh read-back verification. Browser refresh/background suspension/disconnect does not cancel the server-side write child. The existing manual approval endpoint remains available as a recovery path. Read-only jobs never create a write child.
 
 ### Full Snapshot class scope
 
@@ -154,12 +154,12 @@ For blank height/weight fields only, the production Facility runner uses:
 
 | Class | Gender | Height | Weight |
 |---|---|---:|---:|
-| IX–X | Boys | 140–155 cm | 38–52 kg |
-| IX–X | Girls | 135–150 cm | 34–48 kg |
+| IX–X | Boys | 140–160 cm | 38–55 kg |
+| IX–X | Girls | 135–155 cm | 34–50 kg |
 | XI–XII | Boys | 150–170 cm | 42–60 kg |
 | XI–XII | Girls | 146–166 cm | 38–56 kg |
 
-Existing saved measurements are never overwritten. Focused Facility regression coverage passes 13/13. These generated ranges are workflow defaults for unset fields, not a substitute for verified measurements.
+Existing saved measurements are never overwritten. Existing saved Yes values are never overwritten; conflicting dependent states are manual-review cases. Focused Facility regression coverage passes 13/13. These generated ranges are workflow defaults for unset fields, not a substitute for verified measurements.
 
 ## Safety model
 
@@ -274,3 +274,8 @@ Current portal-login behavior:
 - Boys: height 150–170 cm; weight 42–60 kg.
 - Girls: height 146–166 cm; weight 38–56 kg.
 - Existing saved measurements are never overwritten.
+
+
+## Remember UDISE credential behavior
+
+The login UI includes **Remember UDISE password on this Chrome profile**. The implementation uses the browser Credential Management API when available. Credentials are not intentionally stored in the Oracle control API or application database. Browser/Chrome support and policy determine whether the credential is actually saved.
