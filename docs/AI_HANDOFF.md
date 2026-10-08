@@ -5,7 +5,7 @@
 > Repository: `zzpsah/udise-automation-suite`
 > Live web app: `https://udise-auto.vercel.app/`
 > Oracle runtime: `/home/prashant/projects/udise-automation-suite`
-> Last architecture update: **2026-10-07**
+> Last architecture update: **2026-10-08**
 
 ## Current system
 
@@ -120,6 +120,46 @@ Then inspect:
 | Facility | `hermes-vps/udise_vps/facility.py` |
 | Completion | `hermes-vps/udise_vps/completion.py` |
 | Snapshot | `hermes-vps/udise_vps/snapshot.py` |
+
+## Current production write capability — 2026-10-08
+
+The supported write modules are active in production:
+
+- **GP:** IX, X, XI, XII
+- **EP:** IX, X
+- **Facility/FP:** IX, X, XI, XII
+- **Complete Data / Finalize:** IX, X, XI, XII
+
+The following remain intentionally read-only:
+
+- Student Roster
+- Full Snapshot
+- Completion Overview
+
+EP XI/XII is intentionally excluded because the portal's stream/subject mapping is not yet independently verified. This is a portal-contract limitation, not a disabled permission.
+
+### Durable Run & Save
+
+Write workflows now use a server-side durable transition. The UI sends auto_save=true with the preview request. After a successful preview, the Control API creates exactly one write child job linked by approved_from, caps it at 500 submissions, and starts it independently of the browser polling lifecycle. A browser refresh/disconnect therefore cannot strand a successful preview at Preview-only.
+
+The write child performs a fresh pre-write read, one permitted POST per eligible record, and fresh read-back verification. The existing manual approval endpoint remains available as a recovery path. Read-only jobs never create a write child.
+
+### Full Snapshot class scope
+
+The Control API now forwards the selected class as --class <IX|X|XI|XII> to the snapshot runner. This fixes the previous risk where a Class X request could use the runner's default/Class IX scope. Regression coverage verifies all four class selectors and confirms snapshot remains read-only.
+
+### Facility IX/X measurements
+
+For blank height/weight fields only, the production Facility runner uses:
+
+| Class | Gender | Height | Weight |
+|---|---|---:|---:|
+| IX–X | Boys | 140–155 cm | 38–52 kg |
+| IX–X | Girls | 135–150 cm | 34–48 kg |
+| XI–XII | Boys | 150–170 cm | 42–60 kg |
+| XI–XII | Girls | 146–166 cm | 38–56 kg |
+
+Existing saved measurements are never overwritten. Focused Facility regression coverage passes 13/13. These generated ranges are workflow defaults for unset fields, not a substitute for verified measurements.
 
 ## Safety model
 
