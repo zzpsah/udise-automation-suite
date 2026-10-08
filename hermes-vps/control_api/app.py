@@ -1258,6 +1258,13 @@ def _run_job_unlocked(job_id: str) -> None:
                     raise RuntimeError("Approved eShikshaKosh source report is no longer available; generate a new preview")
         elif stage == "facility":
             cmd += ["--class", row["class_name"]]
+            if is_preview:
+                cmd += ["--plan-out", str(out_dir / "approved-plan.json")]
+            else:
+                plan_path = JOBS / str(row["approved_from"]) / "approved-plan.json"
+                if not plan_path.is_file():
+                    raise RuntimeError("Approved Facility write plan is unavailable; generate a new preview")
+                cmd += ["--plan", str(plan_path)]
         elif stage == "finalize":
             cmd += ["--class", row["class_name"], "--from-completion"]
         elif stage not in {"students", "snapshot"}:
