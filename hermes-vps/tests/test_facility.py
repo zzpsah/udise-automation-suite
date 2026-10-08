@@ -98,6 +98,43 @@ def _():
     assert gw < bw, (gw, bw)
 
 
+@check("ix_x_use_requested_measurement_ranges")
+def _():
+    current = {"heightInCm": 0, "weightInKg": 0}
+    for cls in ("IX", "X"):
+        boys = fac.build_facility_updates(
+            current, cwsn=False, rng=random.Random(7), gender=1, class_label=cls
+        )
+        girls = fac.build_facility_updates(
+            current, cwsn=False, rng=random.Random(7), gender=2, class_label=cls
+        )
+        bh, bw = int(boys["heightInCm"]), int(boys["weightInKg"])
+        gh, gw = int(girls["heightInCm"]), int(girls["weightInKg"])
+        assert 140 <= bh <= 155, (cls, bh)
+        assert 38 <= bw <= 52, (cls, bw)
+        assert 135 <= gh <= 150, (cls, gh)
+        assert 34 <= gw <= 48, (cls, gw)
+        assert gh < bh and gw < bw, (cls, gh, bh, gw, bw)
+
+
+@check("xi_xii_keep_legacy_measurement_ranges")
+def _():
+    current = {"heightInCm": 0, "weightInKg": 0}
+    for cls in ("XI", "XII"):
+        boys = fac.build_facility_updates(
+            current, cwsn=False, rng=random.Random(7), gender=1, class_label=cls
+        )
+        girls = fac.build_facility_updates(
+            current, cwsn=False, rng=random.Random(7), gender=2, class_label=cls
+        )
+        bh, bw = int(boys["heightInCm"]), int(boys["weightInKg"])
+        gh, gw = int(girls["heightInCm"]), int(girls["weightInKg"])
+        assert 150 <= bh <= 170, (cls, bh)
+        assert 42 <= bw <= 60, (cls, bw)
+        assert 146 <= gh <= 166, (cls, gh)
+        assert 38 <= gw <= 56, (cls, gw)
+
+
 @check("saved_measurements_are_never_overwritten")
 def _():
     current = {"heightInCm": 147, "weightInKg": 44}

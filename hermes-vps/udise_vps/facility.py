@@ -4,8 +4,10 @@ Ported from the notebook's Facility cells (19-22).
 
 Rules confirmed with the operator:
   - A saved measurement stays. Only blank fields are filled.
-  - Boys: blank height -> 150..170 cm; blank weight -> 42..60 kg
-  - Girls: corresponding lower range -> 146..166 cm; 38..56 kg
+  - Classes IX-X boys: blank height -> 140..155 cm; blank weight -> 38..52 kg
+  - Classes IX-X girls: corresponding lower range -> 135..150 cm; 34..48 kg
+  - Classes XI-XII retain the existing ranges: boys 150..170 cm / 42..60 kg;
+    girls 146..166 cm / 38..56 kg
   - Blank Yes/No  -> No
   - Blank distance -> "Between 1-3 Kms" (code 2)
   - Blank parent education -> "Secondary or Equivalent" (code 3)
@@ -114,8 +116,12 @@ GIRL_HEIGHT_RANGE = (146, 166)
 GIRL_WEIGHT_RANGE = (38, 56)
 
 
-def build_facility_updates(current: dict, cwsn: bool, rng: random.Random, gender=None) -> dict:
-    """Blank-only updates. Saved values are never overwritten."""
+def build_facility_updates(current: dict, cwsn: bool, rng: random.Random, gender=None, class_label: str = "") -> dict:
+    """Blank-only updates. Saved values are never overwritten.
+
+    Classes IX-X use the operator-specified lower adolescent ranges. XI-XII
+    retain the existing Facility Profile ranges for compatibility.
+    """
     updates: dict = {}
 
     # ------------------------------------------------------------ Yes/No flags
@@ -129,8 +135,16 @@ def build_facility_updates(current: dict, cwsn: bool, rng: random.Random, gender
     # ------------------------------------------------------------- measurements
     gender_code = str(gender or "").strip().lower()
     is_female = gender_code in {"2", "2.0", "female", "girl", "f"}
-    height_min, height_max = GIRL_HEIGHT_RANGE if is_female else BOY_HEIGHT_RANGE
-    weight_min, weight_max = GIRL_WEIGHT_RANGE if is_female else BOY_WEIGHT_RANGE
+    if str(class_label).strip().upper() in {"CLASS IX", "CLASS X", "IX", "X"}:
+        # Requested ranges for Classes IX-X only. Female ranges are lower
+        # than the corresponding male ranges. XI-XII keep the legacy ranges.
+        height_range = (135, 150) if is_female else (140, 155)
+        weight_range = (34, 48) if is_female else (38, 52)
+    else:
+        height_range = GIRL_HEIGHT_RANGE if is_female else BOY_HEIGHT_RANGE
+        weight_range = GIRL_WEIGHT_RANGE if is_female else BOY_WEIGHT_RANGE
+    height_min, height_max = height_range
+    weight_min, weight_max = weight_range
     if is_blank(current.get("heightInCm")):
         updates["heightInCm"] = str(rng.randint(height_min, height_max))
     if is_blank(current.get("weightInKg")):
@@ -265,7 +279,9 @@ def run_facility(
             print(f"⚠️ {pen}: FP read failed — {result.detail}", flush=True)
             continue
 
-        updates = build_facility_updates(current, cwsn, rng, gender=gender)
+        updates = build_facility_updates(
+            current, cwsn, rng, gender=gender, class_label=class_label
+        )
         if not updates:
             result.status = "SKIPPED_ALREADY_UP_TO_DATE"
             result.detail = "Nothing blank to fill."
