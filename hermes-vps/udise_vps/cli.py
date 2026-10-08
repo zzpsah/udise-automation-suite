@@ -55,7 +55,8 @@ def _write_plan(path: str | None, results) -> None:
         pen = str(getattr(result, "pen", "") or "")
         sid = str(getattr(result, "student_id", "") or "")
         name = str(getattr(result, "name", "") or "")
-        item = {"pen": pen, "student_id": sid, "name": name, "changes": changes}
+        father_name = str(getattr(result, "father_name", "") or "")
+        item = {"pen": pen, "student_id": sid, "name": name, "father_name": father_name, "changes": changes}
         if status == "PREVIEW" and isinstance(changes, dict) and changes and (pen or sid):
             payload[pen or sid] = item
         elif status == "CWSN_CONFIRM_REQUIRED" and (pen or sid):
