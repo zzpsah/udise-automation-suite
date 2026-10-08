@@ -1349,7 +1349,7 @@ def _run_job_unlocked(job_id: str) -> None:
         # GP/EP approval depends on the exact plan produced by the preview.
         # Never mark such a preview completed (or queue a write child) if the
         # plan artifact was not actually persisted by the runner.
-        if is_preview and stage in {"gp", "ep"}:
+        if is_preview and stage in {"gp", "ep", "facility"}:
             plan_path = out_dir / "approved-plan.json"
             if not plan_path.is_file():
                 raise RuntimeError(
