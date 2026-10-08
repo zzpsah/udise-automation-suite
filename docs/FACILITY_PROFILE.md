@@ -11,7 +11,7 @@ The established route distinction remains unchanged:
 - GET/read-back: `/p0/api/v2/students/facility/{studentId}`
 - current-year POST: `/p0/api/v2/AY/students/facility/{studentId}`
 
-Real measurements are required. Never generate height/weight values to satisfy validation.
+For the current server-side automation, blank height/weight fields may be filled only within the class/gender ranges documented below. Saved measurements are never overwritten. This automated fill is distinct from workbook validation, which continues to accept only values within the portal's configured measurement limits.
 
 
 ## Current export defaults
@@ -61,6 +61,21 @@ Upload validation makes no UDISE request. It checks the workbook, selected class
 The CWSN reference is mandatory, so generate a fresh Facility workbook before validation. A locally valid workbook becomes reviewed without waiting on the portal. Immediately before an actual POST, the submit cell gets the current General Profile CWSN flag and stops if it differs from the exported reference. Every validation attempt clears previous approval. Missing cells are normalized with `where(pd.notna(...), '')` instead of the warning-producing fillna call.
 
 Twenty offline test methods across roster, Facility, enrollment and class selection pass for v1.2.5, including zero UDISE requests during Facility validation. No live Facility submission was performed.
+
+## Current implementation — IX/X measurement generation, 8 October 2026
+
+The maintained server-side Facility Profile runner now applies class-specific blank measurement ranges when it fills an unset height/weight field:
+
+| Class | Gender | Height | Weight |
+|---|---|---:|---:|
+| IX–X | Boys | 140–155 cm | 38–52 kg |
+| IX–X | Girls | 135–150 cm | 34–48 kg |
+| XI–XII | Boys | 150–170 cm | 42–60 kg |
+| XI–XII | Girls | 146–166 cm | 38–56 kg |
+
+For IX–X, the female range is intentionally below the corresponding male range as requested. Existing saved height/weight values remain protected by the blank-only update rule and are not overwritten. XI–XII retains the previous ranges and is covered by an explicit regression test.
+
+The implementation is in `hermes-vps/udise_vps/facility.py`; the focused regression suite is `hermes-vps/tests/test_facility.py`. Verification on 8 October 2026 passed **13/13 Facility tests**, including the new IX/X range tests and XI/XII preservation tests. Change commit: `95b81be` (`fix: adjust IX-X facility measurement ranges`).
 
 ## Verification and limitations
 
