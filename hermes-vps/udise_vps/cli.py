@@ -20,6 +20,7 @@ Writes are preview-only unless --submit is passed.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -41,6 +42,31 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--out", "-o", default=".", help="Output directory (default: .)",
     )
+
+
+def _write_plan(path: str | None, results) -> None:
+    if not path:
+        return
+    payload = {}
+    for result in results:
+        status = str(getattr(result, "status", ""))
+        changes = getattr(result, "changes", {}) or {}
+        pen = str(getattr(result, "pen", "") or "")
+        sid = str(getattr(result, "student_id", "") or "")
+        if status == "PREVIEW" and isinstance(changes, dict) and changes and (pen or sid):
+            payload[pen or sid] = {"pen": pen, "student_id": sid, "changes": changes}
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _load_plan(path: str | None) -> dict:
+    if not path:
+        return {}
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("Approved write plan is not a JSON object")
+    return data
 
 
 def _output_dir(args) -> Path:
@@ -105,9 +131,11 @@ def cmd_gp(args) -> int:
         row_limit=args.limit,
         allow_submit=args.submit,
         max_submissions=args.max,
+        approved_plan=_load_plan(args.plan) if args.submit else None,
     )
     if not args.submit:
         out = _output_dir(args)
+        _write_plan(args.plan_out, results)
         path = out / preview_report.default_filename("gp", session.school_id, args.klass)
         preview_report.write_preview_workbook("gp", results, str(path))
         print(f"REPORT_READY={path.resolve()}")
@@ -167,6 +195,7 @@ def cmd_ep(args) -> int:
         limit=args.limit,
         allow_submit=args.submit,
         max_submissions=args.max,
+        approved_plan=_load_plan(args.plan) if args.submit else None,
         fallback_width=args.fallback_width,
         fix_languages=args.fix_languages,
         admission_style=args.admission_style,
@@ -182,6 +211,7 @@ def cmd_ep(args) -> int:
             "The portal did not return usable EP data; retry after the portal recovers."
         )
     if not args.submit:
+        _write_plan(args.plan_out, results)
         path = out / preview_report.default_filename("ep", session.school_id, args.klass)
         preview_report.write_preview_workbook(
             "ep", results, str(path), eshiksha_rows=report_rows,
@@ -283,6 +313,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Actually POST. Without this, preview only.")
     p.add_argument("--max", type=int, default=1,
                    help="Maximum writes in this run")
+    p.add_argument("--plan-out", default=None, help="Write preview write plan JSON")
+    p.add_argument("--plan", default=None, help="Use approved preview write plan with --submit")
     p.set_defaults(func=cmd_gp)
 
     p = sub.add_parser("finalize", help="Finalize / Complete Data")
@@ -352,6 +384,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Actually POST. Without this, preview only.")
     p.add_argument("--max", type=int, default=1,
                    help="Maximum writes in this run")
+    p.add_argument("--plan-out", default=None, help="Write preview write plan JSON")
+    p.add_argument("--plan", default=None, help="Use approved preview write plan with --submit")
     p.set_defaults(func=cmd_ep)
 
     p = sub.add_parser("facility", help="Facility Profile (Classes IX-XII)")
