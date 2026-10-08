@@ -1151,6 +1151,7 @@ def _run_job(job_id: str) -> None:
                 else:
                     eshiksha = _load_eshiksha_credentials(row["session_id"])
                     cmd += ["--class", ep_class, "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
+                cmd += ["--plan-out", str(out_dir / "approved-plan.json")]
             else:
                 source_dir = JOBS / str(row["approved_from"])
                 plan_path = source_dir / "approved-plan.json"

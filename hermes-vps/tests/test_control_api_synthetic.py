@@ -135,6 +135,45 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert Path(auto_write_cmd[auto_write_cmd.index("--plan") + 1]).is_file()
             assert auto_write_cmd[auto_write_cmd.index("--max") + 1] == "7"
 
+            ep_auto = api.create_job(
+                api.JobIn(
+                    session_id=session_id,
+                    school="2497128",
+                    stage="ep",
+                    class_name="X",
+                    preview=True,
+                    auto_save=True,
+                    max_submissions=1,
+                ),
+                authorization=authorization,
+            )
+            deadline = time.time() + 5
+            ep_auto_state = None
+            while time.time() < deadline:
+                ep_auto_state = api.get_job(ep_auto["job_id"], authorization=authorization)
+                if ep_auto_state["job"].get("auto_write_job_id"):
+                    break
+                time.sleep(0.02)
+            assert ep_auto_state is not None
+            assert ep_auto_state["job"]["status"] == "completed", ep_auto_state
+            ep_auto_write_id = ep_auto_state["job"]["auto_write_job_id"]
+            assert ep_auto_write_id
+            ep_preview_cmd = observed["commands"][-2]
+            assert "--plan-out" in ep_preview_cmd
+            assert Path(ep_preview_cmd[ep_preview_cmd.index("--plan-out") + 1]).is_file()
+            deadline = time.time() + 5
+            ep_auto_write_state = None
+            while time.time() < deadline:
+                ep_auto_write_state = api.get_job(ep_auto_write_id, authorization=authorization)
+                if ep_auto_write_state["job"]["status"] in {"completed", "failed"}:
+                    break
+                time.sleep(0.02)
+            assert ep_auto_write_state is not None
+            assert ep_auto_write_state["job"]["status"] == "completed", ep_auto_write_state
+            ep_auto_write_cmd = observed["commands"][-1]
+            assert "--plan" in ep_auto_write_cmd
+            assert ep_auto_write_cmd[ep_auto_write_cmd.index("--max") + 1] == "1"
+
             queued = api.create_job(
                 api.JobIn(
                     session_id=session_id,
