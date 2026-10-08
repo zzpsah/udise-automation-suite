@@ -134,6 +134,18 @@ def is_blank(value) -> bool:
     return clean_text(value).lower() in {"", "nan", "none", "null"}
 
 
+def is_ep_blank_for_approved_write(field: str, value) -> bool:
+    """Treat the portal's blank sentinels the same way preview logic does."""
+    if is_blank(value):
+        return True
+    if re.fullmatch(r"subject[1-6]", str(field or "")):
+        try:
+            return int(float(clean_text(value))) in {0, 9}
+        except (TypeError, ValueError):
+            return False
+    return False
+
+
 def norm_name(value) -> str:
     return re.sub(r"[^A-Z]", "", str(value or "").upper())
 
@@ -1074,7 +1086,11 @@ def run_ep(
                 result.detail = "Student was not eligible in the approved preview plan; no POST sent."
                 results.append(result)
                 continue
-            conflicts = [f for f, v in changes.items() if not is_blank(current.get(f)) and str(current.get(f)) != str(v)]
+            conflicts = [
+                f for f, v in changes.items()
+                if not is_ep_blank_for_approved_write(f, current.get(f))
+                and str(current.get(f)) != str(v)
+            ]
             if conflicts:
                 result.status = "SKIPPED_STATE_CHANGED"
                 result.detail = "Live EP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."

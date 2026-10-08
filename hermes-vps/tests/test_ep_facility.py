@@ -18,6 +18,14 @@ from udise_vps import ep, facility  # noqa: E402
 
 
 # ------------------------------------------------------------------ helpers
+def test_approved_write_treats_subject_zero_and_nine_as_blank():
+    assert ep.is_ep_blank_for_approved_write("subject1", 0) is True
+    assert ep.is_ep_blank_for_approved_write("subject6", "9") is True
+    assert ep.is_ep_blank_for_approved_write("subject1", 629) is False
+    assert ep.is_ep_blank_for_approved_write("admnNumber", 0) is False
+    print("PASS test_approved_write_treats_subject_zero_and_nine_as_blank")
+
+
 def test_stream_codes_are_not_swapped():
     """The two portals number streams differently; names must win."""
     # eShikshaKosh says: 1=Arts, 2=Science
