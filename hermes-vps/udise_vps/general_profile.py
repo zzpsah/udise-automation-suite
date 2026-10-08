@@ -83,6 +83,30 @@ def pick_mother_tongue(rng: random.Random | None = None) -> int:
     return rng.choice(MOTHER_TONGUE_CHOICES)
 
 
+def build_auto_gp_changes(fresh: dict, pen: str) -> tuple[str, dict]:
+    """Return the exact AUTO-GP eligibility/result used by preview runs.
+
+    This is the single source of truth for stage-level GP pending counts.
+    ``formStatus`` is an overall completion status, not proof that any GP
+    AUTO field is blank.
+    """
+    fresh_cwsn = str(fresh.get("cwsnYN"))
+    if fresh_cwsn in CWSN_SKIP_CODES:
+        return "CWSN_CONFIRM_REQUIRED", {"cwsnYN": 2}
+    if fresh_cwsn in CWSN_UNEXPECTED_SKIP:
+        return "SKIPPED_CWSN_UNEXPECTED", {}
+
+    updates = {
+        field_name: default
+        for field_name, default in AUTO_GP_DEFAULTS.items()
+        if is_blank(fresh.get(field_name))
+    }
+    if "motherTongue" in updates:
+        updates["motherTongue"] = pick_mother_tongue(student_rng(pen))
+    updates = apply_gp_rules(fresh, updates)
+    return ("PREVIEW", updates) if updates else ("NO_CHANGE", {})
+
+
 def apply_gp_rules(fresh: dict, updates: dict) -> dict:
     """Enforce the portal's cross-field rules on the fields being written.
 
@@ -418,43 +442,26 @@ def run_auto_gp(
             print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
-        # ---------------------------------------------------------- CWSN safety
-        fresh_cwsn = str(fresh.get("cwsnYN"))
-        if fresh_cwsn in CWSN_SKIP_CODES:
-            result.status = "CWSN_CONFIRM_REQUIRED"
+        # ------------------------------------------------- shared eligibility
+        eligibility, updates = build_auto_gp_changes(fresh, pen)
+        if eligibility == "CWSN_CONFIRM_REQUIRED":
+            result.status = eligibility
             result.detail = "Fresh GP shows CWSN=Yes. User confirmation required before setting CWSN=No; no POST sent."
-            result.changes = {"cwsnYN": 2}
+            result.changes = updates
             results.append(result)
             print(f"📋 GP_CWSN_CONFIRM_REQUIRED pen={pen} name={name} detail={result.detail}", flush=True)
             print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
-        if fresh_cwsn in CWSN_UNEXPECTED_SKIP:
-            result.status = "SKIPPED_CWSN_UNEXPECTED"
-            result.detail = f"Unexpected CWSN code {fresh_cwsn}. Manual review."
+        if eligibility == "SKIPPED_CWSN_UNEXPECTED":
+            result.status = eligibility
+            result.detail = f"Unexpected CWSN code {fresh.get('cwsnYN')}. Manual review."
             results.append(result)
             print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
-        # ------------------------------------------------- blank-only diff
-        updates = {
-            field_name: default
-            for field_name, default in AUTO_GP_DEFAULTS.items()
-            if is_blank(fresh.get(field_name))
-        }
-
-        # 4.1.12 Mother Tongue: a blank gets a randomised choice between the
-        # generic default and the region option. Only ever set when blank.
-        if "motherTongue" in updates:
-            updates["motherTongue"] = pick_mother_tongue(student_rng(pen))
-
-        # Then enforce the portal's cross-field rules on what we are writing.
-        # A rule only adjusts a field already in `updates`; it never invents an
-        # update for a field the student already has.
-        updates = apply_gp_rules(fresh, updates)
-
         if not updates:
             result.status = "NO_CHANGE"
-            result.detail = "Fresh GP has no approved blank AUTO fields."
+            result.detail = "Fresh GP has no blank AUTO fields."
             results.append(result)
             print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue

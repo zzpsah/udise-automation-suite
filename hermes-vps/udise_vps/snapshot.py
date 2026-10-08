@@ -19,6 +19,7 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from .constants import CLASS_LABEL, CLASS_SCOPES, STATUS_STAGE
+from .general_profile import build_auto_gp_changes
 from .students import get_apaar_id, mask_aadhaar
 
 _SECRET_PARTS = ("password", "token", "cookie", "secret", "authorization", "jsession", "xsrf")
@@ -154,9 +155,22 @@ def collect_snapshot(session, class_scope_name: str | None = None) -> dict[str, 
     if class_scope_name:
         statuses = [row.get("formStatus") for row in result["Completion"]]
         as_int = [value for value in statuses if isinstance(value, int)]
+        # formStatus is an overall completion state, not proof that a GP AUTO
+        # field is blank. Use the exact same field-level eligibility rules as
+        # the GP runner so Snapshot and GP report the same actionable count.
+        gp_pending = 0
+        gp_manual = 0
+        for row in result["GP"]:
+            pen = str(row.get("PEN") or "").strip()
+            status, changes = build_auto_gp_changes(row, pen)
+            if status == "PREVIEW" and changes:
+                gp_pending += 1
+            elif status == "CWSN_CONFIRM_REQUIRED":
+                gp_manual += 1
         print(
             f"[SUMMARY] Class {class_scope_name}: students={total} "
-            f"GP pending={sum(value == 0 for value in as_int)} "
+            f"GP pending={gp_pending} "
+            f"GP manual review={gp_manual} "
             f"EP pending={sum(value in (0, 1) for value in as_int)} "
             f"Facility pending={sum(value in (0, 1, 2) for value in as_int)} "
             f"completed={sum(value == 6 for value in as_int)} issues={len(result['Issues'])}",

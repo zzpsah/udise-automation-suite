@@ -58,6 +58,27 @@ def test_collect_and_write_snapshot():
         wb.close()
 
 
+def test_gp_pending_uses_field_eligibility_not_form_status():
+    class Live:
+        students = [{"studentId": "11", "studentCodeNat": "PEN11", "studentName": "Asha", "classId": 9}]
+
+        def student_detail(self, sid):
+            from udise_vps.constants import AUTO_GP_DEFAULTS
+            # Overall formStatus=0 must not make GP pending when every AUTO
+            # field is already populated.
+            return {"studentId": sid, "studentCodeNat": "PEN11", "studentName": "Asha",
+                    "classId": 9, "formStatus": 0, "aayBplYN": 1, **{k: (2 if k == "cwsnYN" else 1) for k in AUTO_GP_DEFAULTS}}
+
+        def enrolment_detail(self, sid): return {}
+        def facility_detail(self, sid): return {}
+
+    data = snapshot.collect_snapshot(Live(), "IX")
+    assert data["Completion"][0]["formStatus"] == 0
+    status, changes = snapshot.build_auto_gp_changes(data["GP"][0], "PEN11")
+    assert status == "NO_CHANGE"
+    assert changes == {}
+
+
 def test_empty_roster_is_rejected():
     class Empty:
         students = []
