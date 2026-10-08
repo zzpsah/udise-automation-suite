@@ -55,6 +55,9 @@ LOGIN_BROWSERS: dict[str, dict[str, Any]] = {}
 # session is shared, so concurrent runners can invalidate/race each other.
 _SESSION_JOB_LOCKS: dict[str, threading.Lock] = {}
 _SESSION_JOB_LOCKS_GUARD = threading.Lock()
+_ACTIVE_PROCS: dict[str, subprocess.Popen] = {}
+_CANCELLED_JOBS: set[str] = set()
+_ACTIVE_PROCS_GUARD = threading.Lock()
 
 
 def _db() -> sqlite3.Connection:
@@ -1314,6 +1317,8 @@ def _run_job_unlocked(job_id: str) -> None:
         proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 bufsize=1)
+        with _ACTIVE_PROCS_GUARD:
+            _ACTIVE_PROCS[job_id] = proc
         heartbeat_stop = threading.Event()
         heartbeat_state = {"expired": False}
         def _job_keepalive() -> None:
@@ -1352,6 +1357,17 @@ def _run_job_unlocked(job_id: str) -> None:
                 _update_progress(job_id, cur, total)
         code = proc.wait()
         heartbeat_stop.set()
+        with _ACTIVE_PROCS_GUARD:
+            cancelled = job_id in _CANCELLED_JOBS
+            _ACTIVE_PROCS.pop(job_id, None)
+        if cancelled:
+            with _db() as conn:
+                conn.execute(
+                    "UPDATE jobs SET status='cancelled',updated_at=?,message=? WHERE id=?",
+                    (int(time.time()), "Cancelled by operator. No remaining students were submitted.", job_id),
+                )
+            _event(job_id, "Cancelled by operator. No remaining students were submitted.")
+            return
         if code != 0:
             if heartbeat_state.get("expired"):
                 raise RuntimeError("UDISE portal session expired during the workflow. No blind retry was attempted.")
@@ -1463,12 +1479,21 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
     job_id = uuid.uuid4().hex
     now = int(time.time())
     with _db() as conn:
+        active = conn.execute(
+            "SELECT id, stage, class_name FROM jobs WHERE session_id=? AND status IN ('running','queued') ORDER BY created_at DESC LIMIT 1",
+            (body.session_id,),
+        ).fetchone()
+        if active:
+            raise HTTPException(
+                409,
+                f"A workflow is already running for this UDISE session ({active['stage']} {active['class_name'] or 'ALL'}). Cancel it or wait for it to finish before starting a fresh run.",
+            )
         conn.execute("""INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,approved_from,approved_at,max_submissions,auto_save)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                     (job_id, now, now, "queued", body.stage, body.class_name, effective_school,
-                      body.session_id, 1, "Queued", None, None, int(body.max_submissions), int(bool(body.auto_save))))
+                     (job_id, now, now, "running", body.stage, body.class_name, effective_school,
+                      body.session_id, 1, "Starting UDISE job", None, None, int(body.max_submissions), int(bool(body.auto_save))))
     threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
-    return {"job_id": job_id, "status": "queued"}
+    return {"job_id": job_id, "status": "running"}
 
 
 def _approval_phrase(stage: str, class_name: str | None) -> str:
@@ -1490,6 +1515,33 @@ def _job_session_id(job_id: str) -> str:
     with _db() as conn:
         row = conn.execute("SELECT session_id FROM jobs WHERE id=?", (job_id,)).fetchone()
     return str(row[0]) if row else str(job_id)
+
+
+@app.post("/api/v1/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, authorization: str | None = Header(default=None)) -> dict:
+    require_api(authorization)
+    with _db() as conn:
+        row = conn.execute("SELECT id,status FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Job not found")
+    if row["status"] not in {"running","queued","awaiting_confirmation"}:
+        return {"job_id": job_id, "status": row["status"], "cancelled": False}
+    with _ACTIVE_PROCS_GUARD:
+        _CANCELLED_JOBS.add(job_id)
+        proc = _ACTIVE_PROCS.get(job_id)
+    if proc is not None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    else:
+        with _db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='cancelled',updated_at=?,message=? WHERE id=?",
+                (int(time.time()), "Cancelled by operator.", job_id),
+            )
+        _event(job_id, "Cancelled by operator.")
+    return {"job_id": job_id, "status": "cancelled", "cancelled": True}
 
 
 @app.post("/api/v1/jobs/{job_id}/confirm-cwsn")
