@@ -1,6 +1,6 @@
 # Architecture — Current Production System
 
-Last updated: **2026-10-07**
+Last updated: **2026-10-08**
 
 ## System layers
 
@@ -106,6 +106,10 @@ For school-level login:
 
 Authenticated session school context overrides stale frontend presets.
 
+## Durable write boundary
+
+The production **Run & Save** path is server-durable. A successful preview creates exactly one bounded write child job linked to the approved preview. The child performs its own fresh pre-write read, sends permitted writes once, and performs fresh read-back verification. Browser refresh, background suspension, or disconnect does not cancel an already-created write child. Read-only stages never create a write child.
+
 ## Write boundary
 
 ```mermaid
@@ -122,3 +126,18 @@ flowchart LR
 ```
 
 No blind POST retry after ambiguous failure.
+
+
+## Facility protected-value boundary
+
+Facility automation is blank-only. Existing saved measurements and saved Yes/No values are preserved. An existing Yes is never silently changed to No. If a dependent state conflicts with a saved Yes, the record is retained for manual review.
+
+Current IX/X blank measurement defaults:
+- Boys: 140–160 cm, 38–55 kg
+- Girls: 135–155 cm, 34–50 kg
+
+XI/XII defaults remain:
+- Boys: 150–170 cm, 42–60 kg
+- Girls: 146–166 cm, 38–56 kg
+
+These are workflow defaults for unset fields and do not replace actual measured values.
