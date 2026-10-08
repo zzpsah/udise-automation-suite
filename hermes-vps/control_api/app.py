@@ -1286,8 +1286,13 @@ def _run_job_unlocked(job_id: str) -> None:
         if cwsn_waiting:
             _event(
                 job_id,
-                f"⚠️ GP_CWSN_CONFIRM_REQUIRED count={len(pending_data)} · Confirm CWSN=No for these students to continue the authorized save.",
+                f"GP-UPDATE: CWSN confirmation required for {len(pending_data)} student(s). Review PEN, Name and Father's Name before continuing.",
             )
+            for item in pending_data.values():
+                _event(
+                    job_id,
+                    f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmation required - CWSN=Yes",
+                )
         else:
             _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
         if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting:
