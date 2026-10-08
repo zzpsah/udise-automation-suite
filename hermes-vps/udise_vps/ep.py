@@ -1072,7 +1072,7 @@ def run_ep(
             result.status = "READ_ERROR"
             result.detail = f"{type(exc).__name__}: {exc}"
             results.append(result)
-            print(f"⚠️ {pen}: EP read failed — {result.detail}", flush=True)
+            print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             continue
 
         result.current = {field: current.get(field) for field in COMPARE_FIELDS}
@@ -1121,13 +1121,13 @@ def run_ep(
                     msg = err.get("message") if isinstance(err, dict) else err
                     result.status = "FAILED"
                     result.detail = "HTTP %s; %s" % (status_code, msg or body.get("message") or "rejected")
-                    print(f"⚠️ EP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                    print(f"📋 EP_APPROVED_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                     results.append(result)
                     break
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
-                print(f"⚠️ EP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 EP_APPROVED_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 results.append(result)
                 break
             submissions += 1
@@ -1150,7 +1150,7 @@ def run_ep(
             else:
                 result.status = "UNCONFIRMED"
                 result.detail = "Fresh EP read-back differs: " + ", ".join(mismatches or ["unknown"])
-                print(f"⚠️ EP_APPROVED_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 EP_APPROVED_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 results.append(result)
                 break
             continue
@@ -1189,7 +1189,7 @@ def run_ep(
 
             if missing:
                 result.detail = f"catalogue has no {', '.join(missing)}; languages left as saved"
-                print(f"⚠️ {pen}: {result.detail}", flush=True)
+                print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             else:
                 for field_name, code in plan["codes"].items():
                     saved = current.get(field_name)
@@ -1269,7 +1269,7 @@ def run_ep(
                     "--not-studying, or allow the automatic rule."
                 )
                 results.append(result)
-                print(f"⚠️ {pen}: {result.detail}", flush=True)
+                print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
             updates["examResultPy"] = exam_result_override
         elif exam_result_override is not None and exam_result != exam_result_override:
@@ -1295,7 +1295,7 @@ def run_ep(
                     "answer the prompt."
                 )
                 results.append(result)
-                print(f"⚠️ {pen}: {result.detail}", flush=True)
+                print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
             result.stream = stream_label
             if clean_number(current.get("academicStream")) != stream_code:
@@ -1305,7 +1305,7 @@ def run_ep(
             result.status = "SKIPPED_ALREADY_UP_TO_DATE"
             result.detail = result.detail or "Nothing blank to fill."
             results.append(result)
-            print(f"• {pen}: nothing to fill.", flush=True)
+            print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             continue
 
         result.changes = updates
@@ -1316,7 +1316,7 @@ def run_ep(
             result.detail = f"{len(updates)} field(s) would be set."
             results.append(result)
             print(
-                f"👁️ {position}/{len(selected)} {pen}: preview — "
+                f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail} changes="
                 + ", ".join(updates),
                 flush=True,
             )
@@ -1326,7 +1326,7 @@ def run_ep(
             result.status = "LIMIT_REACHED"
             result.detail = f"max submissions ({max_submissions}) reached."
             results.append(result)
-            print(f"🛑 {pen}: submission cap reached.", flush=True)
+            print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             continue
 
         # ---------------------------------------------------- one write
@@ -1347,7 +1347,7 @@ def run_ep(
                 result.status = "FAILED"
                 result.detail = f"HTTP {status_code}; {msg or body.get('message') or 'rejected'}"
                 results.append(result)
-                print(f"❌ {pen}: {result.detail}", flush=True)
+                print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 break
         except Exception as exc:
             post_error = exc
@@ -1373,7 +1373,7 @@ def run_ep(
                 matched, mismatches = readback_matches(saved, payload)
                 if matched:
                     break
-                print(f"   still different: {', '.join(mismatches)}", flush=True)
+                print(f"📋 EP_RESULT status=READBACK_PENDING pen={result.pen} name={result.name} detail=Still different: {', '.join(mismatches)}", flush=True)
             except Exception:
                 continue
 
@@ -1386,18 +1386,18 @@ def run_ep(
             if post_error:
                 result.detail += " (POST reported a transport error.)"
             results.append(result)
-            print(f"✅ {pen}: saved and confirmed.", flush=True)
+            print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
         elif verified:
             result.status = "RESPONSE_SUCCESS_NOT_PERSISTED" if response_success else "FAILED"
             result.detail = "Read-back differs: " + ", ".join(mismatches)
             results.append(result)
-            print(f"⚠️ {pen}: {result.detail}", flush=True)
+            print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             break
         else:
             result.status = "UNCONFIRMED"
             result.detail = "No usable read-back; check the portal before any retry."
             results.append(result)
-            print(f"⚠️ {pen}: {result.detail}", flush=True)
+            print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             break
 
     confirmed = sum(1 for r in results if r.confirmed)

@@ -263,7 +263,7 @@ def run_facility(
             result.status = "READ_ERROR"
             result.detail = f"General Profile unreadable: {type(exc).__name__}"
             results.append(result)
-            print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+            print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             print(f"⚠️ {pen}: {result.detail}", flush=True)
             continue
 
@@ -277,7 +277,7 @@ def run_facility(
             result.status = "READ_ERROR"
             result.detail = f"{type(exc).__name__}: {exc}"
             results.append(result)
-            print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+            print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             print(f"⚠️ {pen}: FP read failed — {result.detail}", flush=True)
             continue
 
@@ -288,7 +288,7 @@ def run_facility(
             result.status = "SKIPPED_ALREADY_UP_TO_DATE"
             result.detail = "Nothing blank to fill."
             results.append(result)
-            print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+            print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             print(f"• {pen}: nothing to fill.", flush=True)
             continue
 
@@ -300,7 +300,7 @@ def run_facility(
             result.status = "PREVIEW"
             result.detail = f"{len(updates)} field(s) would be set."
             results.append(result)
-            print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+            print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             print(
                 f"👁️ {position}/{len(selected)} {pen}: preview — "
                 + ", ".join(f"{k}={v}" for k, v in sorted(updates.items())),
@@ -312,7 +312,7 @@ def run_facility(
             result.status = "LIMIT_REACHED"
             result.detail = f"max submissions ({max_submissions}) reached."
             results.append(result)
-            print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+            print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
             print(f"🛑 {pen}: submission cap reached.", flush=True)
             break
 
@@ -330,7 +330,7 @@ def run_facility(
                 result.status = "FAILED"
                 result.detail = f"HTTP {status_code}; {detail or body.get('message') or 'rejected'}"
                 results.append(result)
-                print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+                print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 print(f"❌ {pen}: {result.detail}", flush=True)
                 break
         except Exception as exc:
@@ -362,7 +362,7 @@ def run_facility(
                 result.detail = f"Read-back failed: {type(exc).__name__}"
 
         results.append(result)
-        print(f"📋 FP_RESULT status={result.status} detail={result.detail}", flush=True)
+        print(f"📋 FP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
         if result.confirmed:
             print(f"✅ {pen}: saved and confirmed.", flush=True)
         else:
