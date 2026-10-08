@@ -73,3 +73,25 @@ git diff --check
 ```
 
 Distinguish Git push, Oracle restart, Vercel Ready, alias update and live verification.
+
+
+## Deployment verification record — 8 October 2026
+
+- Latest synchronized documentation/code head: `a6bd1d0`.
+- Vercel project linkage in `hermes-vps/web/.vercel/project.json` points to project `udise-automation-suite`.
+- Production URL returns HTTP 200, but a production-content check previously showed that the earlier `1735ec27` UI styling change was not yet present in the served production CSS.
+- A `x-vercel-cache: HIT` response is not, by itself, proof that the latest Git commit is deployed.
+- After documentation commits are pushed, verify the new production build by checking both the Vercel deployment state and a production-content marker. Do not call deployment complete merely because the URL returns 200.
+
+### Deployment acceptance
+
+```text
+GitHub main updated
+→ Vercel deployment triggered
+→ Build succeeds / Ready
+→ production alias points to new deployment
+→ production marker/content matches current commit
+→ live smoke test
+```
+
+If Git→Vercel does not trigger, use the documented repo-root Vercel command. Do not create a second deployment project or change the production alias without review.
