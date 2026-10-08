@@ -1299,6 +1299,59 @@ def eshiksha_report_result(job_id: str, authorization: str | None = Header(defau
         raise HTTPException(404, "This EP run used an uploaded report or no source report was retained")
     return FileResponse(reports[-1], filename=reports[-1].name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+@app.get("/api/v1/eshiksha-preview")
+def eshiksha_preview(session_id: str | None = None, authorization: str | None = Header(default=None)):
+    """Return a safe browser preview of the retained eShikshaKosh source workbook."""
+    require_api(authorization)
+    if not ESK_UPLOAD.exists():
+        raise HTTPException(404, "eShikshaKosh source report is not available; fetch it first")
+    meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
+    bound_session = str(meta.get("session_id") or "")
+    if session_id and bound_session and bound_session != session_id:
+        raise HTTPException(409, "eShikshaKosh source belongs to a different UDISE session")
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(ESK_UPLOAD, read_only=True, data_only=True)
+        ws = wb.active
+        rows = ws.iter_rows(values_only=True)
+        headers = [str(x or "").strip() for x in next(rows, ())]
+        index = {name: i for i, name in enumerate(headers)}
+        wanted = ["Student Name", "Father's Name", "Class", "Section", "Admission No", "OTR Number", "OTR Status", "Stream"]
+        missing = [name for name in wanted if name not in index]
+        if missing:
+            wb.close()
+            raise RuntimeError("eShikshaKosh report is missing expected columns: " + ", ".join(missing))
+        preview_rows = []
+        class_counts = {}
+        total = 0
+        for values in rows:
+            if not any(v not in (None, "") for v in values):
+                continue
+            total += 1
+            cls = str(values[index["Class"]] or "").strip()
+            class_counts[cls] = class_counts.get(cls, 0) + 1
+            if len(preview_rows) < 25:
+                preview_rows.append({
+                    name: str(values[index[name]] or "").strip()
+                    for name in wanted
+                })
+        wb.close()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(422, "Could not read the fetched eShikshaKosh workbook: " + str(exc)[:500]) from exc
+    return {
+        "ready": True,
+        "source": "live" if meta.get("source") == "live" else "upload",
+        "school_name": meta.get("school_name", ""),
+        "udise": meta.get("udise", ""),
+        "total": total,
+        "class_counts": class_counts,
+        "preview_limit": len(preview_rows),
+        "rows": preview_rows,
+    }
+
+
 @app.get("/api/v1/ep-template")
 def ep_template(class_name: str = "IX", session_id: str | None = None, school: str = "school", authorization: str | None = Header(default=None)):
     """Return a live, pre-filled EP review workbook with subject dropdowns."""
