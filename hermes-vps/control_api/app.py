@@ -991,6 +991,23 @@ def _event(job_id: str, message: str, level: str = "info") -> None:
 
 def _progress_line(line: str) -> tuple[str | None, int | None, int | None]:
     line = line.strip()
+    gp = re.search(r"📋 GP(?:_APPROVED)?_RESULT status=(\\S+) pen=(\\S+) name=(.*?) detail=(.*)$", line)
+    if gp:
+        status, pen, name, detail = gp.groups()
+        labels = {
+            "NO_CHANGE": "Skipped",
+            "SKIPPED_CWSN": "Skipped",
+            "SKIPPED_CWSN_UNEXPECTED": "Skipped",
+            "SUCCESS_CONFIRMED": "Saved + confirmed",
+            "FAILED": "Failed",
+            "UNCONFIRMED": "Not confirmed",
+            "READ_ERROR": "Skipped",
+            "PREVIEW": "Eligible",
+            "LIMIT_REACHED": "Skipped",
+            "CWSN_CONFIRM_REQUIRED": "Confirmation required",
+        }
+        label = labels.get(status, status.replace("_", " ").title())
+        return f"GP-UPDATE: {pen} - {name} - {label} - {detail}", None, None
     m = re.search(r"scope:\s*([A-Za-z ]+)\s*\|\s*(\d+)\s+student", line, re.I)
     if m:
         return f"{line}", 0, int(m.group(2))
