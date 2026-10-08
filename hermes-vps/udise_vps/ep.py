@@ -1032,6 +1032,13 @@ def run_ep(
 
     results: list[EpResult] = []
     submissions = 0
+    if approved_plan is not None:
+        pen_matches = sum(1 for student in selected if str(student.get("studentCodeNat") or "").strip() in approved_plan)
+        sid_matches = sum(1 for student in selected if str(student.get("studentId") or student.get("id") or "").strip() in approved_plan)
+        print(
+            f"🔐 Approved EP plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
+            flush=True,
+        )
 
     for position, student in enumerate(selected, 1):
         sid = str(student.get("studentId") or student.get("id") or "").strip()
@@ -1370,6 +1377,14 @@ def run_ep(
     preview = sum(1 for r in results if r.status == "PREVIEW")
     skipped = sum(1 for r in results if r.status.startswith("SKIPPED"))
     other = len(results) - confirmed - preview - skipped
+    if approved_plan is not None:
+        not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
+        state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
+        limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
+        print(
+            f"🔎 Approved EP outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
+            flush=True,
+        )
 
     print("\n" + "━" * 30)
     print(f"✅ Saved + confirmed : {confirmed}")
