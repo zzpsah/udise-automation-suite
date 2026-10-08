@@ -276,9 +276,11 @@ def cmd_finalize(args) -> int:
         session, pens,
         allow_finalize=args.submit,
         max_submissions=args.max,
+        approved_plan=_load_plan(args.plan) if args.submit and args.plan else None,
     )
     if not args.submit:
         out = _output_dir(args)
+        _write_plan(args.plan_out, results)
         path = out / preview_report.default_filename("finalize", session.school_id, args.klass)
         preview_report.write_preview_workbook("finalize", results, str(path))
         print(f"REPORT_READY={path.resolve()}")
@@ -339,7 +341,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--submit", action="store_true",
                    help="Actually POST. Without this, preview only.")
     p.add_argument("--max", type=int, default=1,
-                   help="Maximum writes in this run")
+                   help="Maximum writes in this run (0 = all)")
+    p.add_argument("--plan-out", default=None, help="Write preview write plan JSON")
+    p.add_argument("--plan", default=None, help="Use approved preview write plan with --submit")
     p.set_defaults(func=cmd_finalize)
 
     p = sub.add_parser("ep", help="Enrollment Profile (Classes IX and X)")
