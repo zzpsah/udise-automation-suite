@@ -308,7 +308,7 @@ def run_facility(
             )
             continue
 
-        if submissions >= max_submissions:
+        if max_submissions > 0 and submissions >= max_submissions:
             result.status = "LIMIT_REACHED"
             result.detail = f"max submissions ({max_submissions}) reached."
             results.append(result)
