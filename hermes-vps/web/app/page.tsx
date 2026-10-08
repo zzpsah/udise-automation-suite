@@ -76,6 +76,7 @@ export default function Page(){
   const [job,setJob]=useState<JobState|null>(null);
   const [infoStage,setInfoStage]=useState<string|null>(null);
   const [msg,setMsg]=useState("");
+  const [saveLimit,setSaveLimit]=useState(1);
 
   async function loadCaps(){
     const r=await fetch("/api/capabilities",{cache:"no-store"});
@@ -271,7 +272,7 @@ export default function Page(){
     if(selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
     setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-      session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true,auto_save:selected?.mode==="write"
+      session_id:sessionId,school:school.trim(),stage,class_name:selected?.requires_class?klass:null,preview:true,auto_save:selected?.mode==="write",max_submissions:selected?.mode==="write"?saveLimit:1
     })});
     const d=await r.json();
     if(!r.ok){setMsg(clientFailure(selected?.label||stage,"Start preview",d.detail||d.error||"Unknown error"));return}
@@ -287,7 +288,7 @@ export default function Page(){
       setJob(d);
       if(d.job.stage==="ep"&&["completed","failed"].includes(d.job.status)) setEshikshaReady(false);
       if(d.job.auto_write_job_id){
-        setMsg("Preview verified. Server-side save is queued; browser connection is no longer required.");
+        const limit=Number(d.job.max_submissions||saveLimit||1); setMsg(`Preview verified. Server-side save is queued for up to ${limit} record(s); browser connection is no longer required.`);
         if(d.job.auto_write_job_id!==jobId){
           setJobId(d.job.auto_write_job_id);
           return;
@@ -387,7 +388,7 @@ export default function Page(){
                 <a className="source-link" href={`/api/ep-template?class=${encodeURIComponent(klass)}&session_id=${encodeURIComponent(sessionId)}&school=${encodeURIComponent(school)}`}>Download EP template</a>
               </div>
             </div>}
-            {selected.mode==="write"?<div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?(eshikshaReady||eshikshaReportReady?" eShikshaKosh is used as the EP source.":klass==="X"?" Class X can use UDISE current values and built-in EP rules without eShikshaKosh.":""):""}</span></div></div>:<p>{selected.description}</p>}
+            {selected.mode==="write"?<><div className="save-limit-control"><label><strong>Students to save</strong><select value={saveLimit} onChange={e=>setSaveLimit(Number(e.target.value))}>{[1,5,10,25,50,100,250,500].map(n=><option key={n} value={n}>{n} student{n===1?"":"s"}</option>)}</select></label><small>Preview checks the full selected class. After preview, the server will save at most the selected number of eligible records.</small></div><div className="lock-reason"><div><strong>Automatic save with verification</strong><span>The system checks current values, saves only eligible changes, then verifies each save with a fresh read-back.{selected.id==="ep"?(eshikshaReady||eshikshaReportReady?" eShikshaKosh is used as the EP source.":klass==="X"?" Class X can use UDISE current values and built-in EP rules without eShikshaKosh.":""):""}</span></div></div></>:<p>{selected.description}</p>}
           </div>}
 
           <div className="run-row">
