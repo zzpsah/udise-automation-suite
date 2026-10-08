@@ -99,6 +99,48 @@ export default function Page(){
   const [saveLimit,setSaveLimit]=useState(1);
   const [customSaveLimit,setCustomSaveLimit]=useState("");
   const [cwsnConfirmBusy,setCwsnConfirmBusy]=useState(false);
+  const [sessionHydrated,setSessionHydrated]=useState(false);
+
+  const SESSION_STORAGE_KEY="udise_active_session";
+
+  async function restorePersistedSession(){
+    try{
+      const raw=window.localStorage.getItem(SESSION_STORAGE_KEY);
+      if(!raw){setSessionHydrated(true);return}
+      const saved=JSON.parse(raw) as {sessionId?:string;school?:string;schoolName?:string;udiseCode?:string};
+      if(!saved.sessionId){
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        setSessionHydrated(true);
+        return;
+      }
+      setSessionId(saved.sessionId);
+      if(saved.school) setSchool(saved.school);
+      setSessionSchoolName(String(saved.schoolName||""));
+      setSessionUdiseCode(String(saved.udiseCode||""));
+    }catch{
+      try{window.localStorage.removeItem(SESSION_STORAGE_KEY)}catch{}
+    }finally{
+      setSessionHydrated(true);
+    }
+  }
+
+  useEffect(()=>{restorePersistedSession()},[]);
+
+  useEffect(()=>{
+    if(!sessionHydrated) return;
+    if(!sessionId){
+      try{window.localStorage.removeItem(SESSION_STORAGE_KEY)}catch{}
+      return;
+    }
+    try{
+      window.localStorage.setItem(SESSION_STORAGE_KEY,JSON.stringify({
+        sessionId,
+        school,
+        schoolName:sessionSchoolName,
+        udiseCode:sessionUdiseCode
+      }));
+    }catch{}
+  },[sessionHydrated,sessionId,school,sessionSchoolName,sessionUdiseCode]);
 
   async function loadCaps(){
     const r=await fetch("/api/capabilities",{cache:"no-store"});
@@ -164,8 +206,13 @@ export default function Page(){
     setMsg(d.school_id?"Students Module connected. Select class and workflow.":"UDISE connected, but Students Module school scope could not be resolved.");
   }
 
-  useEffect(()=>{beginUdiseLogin()},[]);
   useEffect(()=>{
+    if(!sessionHydrated||sessionId) return;
+    beginUdiseLogin();
+  },[sessionHydrated,sessionId]);
+
+  useEffect(()=>{
+    if(!sessionHydrated){return}
     if(!sessionId){setSessionSeconds(0);return}
     let cancelled=false;
     const verify=async(refresh=false)=>{
