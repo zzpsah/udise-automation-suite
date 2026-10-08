@@ -1114,10 +1114,11 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
     # EP needs student-level visibility: an aggregate count is not enough to
     # tell the operator which student's Enrollment Profile was actually saved.
     # Keep other stages on the compact summary table.
-    if stage == "ep":
+    if stage in {"ep", "finalize"}:
         ep_rows = []
+        result_prefix = "FINALIZE" if stage == "finalize" else "EP(?:_APPROVED|_SAVE)?"
         ep_pattern = re.compile(
-            r"EP(?:_APPROVED|_SAVE)?_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$"
+            rf"{result_prefix}_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$"
         )
         for message in messages:
             match = ep_pattern.search(message)
@@ -1132,6 +1133,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
             lines = ["RESULT_TABLE", "Status|PEN|Student|Detail"]
             lines.extend("|".join(row) for row in ep_rows)
             return "\n".join(lines)
+
 
     if not grouped:
         return "RESULT_TABLE\nStatus|Count\nCompleted|1"

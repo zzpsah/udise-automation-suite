@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from . import completion as completion_mod
@@ -278,11 +279,16 @@ def cmd_finalize(args) -> int:
         max_submissions=args.max,
         approved_plan=_load_plan(args.plan) if args.submit and args.plan else None,
     )
+    out = _output_dir(args)
     if not args.submit:
-        out = _output_dir(args)
         _write_plan(args.plan_out, results)
         path = out / preview_report.default_filename("finalize", session.school_id, args.klass)
         preview_report.write_preview_workbook("finalize", results, str(path))
+        print(f"REPORT_READY={path.resolve()}")
+    else:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = out / f"UDISE_Complete_Data_Save_Report_{session.school_id}_{args.klass}_{stamp}.xlsx"
+        finalize_mod.write_finalize_workbook(results, str(path), max_submissions=args.max)
         print(f"REPORT_READY={path.resolve()}")
     return 0
 

@@ -21,6 +21,7 @@ Body: the student ID string (Content-Type: text/plain).
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,6 +58,68 @@ def _submit_once(session, student_id: str):
         allow_redirects=False,
     )
 
+
+
+def write_finalize_workbook(results: list[FinalizeResult], path: str, *, max_submissions: int) -> str:
+    """Write the authoritative Complete Data save report, including every processed student.
+
+    The report deliberately includes the student that hit the save cap so the operator can
+    see exactly where the bounded batch stopped, rather than treating it as an unexplained
+    aggregate "Other" count.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    summary = wb.active
+    summary.title = "Summary"
+    confirmed = sum(1 for r in results if r.confirmed)
+    limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
+    skipped = sum(1 for r in results if r.status.startswith("SKIPPED"))
+    failed = sum(1 for r in results if r.status == "FAILED")
+    unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
+    summary_rows = [
+        ("Report", "Complete Data / Finalize Save Report"),
+        ("Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        ("Save limit", max_submissions if max_submissions > 0 else "All students"),
+        ("Saved + confirmed", confirmed),
+        ("Skipped", skipped),
+        ("Save limit reached", limit_reached),
+        ("Failed", failed),
+        ("Not confirmed", unconfirmed),
+        ("Students reported", len(results)),
+    ]
+    for row in summary_rows:
+        summary.append(row)
+    summary["A1"].font = Font(bold=True)
+    summary.column_dimensions["A"].width = 28
+    summary.column_dimensions["B"].width = 42
+
+    ws = wb.create_sheet("Student Results")
+    headers = ["Order", "Status", "PEN", "Student ID", "Student", "Detail", "Reason"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    for i, r in enumerate(results, 1):
+        ws.append([i, r.status, r.pen, r.student_id, r.name, r.detail, r.reason])
+    widths = [10, 32, 18, 18, 32, 70, 45]
+    for idx, width in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(1, idx).column_letter].width = width
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    if limit_reached:
+        cap = wb.create_sheet("Save Limit")
+        cap.append(["Save limit", max_submissions])
+        cap.append(["Saved before cap", confirmed])
+        cap.append(["Student where cap was reached", next((r.name for r in results if r.status == "LIMIT_REACHED"), "")])
+        cap.append(["PEN", next((r.pen for r in results if r.status == "LIMIT_REACHED"), "")])
+        cap.append(["Result", "No POST was sent for this student because the configured save limit had already been reached."])
+        cap.column_dimensions["A"].width = 32
+        cap.column_dimensions["B"].width = 80
+
+    wb.save(path)
+    return path
 
 def finalize(
     session,
