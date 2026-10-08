@@ -94,6 +94,20 @@ def yes_no_code(value) -> int | None:
     return None
 
 
+def approved_yn_conflict(live, proposed) -> bool:
+    """Return True only when a fresh saved Yes/No conflicts with approval.
+
+    P4 rule: an approved No (2) is specifically intended to resolve a live
+    unanswered field. Therefore live blank/0/9 is compatible with approved No.
+    A live Yes (1) is a real protected value and must stop the write.
+    """
+    live_norm = yes_no_code(live)
+    proposed_norm = yes_no_code(proposed)
+    if proposed_norm == 2 and live_norm is None:
+        return False
+    return live_norm is not None and live_norm != proposed_norm
+
+
 @dataclass
 class FacilityResult:
     pen: str
@@ -305,9 +319,7 @@ def run_facility(
             for field, proposed in updates.items():
                 live = current.get(field)
                 if field in FACILITY_YN:
-                    live_norm = yes_no_code(live)
-                    proposed_norm = yes_no_code(proposed)
-                    if live_norm is not None and live_norm != proposed_norm:
+                    if approved_yn_conflict(live, proposed):
                         conflicts.append(field)
                 elif not is_blank(live) and text(live) != text(proposed):
                     conflicts.append(field)

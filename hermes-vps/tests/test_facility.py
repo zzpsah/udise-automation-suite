@@ -220,6 +220,20 @@ def _():
     assert up["scoutsYn"] == 2
 
 
+@check("approved_no_accepts_fresh_unanswered_sentinel")
+def _():
+    """REGRESSION: approved No must not be blocked by a fresh 9/blank read."""
+    for live in (None, "", 9, "9", 0, "0"):
+        assert fac.approved_yn_conflict(live, 2) is False, live
+
+
+@check("approved_no_still_blocks_live_yes")
+def _():
+    assert fac.approved_yn_conflict(1, 2) is True
+    assert fac.approved_yn_conflict("Yes", "No") is True
+    assert fac.approved_yn_conflict(2, 2) is False
+
+
 print()
 if FAILED:
     print(f"{len(PASSED)}/{len(PASSED) + len(FAILED)} passed")
