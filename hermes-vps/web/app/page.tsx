@@ -420,7 +420,7 @@ export default function Page(){
         <div className="output-title"><div><span className="eyebrow">ACTIVITY &amp; RESULT</span><h2>{job?"Workflow progress":"Ready to begin"}</h2></div>{job&&<span className="badge">{job.job.status}</span>}</div>
         {!job&&<div className="empty-output"><span className="status-mark">STATUS</span><strong>{msg||"Connect UDISE and choose a workflow."}</strong><p>Progress and downloadable results will appear here.</p></div>}
         {job&&<div className="job-output">
-          <div className="friendly-message">{job.job.message||msg}</div>
+          {String(job.job.message||msg).startsWith("RESULT_TABLE") ? (()=>{const rows=String(job.job.message||"").split("\n").slice(2).filter(Boolean).map(x=>x.split("|")); return <table className="result-table"><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=>i===0?<th key={j}>{c}</th>:<td key={j}>{c}</td>)}</tr>)}</tbody></table>})() : <div className="friendly-message">{job.job.message||msg}</div>}
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           {job.events.some(e=>e.message.includes("GP_CWSN_CONFIRM_REQUIRED"))&&job.job.stage==="gp"&&job.job.status==="awaiting_confirmation"&&!job.job.auto_write_job_id&&<div className="error-box" role="alert">
             <strong>CWSN confirmation required</strong>
