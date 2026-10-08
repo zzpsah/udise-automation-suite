@@ -1192,7 +1192,7 @@ def _queue_automatic_write(preview_job_id: str) -> str:
                    preview,message,approved_from,approved_at,max_submissions,auto_save
                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                write_job_id, now, now, "queued", preview["stage"], preview["class_name"],
+                write_job_id, now, now, "running", preview["stage"], preview["class_name"],
                 preview["school"], preview["session_id"], 0,
                 "Authorized automatic save starting", preview_job_id, now, int(preview["max_submissions"] if preview["max_submissions"] is not None else 0), 0,
             ),
@@ -1480,7 +1480,7 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
     now = int(time.time())
     with _db() as conn:
         active = conn.execute(
-            "SELECT id, stage, class_name FROM jobs WHERE session_id=? AND status IN ('running','queued') ORDER BY created_at DESC LIMIT 1",
+            "SELECT id, stage, class_name FROM jobs WHERE session_id=? AND status IN ('running','awaiting_confirmation') ORDER BY created_at DESC LIMIT 1",
             (body.session_id,),
         ).fetchone()
         if active:
