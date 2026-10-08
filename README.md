@@ -17,7 +17,7 @@ After login the UI is designed to show **Students Module connected**, school nam
 
 ### Production write model — 8 October 2026
 
-For write-capable workflows (**GP, EP, Facility/FP, Complete Data**), **Run & Save is now server-durable**. The UI requests a preview with `auto_save=true`; after a successful preview, the Oracle Control API creates exactly one bounded write child job (maximum 500 submissions) and runs it server-side. A browser refresh, background suspension, or disconnect therefore does not cancel the Preview → Write transition.
+For write-capable workflows (**GP, EP, Facility/FP, Complete Data**), **Run & Save is now server-durable**. The UI requests a preview with `auto_save=true` plus a user-selected save limit (1–500). After a successful preview, the Oracle Control API creates exactly one bounded write child job using that exact approved limit and runs it server-side. A browser refresh, background suspension, or disconnect therefore does not cancel the Preview → Write transition.
 
 The write child still performs its own fresh pre-write read, sends only permitted POSTs, and requires fresh read-back verification. Read-only stages (**Students, Full Snapshot, Completion Overview**) never create a write child. The manual approval endpoint remains available as a recovery path.
 
