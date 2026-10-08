@@ -96,6 +96,7 @@ def test_preview_lifecycle_and_write_lock() -> None:
                     class_name="IX",
                     preview=True,
                     auto_save=True,
+                        max_submissions=7,
                 ),
                 authorization=authorization,
             )
@@ -123,7 +124,7 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert auto_write_state["job"]["approved_from"] == auto_queued["job_id"]
             auto_write_cmd = observed["commands"][-1]
             assert "--submit" in auto_write_cmd
-            assert auto_write_cmd[auto_write_cmd.index("--max") + 1] == "500"
+            assert auto_write_cmd[auto_write_cmd.index("--max") + 1] == "7"
 
             queued = api.create_job(
                 api.JobIn(
