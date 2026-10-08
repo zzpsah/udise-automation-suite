@@ -68,8 +68,8 @@ The maintained server-side Facility Profile runner now applies class-specific bl
 
 | Class | Gender | Height | Weight |
 |---|---|---:|---:|
-| IX–X | Boys | 140–155 cm | 38–52 kg |
-| IX–X | Girls | 135–150 cm | 34–48 kg |
+| IX–X | Boys | 140–160 cm | 38–55 kg |
+| IX–X | Girls | 135–155 cm | 34–50 kg |
 | XI–XII | Boys | 150–170 cm | 42–60 kg |
 | XI–XII | Girls | 146–166 cm | 38–56 kg |
 
