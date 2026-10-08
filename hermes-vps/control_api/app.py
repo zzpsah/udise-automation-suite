@@ -1162,10 +1162,24 @@ def _run_job(job_id: str) -> None:
         _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
     except Exception as exc:
         safe = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(exc))[:500]
+        stage_label = str(row["stage"] or "unknown").upper()
+        component = {
+            "students": "UDISE Student Roster",
+            "snapshot": "UDISE Snapshot Runner",
+            "gp": "UDISE General Profile Runner",
+            "ep": "UDISE Enrollment Profile Runner",
+            "facility": "UDISE Facility Profile Runner",
+            "completion": "UDISE Completion Runner",
+            "finalize": "UDISE Finalize Runner",
+        }.get(str(row["stage"]), "Workflow Runner")
+        if str(row["stage"]) == "ep" and bool(row["preview"]) and eshiksha:
+            component = "eShikshaKosh Source Fetch / EP Runner"
+        operation = "preview" if bool(row["preview"]) else "approved write"
+        diagnostic = f"FAILURE · Component: {component} · Stage: {stage_label} · Operation: {operation} · Detail: {safe}"
         with _db() as conn:
             conn.execute("UPDATE jobs SET status='failed',updated_at=?,message=?,error=? WHERE id=?",
-                         (int(time.time()), "Job failed", safe, job_id))
-        _event(job_id, f"Job failed: {safe}", "error")
+                         (int(time.time()), diagnostic, diagnostic, job_id))
+        _event(job_id, diagnostic, "error")
 
 
 @app.post("/api/v1/jobs")
