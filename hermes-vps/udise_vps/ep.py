@@ -1036,7 +1036,7 @@ def run_ep(
         pen_matches = sum(1 for student in selected if str(student.get("studentCodeNat") or "").strip() in approved_plan)
         sid_matches = sum(1 for student in selected if str(student.get("studentId") or student.get("id") or "").strip() in approved_plan)
         print(
-            f"🔐 Approved EP plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
+            f"📋 eShikshaKosh approved plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
             flush=True,
         )
 
@@ -1382,7 +1382,7 @@ def run_ep(
         state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
         limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
         print(
-            f"🔎 Approved EP outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
+            f"📋 eShikshaKosh approved outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
             flush=True,
         )
 
