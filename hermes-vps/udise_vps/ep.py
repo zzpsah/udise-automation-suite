@@ -1404,6 +1404,14 @@ def run_ep(
     preview = sum(1 for r in results if r.status == "PREVIEW")
     skipped = sum(1 for r in results if r.status.startswith("SKIPPED"))
     other = len(results) - confirmed - preview - skipped
+    failed = sum(1 for r in results if r.status == "FAILED")
+    unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
+    manual_review = sum(1 for r in results if r.status == "MANUAL_REVIEW")
+    if approved_plan is not None:
+        print(
+            f"📋 EP outcome: confirmed={confirmed} | skipped={skipped} | manual-review={manual_review} | "
+            f"failed={failed} | unconfirmed={unconfirmed}", flush=True
+        )
     if approved_plan is not None:
         not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
         state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")

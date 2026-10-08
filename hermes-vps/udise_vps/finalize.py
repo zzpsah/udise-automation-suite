@@ -108,6 +108,7 @@ def finalize(
             result.status = "READ_ERROR"
             result.detail = f"{type(exc).__name__}: {exc}"
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⚠️ {pen}: fresh read failed — {result.detail}", flush=True)
             break
 
@@ -116,6 +117,7 @@ def finalize(
             result.detail = "Fresh read shows formStatus=6."
             result.reason = "Already complete; no POST sent."
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⏭️ {pen}: already complete (6).", flush=True)
             continue
 
@@ -124,6 +126,7 @@ def finalize(
             result.detail = f"Fresh formStatus={before}; expected 3."
             result.reason = "Only status 3 is eligible."
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⏭️ {pen}: blocked — formStatus={before}.", flush=True)
             continue
 
@@ -133,6 +136,7 @@ def finalize(
             result.status = "PREVIEW"
             result.detail = "Eligible: fresh formStatus=3."
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"👁️ {pen}: preview — eligible for Complete Data.", flush=True)
             continue
 
@@ -140,6 +144,7 @@ def finalize(
             result.status = "LIMIT_REACHED"
             result.detail = f"FINALIZE_MAX_SUBMISSIONS={max_submissions} reached."
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"🛑 {pen}: submission cap reached.", flush=True)
             break
 
@@ -152,6 +157,7 @@ def finalize(
             result.status = "UNCONFIRMED"
             result.detail = f"Pre-POST re-read failed: {type(exc).__name__}: {exc}"
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⚠️ {pen}: {result.detail}", flush=True)
             break
 
@@ -159,6 +165,7 @@ def finalize(
             result.status = "SKIPPED_STATE_CHANGED"
             result.detail = f"State changed between reads: {before} -> {gate}."
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⏭️ {pen}: state changed to {gate} — not submitting.", flush=True)
             break
 
@@ -174,6 +181,7 @@ def finalize(
                 result.status = "FAILED"
                 result.detail = f"HTTP {response.status_code}"
                 results.append(result)
+                print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
                 print(f"❌ {pen}: POST HTTP {response.status_code}.", flush=True)
                 break
         except Exception as exc:
@@ -196,6 +204,7 @@ def finalize(
             result.status = "UNCONFIRMED"
             result.detail = f"Read-back failed: {type(exc).__name__}: {exc}"
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⚠️ {pen}: could not confirm — check the portal.", flush=True)
             break
 
@@ -209,6 +218,7 @@ def finalize(
                 + (" (POST reported a transport error.)" if post_error else "")
             )
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"✅ {pen}: finalized and confirmed.", flush=True)
         else:
             result.status = "UNCONFIRMED"
@@ -217,6 +227,7 @@ def finalize(
                 "not 6. Manual review required."
             )
             results.append(result)
+            print(f"📋 FINALIZE_RESULT status={result.status} detail={result.detail}", flush=True)
             print(f"⚠️ {pen}: {result.detail}", flush=True)
             break
 
@@ -224,6 +235,15 @@ def finalize(
     preview = sum(1 for r in results if r.status == "PREVIEW")
     skipped = sum(1 for r in results if r.status.startswith("SKIPPED"))
     other = len(results) - success - preview - skipped
+    failed = sum(1 for r in results if r.status == "FAILED")
+    unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
+    limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
+    state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
+    read_errors = sum(1 for r in results if r.status == "READ_ERROR")
+    print(
+        f"📋 FINALIZE outcome: confirmed={success} | skipped={skipped} | state-changed={state_changed} | "
+        f"limit-reached={limit_reached} | failed={failed} | unconfirmed={unconfirmed} | read-errors={read_errors}", flush=True
+    )
 
     print("\n" + "━" * 30)
     print(f"✅ Finalized + confirmed : {success}")
