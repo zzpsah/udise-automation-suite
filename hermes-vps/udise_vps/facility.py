@@ -333,7 +333,7 @@ def run_facility(
             conflicts = []
             for field, proposed in updates.items():
                 live = current.get(field)
-                if field in FACILITY_YN:
+                if field in FACILITY_YN.values():
                     if approved_yn_conflict(live, proposed):
                         conflicts.append(field)
                 elif not is_blank(live) and text(live) != text(proposed):

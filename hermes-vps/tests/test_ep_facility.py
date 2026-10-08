@@ -1030,6 +1030,16 @@ def test_facility_blank_only_fill():
     print("PASS test_facility_blank_only_fill")
 
 
+def test_facility_save_plan_recognizes_api_field_names_as_yes_no_fields():
+    from udise_vps.facility import FACILITY_YN, approved_yn_conflict
+    assert "facilityYn" in FACILITY_YN.values()
+    assert "nccYn" in FACILITY_YN.values()
+    assert approved_yn_conflict(9, 2) is False
+    assert approved_yn_conflict("9", 2) is False
+    assert approved_yn_conflict(1, 2) is True
+    assert approved_yn_conflict(2, 2) is False
+
+
 def test_facility_yes_no_display_variants_are_not_treated_as_blank():
     assert facility.yes_no_code("1 - Yes") == 1
     assert facility.yes_no_code("Yes - 1") == 1
