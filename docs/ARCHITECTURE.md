@@ -141,3 +141,6 @@ XI/XII defaults remain:
 - Girls: 146–166 cm, 38–56 kg
 
 These are workflow defaults for unset fields and do not replace actual measured values.
+
+### EP student-level result output
+Enrollment Profile runner events retain PEN, student name, status, and detail for each processed student. The Control API now exposes these EP rows directly to the UI as Status | PEN | Student | Detail instead of collapsing EP completion into an aggregate count.

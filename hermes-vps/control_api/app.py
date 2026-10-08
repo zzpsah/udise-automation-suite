@@ -1111,6 +1111,28 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
             f"Confirmation required|{sum(counts.values())}\n"
             "Action|Review listed students and confirm CWSN=No"
         )
+    # EP needs student-level visibility: an aggregate count is not enough to
+    # tell the operator which student's Enrollment Profile was actually saved.
+    # Keep other stages on the compact summary table.
+    if stage == "ep":
+        ep_rows = []
+        ep_pattern = re.compile(
+            r"EP(?:_APPROVED)?_RESULT status=(\S+) pen=(\S+) name=(.*?) detail=(.*)$"
+        )
+        for message in messages:
+            match = ep_pattern.search(message)
+            if not match:
+                continue
+            status, pen, name, detail = match.groups()
+            label = labels.get(status, status.replace("_", " ").title())
+            safe_name = re.sub(r"\s+", " ", name).strip().replace("|", "/")
+            safe_detail = re.sub(r"\s+", " ", detail).strip().replace("|", "/")
+            ep_rows.append((label, pen, safe_name, safe_detail))
+        if ep_rows:
+            lines = ["RESULT_TABLE", "Status|PEN|Student|Detail"]
+            lines.extend("|".join(row) for row in ep_rows)
+            return "\n".join(lines)
+
     if not grouped:
         return "RESULT_TABLE\nStatus|Count\nCompleted|1"
     lines = ["RESULT_TABLE", "Status|Count"]
