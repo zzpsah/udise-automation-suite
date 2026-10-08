@@ -338,7 +338,7 @@ def run_auto_gp(
             result.status = "READ_ERROR"
             result.detail = f"{type(exc).__name__}: {exc}"
             results.append(result)
-            print(f"⚠️ {pen}: read failed — {result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
 
         # ------------------------------------------------ approved plan
@@ -410,13 +410,13 @@ def run_auto_gp(
             result.status = "SKIPPED_CWSN"
             result.detail = "Fresh GP shows CWSN=Yes. No POST sent. Manual review."
             results.append(result)
-            print(f"⏭️ {pen}: CWSN=Yes — skipped for manual review.", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
         if fresh_cwsn in CWSN_UNEXPECTED_SKIP:
             result.status = "SKIPPED_CWSN_UNEXPECTED"
             result.detail = f"Unexpected CWSN code {fresh_cwsn}. Manual review."
             results.append(result)
-            print(f"⏭️ {pen}: CWSN={fresh_cwsn} unexpected — manual review.", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
 
         # ------------------------------------------------- blank-only diff
@@ -440,7 +440,7 @@ def run_auto_gp(
             result.status = "NO_CHANGE"
             result.detail = "Fresh GP has no approved blank AUTO fields."
             results.append(result)
-            print(f"• {pen}: nothing blank to fill.", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
 
         result.changes = updates
@@ -449,18 +449,14 @@ def run_auto_gp(
             result.status = "PREVIEW"
             result.detail = f"{len(updates)} blank field(s) would be filled."
             results.append(result)
-            print(
-                f"👁️ {position}/{len(selected)} {pen}: preview — "
-                f"{', '.join(updates)}",
-                flush=True,
-            )
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
 
         if submissions >= max_submissions:
             result.status = "LIMIT_REACHED"
             result.detail = f"AUTO_GP_MAX_SUBMISSIONS={max_submissions} reached."
             results.append(result)
-            print(f"🛑 {pen}: submission cap reached.", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             continue
 
         # --------------------------------------------------------- one write
@@ -477,7 +473,7 @@ def run_auto_gp(
                     f"{body.get('message') or body.get('error') or 'rejected'}"
                 )
                 results.append(result)
-                print(f"❌ {pen}: {result.detail}", flush=True)
+                print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
                 break
         except Exception as exc:
             # Transmitted state is unknown — read back before deciding anything.
@@ -498,7 +494,7 @@ def run_auto_gp(
             result.status = "UNCONFIRMED"
             result.detail = f"Read-back failed: {type(exc).__name__}: {exc}"
             results.append(result)
-            print(f"⚠️ {pen}: could not confirm — check the portal.", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             break
 
         mismatches = read_back_matches(verify, updates)
@@ -514,7 +510,7 @@ def run_auto_gp(
                 + (" (POST reported a transport error.)" if post_error else "")
             )
             results.append(result)
-            print(f"✅ {pen}: AUTO GP saved and confirmed.", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
         else:
             result.status = "UNCONFIRMED"
             result.detail = (
@@ -522,13 +518,18 @@ def run_auto_gp(
                 "Manual review required."
             )
             results.append(result)
-            print(f"⚠️ {pen}: {result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
             break
 
     confirmed = sum(1 for r in results if r.confirmed)
     no_change = sum(1 for r in results if r.status == "NO_CHANGE")
     previewed = sum(1 for r in results if r.status == "PREVIEW")
     other = len(results) - confirmed - no_change - previewed
+    status_counts = {}
+    for r in results:
+        status_counts[r.status] = status_counts.get(r.status, 0) + 1
+    breakdown = " | ".join(f"{k}={v}" for k, v in sorted(status_counts.items()))
+    print(f"📋 GP outcome: {breakdown}", flush=True)
     if approved_plan is not None:
         not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
         state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
@@ -547,7 +548,7 @@ def run_auto_gp(
     if previewed:
         print(f"👁️  Preview only      : {previewed}")
     if other:
-        print(f"⚠️  Skipped / other   : {other}")
+        print(f"⚠️  Other (see GP_RESULT events above) : {other}")
     print("━" * 30)
 
     return results
