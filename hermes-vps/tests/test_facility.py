@@ -189,6 +189,37 @@ def _():
     assert "facProvidedCwsnYn" in up2, up2
 
 
+@check("facility_no_forces_unanswered_activity_flags_to_no")
+def _():
+    current = {
+        "facilityYn": 9,
+        "olympdsNlc": 9,
+        "nccYn": 9,
+        "nssYn": 9,
+        "scoutsYn": 9,
+    }
+    up = fac.build_facility_updates(current, cwsn=False, rng=random.Random(1))
+    assert up["facilityYn"] == 2
+    for field in ("olympdsNlc", "nccYn", "nssYn", "scoutsYn"):
+        assert up[field] == 2, (field, up)
+
+
+@check("facility_existing_yes_is_not_overwritten_by_dependency")
+def _():
+    current = {
+        "facilityYn": 2,
+        "olympdsNlc": 1,
+        "nccYn": 9,
+        "nssYn": 9,
+        "scoutsYn": 9,
+    }
+    up = fac.build_facility_updates(current, cwsn=False, rng=random.Random(1))
+    assert "olympdsNlc" not in up
+    assert up["nccYn"] == 2
+    assert up["nssYn"] == 2
+    assert up["scoutsYn"] == 2
+
+
 print()
 if FAILED:
     print(f"{len(PASSED)}/{len(PASSED) + len(FAILED)} passed")
