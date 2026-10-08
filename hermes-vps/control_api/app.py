@@ -1054,6 +1054,8 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "facility": r"FP_RESULT status=([A-Z0-9_]+)",
         "finalize": r"FINALIZE_RESULT status=([A-Z0-9_]+)",
         "snapshot": r"SNAPSHOT_RESULT status=([A-Z0-9_]+)",
+        "completion": r"COMPLETION_RESULT status=([A-Z0-9_]+)",
+
     }
     pattern = patterns.get(stage)
     if pattern:
@@ -1267,6 +1269,13 @@ def _run_job_unlocked(job_id: str) -> None:
                 cmd += ["--plan", str(plan_path)]
         elif stage == "finalize":
             cmd += ["--class", row["class_name"], "--from-completion"]
+            if is_preview:
+                cmd += ["--plan-out", str(out_dir / "approved-plan.json")]
+            else:
+                plan_path = JOBS / str(row["approved_from"]) / "approved-plan.json"
+                if not plan_path.is_file():
+                    raise RuntimeError("Approved Complete Data write plan is unavailable; generate a new preview")
+                cmd += ["--plan", str(plan_path)]
         elif stage not in {"students", "snapshot"}:
             raise RuntimeError("This stage is not enabled in the read-only MVP")
 
@@ -1349,7 +1358,7 @@ def _run_job_unlocked(job_id: str) -> None:
         # GP/EP approval depends on the exact plan produced by the preview.
         # Never mark such a preview completed (or queue a write child) if the
         # plan artifact was not actually persisted by the runner.
-        if is_preview and stage in {"gp", "ep", "facility"}:
+        if is_preview and stage in {"gp", "ep", "facility", "finalize"}:
             plan_path = out_dir / "approved-plan.json"
             if not plan_path.is_file():
                 raise RuntimeError(
