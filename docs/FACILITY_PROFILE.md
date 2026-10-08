@@ -77,6 +77,12 @@ For IX–X, the female range is intentionally below the corresponding male range
 
 The implementation is in `hermes-vps/udise_vps/facility.py`; the focused regression suite is `hermes-vps/tests/test_facility.py`. Verification on 8 October 2026 passed **13/13 Facility tests**, including the new IX/X range tests and XI/XII preservation tests. Change commit: `95b81be` (`fix: adjust IX-X facility measurement ranges`).
 
+## Full Snapshot class-scope fix — 8 October 2026
+
+The Control API previously did not forward the selected class when starting the `snapshot` stage. This allowed the snapshot runner to use its default scope instead of the class selected in the portal UI; in particular, a requested Class X snapshot could run against Class IX/default scope.
+
+The Control API now explicitly passes `--class <selected-class>` for every Full Snapshot job. A synthetic control-plane regression test verifies that a Class X Snapshot job reaches the runner with `--class X` and remains read-only. Snapshot tests pass **2/2**, and the control-plane synthetic lifecycle test passes.
+
 ## Verification and limitations
 
 Seven offline test methods cover exact payload keys, unanswered codes, conditional benefits, non-CWSN exclusion, measurement ranges, read-back normalization and mocked save outcomes (success, timeout then saved, rejection). Enrollment regression and class-selector tests also pass against the new notebook.

@@ -218,6 +218,29 @@ def test_preview_lifecycle_and_write_lock() -> None:
             assert "--report" in ep_cmd and str(ep_source) in ep_cmd
             assert "--fetch-report" not in ep_cmd
             assert ep_cmd[ep_cmd.index("--max") + 1] == "5"
+
+            snapshot_job = api.create_job(
+                api.JobIn(
+                    session_id=session_id,
+                    school="2497128",
+                    stage="snapshot",
+                    class_name="X",
+                    preview=True,
+                ),
+                authorization=authorization,
+            )
+            deadline = time.time() + 5
+            snapshot_state = None
+            while time.time() < deadline:
+                snapshot_state = api.get_job(snapshot_job["job_id"], authorization=authorization)
+                if snapshot_state["job"]["status"] in {"completed", "failed"}:
+                    break
+                time.sleep(0.02)
+            assert snapshot_state is not None
+            assert snapshot_state["job"]["status"] == "completed", snapshot_state
+            snapshot_cmd = observed["commands"][-1]
+            assert snapshot_cmd[snapshot_cmd.index("--class") + 1] == "X"
+            assert "--submit" not in snapshot_cmd
         finally:
             api.subprocess.Popen = original_popen
             api._check_portal_session = original_check

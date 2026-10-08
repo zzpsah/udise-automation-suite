@@ -1054,6 +1054,12 @@ def _run_job(job_id: str) -> None:
         cmd = [str(RUNNER), stage, "--school", row["school"], "--out", str(out_dir)]
         if stage == "completion":
             cmd += ["--class", row["class_name"]]
+        elif stage == "snapshot":
+            # Full Snapshot is class-scoped in the UI/API. Always forward the
+            # selected class; otherwise the CLI defaults to the full roster,
+            # and an earlier wrapper path could accidentally run its default
+            # IX scope when Class X was requested.
+            cmd += ["--class", row["class_name"]]
         elif stage == "gp":
             cmd += ["--class", row["class_name"], "--run-mode", "All students"]
         elif stage == "ep":
