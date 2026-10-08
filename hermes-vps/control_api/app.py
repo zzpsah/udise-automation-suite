@@ -1116,6 +1116,13 @@ def _run_job(job_id: str) -> None:
             cmd += ["--class", row["class_name"]]
         elif stage == "gp":
             cmd += ["--class", row["class_name"], "--run-mode", "All students"]
+            if is_preview:
+                cmd += ["--plan-out", str(out_dir / "approved-plan.json")]
+            else:
+                plan_path = JOBS / str(row["approved_from"]) / "approved-plan.json"
+                if not plan_path.is_file():
+                    raise RuntimeError("Approved GP write plan is unavailable; generate a new preview")
+                cmd += ["--plan", str(plan_path)]
         elif stage == "ep":
             ep_class = str(row["class_name"] or "").upper()
             if is_preview:
@@ -1134,6 +1141,10 @@ def _run_job(job_id: str) -> None:
                     cmd += ["--class", ep_class, "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
             else:
                 source_dir = JOBS / str(row["approved_from"])
+                plan_path = source_dir / "approved-plan.json"
+                if not plan_path.is_file():
+                    raise RuntimeError("Approved EP write plan is unavailable; generate a new preview")
+                cmd += ["--plan", str(plan_path)]
                 reports = sorted(source_dir.glob("eShikshaKosh_OTR_*.xlsx"))
                 if reports:
                     cmd += ["--class", ep_class, "--report", str(reports[-1])]
