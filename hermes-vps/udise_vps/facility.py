@@ -132,6 +132,14 @@ def build_facility_updates(current: dict, cwsn: bool, rng: random.Random, gender
         if saved is None:
             updates[field_name] = 2  # No
 
+    # If Facilities Provided = No, the dependent activity flags are No when
+    # unanswered. Existing Yes values are never overwritten.
+    facility_value = updates.get("facilityYn", yes_no_code(current.get("facilityYn")))
+    if facility_value == 2:
+        for field_name in ("olympdsNlc", "nccYn", "nssYn", "scoutsYn"):
+            if yes_no_code(current.get(field_name)) is None:
+                updates[field_name] = 2
+
     # ------------------------------------------------------------- measurements
     gender_code = str(gender or "").strip().lower()
     is_female = gender_code in {"2", "2.0", "female", "girl", "f"}
@@ -296,7 +304,12 @@ def run_facility(
             conflicts = []
             for field, proposed in updates.items():
                 live = current.get(field)
-                if not is_blank(live) and text(live) != text(proposed):
+                if field in FACILITY_YN:
+                    live_norm = yes_no_code(live)
+                    proposed_norm = yes_no_code(proposed)
+                    if live_norm is not None and live_norm != proposed_norm:
+                        conflicts.append(field)
+                elif not is_blank(live) and text(live) != text(proposed):
                     conflicts.append(field)
             if conflicts:
                 result.status = "SKIPPED_STATE_CHANGED"
