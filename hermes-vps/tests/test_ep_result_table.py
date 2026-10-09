@@ -41,9 +41,9 @@ def test_ep_result_table_lists_students() -> None:
                 )
 
         output = app._result_table_message(job_id, "ep")
-        assert "Status|PEN|Student|Detail" in output
+        assert "Status|PEN|Student|Reason / Action" in output
         assert "Saved + confirmed|PEN001|Ravi Kumar|Saved and verified" in output
-        assert "Not in save plan|PEN002|Sunita Devi|Student was not in the save plan; no POST sent." in output
+        assert "Needs fresh preview|PEN002|Sunita Devi|Student was not in the save plan; no POST sent." in output
         assert "Save limit reached|PEN003|Amit Kumar|Save limit (1) reached; no POST sent." in output
         assert "Live value changed|PEN004|Pooja Devi|Live EP values changed since preview: admnNumber. No POST sent." in output
 
