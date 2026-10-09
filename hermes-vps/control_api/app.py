@@ -967,6 +967,22 @@ async def eshiksha_submit(token: str, request: Request):
 <h2>eShikshaKosh connected</h2><p>Login verified for <strong>{school_name}</strong>. Close this panel and return to Enrollment Profile.</p></body></html>""")
 
 
+def _find_cached_eshiksha_report(session_id: str, year: str = "2026-27") -> Path | None:
+    """Find the latest retained OTR workbook from a completed EP preview for this UDISE session/year."""
+    if not session_id or not re.fullmatch(r"\d{4}-\d{2}", str(year or "")):
+        return None
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT id FROM jobs WHERE stage='ep' AND status='completed' AND session_id=? ORDER BY updated_at DESC",
+            (session_id,),
+        ).fetchall()
+    for row in rows:
+        for report in sorted((JOBS / str(row["id"])).glob("eShikshaKosh_OTR_*.xlsx"), key=lambda p: p.stat().st_mtime, reverse=True):
+            if year in report.name and report.is_file():
+                return report
+    return None
+
+
 def _load_eshiksha_credentials(session_id: str | None = None) -> dict:
     if not ESK_CREDENTIAL.exists():
         raise RuntimeError("Connect eShikshaKosh securely before running EP preview")
@@ -1294,8 +1310,17 @@ def _run_job_unlocked(job_id: str) -> None:
                 elif ep_class == "X":
                     cmd += ["--class", ep_class]
                 else:
-                    eshiksha = _load_eshiksha_credentials(row["session_id"])
-                    cmd += ["--class", ep_class, "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
+                    cached_report = _find_cached_eshiksha_report(row["session_id"], "2026-27")
+                    if cached_report:
+                        # Copy into this job so the exact source remains available for approval/save.
+                        job_report = out_dir / cached_report.name
+                        shutil.copy2(cached_report, job_report)
+                        os.chmod(job_report, 0o600)
+                        cmd += ["--class", ep_class, "--report", str(job_report)]
+                        _event(job_id, "Reusing the retained eShikshaKosh OTR report for this UDISE session; no reconnect required.")
+                    else:
+                        eshiksha = _load_eshiksha_credentials(row["session_id"])
+                        cmd += ["--class", ep_class, "--fetch-report", "--year", eshiksha.get("year", "2026-27")]
                 cmd += ["--plan-out", str(out_dir / "approved-plan.json")]
             else:
                 source_dir = JOBS / str(row["approved_from"])
@@ -1715,6 +1740,22 @@ def eshiksha_report_result(job_id: str, authorization: str | None = Header(defau
     if not reports:
         raise HTTPException(404, "This EP run used an uploaded report or no source report was retained")
     return FileResponse(reports[-1], filename=reports[-1].name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+@app.get("/api/v1/eshiksha-report-status")
+def eshiksha_report_status(session_id: str, year: str = "2026-27", authorization: str | None = Header(default=None)) -> dict:
+    """Report availability only; never returns credentials or student data."""
+    require_api(authorization)
+    _load_session(session_id)
+    meta = _json_read(ESK_UPLOAD_META) if ESK_UPLOAD_META.exists() else {}
+    upload_ready = ESK_UPLOAD.exists() and meta.get("session_id") in {"", session_id}
+    cached = None if upload_ready else _find_cached_eshiksha_report(session_id, year)
+    return {
+        "ready": bool(upload_ready or cached),
+        "source": "uploaded" if upload_ready else "cached" if cached else "none",
+        "year": year,
+        "report_name": cached.name if cached else ("uploaded-report.xlsx" if upload_ready else ""),
+    }
+
 
 @app.get("/api/v1/eshiksha-preview")
 def eshiksha_preview(session_id: str | None = None, authorization: str | None = Header(default=None)):

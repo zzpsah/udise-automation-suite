@@ -257,6 +257,27 @@ export default function Page(){
     return ()=>clearInterval(t);
   },[sessionToken,sessionId]);
 
+  useEffect(()=>{
+    if(!sessionId || stage!=="ep") return;
+    let cancelled=false;
+    (async()=>{
+      try {
+        const r=await fetch(`/api/eshiksha-report-status?session_id=${encodeURIComponent(sessionId)}&year=${encodeURIComponent(eshikshaYear)}`,{cache:"no-store"});
+        if(!r.ok) return;
+        const d=await r.json();
+        if(cancelled) return;
+        if(d.ready){
+          setEshikshaReportReady(true);
+          setEshikshaReady(false);
+          setMsg("Saved eShikshaKosh report is ready for this session. You can continue the next EP batch without reconnecting.");
+        } else {
+          setEshikshaReportReady(false);
+        }
+      } catch { /* Keep the existing manual connection/upload fallback available. */ }
+    })();
+    return ()=>{cancelled=true};
+  },[sessionId,stage,eshikshaYear]);
+
   async function connectEshiksha(){
     setMsg("Preparing secure eShikshaKosh sign-in…");
     setEshikshaReady(false);setEshikshaReportReady(false);setEshikshaPreview(null);
@@ -457,7 +478,7 @@ export default function Page(){
                 <span className={"source-pill "+((eshikshaReady||eshikshaReportReady||["X","XII"].includes(klass))?"ready":"needed")}>{eshikshaReportReady?"EP source ready":eshikshaReady?"Verified connection":["X","XII"].includes(klass)?`Optional for Class ${klass}`:"Source required"}</span>
               </div>
               {eshikshaReady&&<div className="source-identity"><strong>Connected:</strong> {eshikshaSchoolName||"eShikshaKosh school"}{eshikshaConnectedUdise?` · UDISE ${eshikshaConnectedUdise}`:""}<small>Login verified. The password is temporary for this UDISE session and is discarded after the live source fetch.</small></div>}
-              {eshikshaReportReady&&<div className="source-identity"><strong>EP source ready.</strong> The fetched/uploaded eShikshaKosh report is retained server-side and passed automatically into Enrollment Profile.</div>}
+              {eshikshaReportReady&&<div className="source-identity"><strong>EP source ready.</strong> The fetched/uploaded eShikshaKosh report is retained server-side for this UDISE session and academic year, and reused for subsequent EP batches without reconnecting.</div>}
               {eshikshaPreview&&<div className="source-preview">
                 <div className="source-preview-head"><div><strong>Latest eShikshaKosh data</strong><small>{eshikshaPreview.total} students loaded · showing first {eshikshaPreview.preview_limit}</small></div><span className="badge ok">Ready for EP</span></div>
                 <div className="source-counts">{Object.entries(eshikshaPreview.class_counts).sort().map(([k,v])=><span key={k}>Class {k.replace(/^Class\\s*/i,"")}: <strong>{v}</strong></span>)}</div>
