@@ -1137,6 +1137,11 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
             lines = ["RESULT_TABLE", "Status|PEN|Student|Reason / Action"]
             lines.extend("|".join(row) for row in result_rows)
             return "\n".join(lines)
+        if stage == "finalize" and any("Finalize preview: 0 eligible students" in message for message in messages):
+            return (
+                "RESULT_TABLE\nStatus|Count\nEligible for Finalize|0\n"
+                "Action|No students have formStatus=3 (Ready to Complete); no finalization is needed."
+            )
 
 
     if not grouped:

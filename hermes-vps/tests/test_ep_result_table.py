@@ -47,6 +47,22 @@ def test_ep_result_table_lists_students() -> None:
         assert "Save limit reached|PEN003|Amit Kumar|Save limit (1) reached; no POST sent." in output
         assert "Live value changed|PEN004|Pooja Devi|Live EP values changed since preview: admnNumber. No POST sent." in output
 
+        finalize_job_id = "c" * 32
+        with app._db() as conn:
+            conn.execute(
+                """INSERT INTO jobs(
+                    id,created_at,updated_at,status,stage,class_name,school,session_id,preview
+                ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                (finalize_job_id, now, now, "completed", "finalize", "X", "school", "session", 1),
+            )
+            conn.execute(
+                "INSERT INTO events(job_id,created_at,level,message) VALUES(?,?,?,?)",
+                (finalize_job_id, now, "info", "ℹ️ Finalize preview: 0 eligible students. No students currently have formStatus=3 (Ready to Complete); no finalization is needed for this run."),
+            )
+        finalize_output = app._result_table_message(finalize_job_id, "finalize")
+        assert "Eligible for Finalize|0" in finalize_output
+        assert "No students have formStatus=3 (Ready to Complete); no finalization is needed." in finalize_output
+
 
 if __name__ == "__main__":
     test_ep_result_table_lists_students()

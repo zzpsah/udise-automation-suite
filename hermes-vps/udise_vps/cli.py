@@ -258,10 +258,17 @@ def cmd_finalize(args) -> int:
         report = completion_mod.scan_completion(session, class_scope_name=args.klass)
         pens = report.ready_pens
         if not pens:
-            print("ℹ️ No formStatus=3 students; nothing to finalize.")
+            print(
+                "ℹ️ Finalize preview: 0 eligible students. "
+                "No students currently have formStatus=3 (Ready to Complete); "
+                "no finalization is needed for this run."
+            )
             results = []
             if not args.submit:
                 out = _output_dir(args)
+                # An empty plan is still a valid preview artifact. The Control API
+                # requires it to distinguish “nothing eligible” from a runner bug.
+                _write_plan(args.plan_out, results)
                 path = out / preview_report.default_filename("finalize", session.school_id, args.klass)
                 preview_report.write_preview_workbook("finalize", results, str(path))
                 print(f"REPORT_READY={path.resolve()}")
