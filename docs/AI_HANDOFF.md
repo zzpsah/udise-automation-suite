@@ -279,3 +279,33 @@ Current portal-login behavior:
 ## Remember UDISE credential behavior
 
 The login UI includes **Remember UDISE password on this Chrome profile**. The implementation uses the browser Credential Management API when available. Credentials are not intentionally stored in the Oracle control API or application database. Browser/Chrome support and policy determine whether the credential is actually saved.
+
+
+## Development checkpoint — 9 October 2026
+
+### Latest operator feedback / audit required
+
+The operator reported that expected rules were not visible in the P4/information rules view, and that the browser-profile **Remember UDISE password** control was not visible in the UI screenshot. Documentation alone is not proof that these are present in the actual runtime UI or rule registry.
+
+Before calling this complete, inspect the source of truth for P4/information rules, the Facility Profile workflow, and the deployed login UI. Reconcile runtime behavior, source code, generated rule/help content, and docs.
+
+Required behaviors to preserve and verify:
+
+- Facility Profile is blank-only: do not overwrite existing saved values.
+- Existing saved **Yes** values remain protected; never flip them to No. Conflicting dependent values go to manual review.
+- IX–X blank-field workflow defaults: boys 140–160 cm / 38–55 kg; girls 135–155 cm / 34–50 kg.
+- XI–XII defaults documented in this repo: boys 150–170 cm / 42–60 kg; girls 146–166 cm / 38–56 kg. Do not imply live write verification where none exists.
+- The login UI should expose the Remember UDISE password on this Chrome profile option. It uses the browser Credential Management API where supported; browser/Chrome policy controls actual persistence. Do not store the password in the Oracle API or app database.
+- Keep preview-first writes, explicit bounded approval, fresh pre-write read, no blind POST retries, and fresh read-back verification.
+
+### Separate eShikshaKosh downloader
+
+A separate Next.js UI was deployed from `zzpsah/eshikshakosh-automation` at **https://eshikakoshapp.vercel.app**. It is not the UDISE application. At the last checkpoint its Generate action was still a placeholder; authenticated backend bridge and end-to-end Excel download remain pending. UDISE's existing EP eShikshaKosh adapter is a separate integration and must not be conflated with this standalone report-downloader deployment.
+
+### Scope and deployment guardrails
+
+- Keep UDISE production at `https://udise-auto.vercel.app/` separate.
+- Do not modify `udise-login-staging`; the operator explicitly asked that staging be left alone.
+- Keep eShikshaKosh and UDISE repositories/projects/deployments independent.
+- UDISE development was paused by the operator while the standalone eShikshaKosh app was being set up. Treat the above as the next audit queue, not as authorization to change production or staging without the operator resuming UDISE work.
+- Preserve unrelated working-tree modifications; never use broad reset/clean commands.
