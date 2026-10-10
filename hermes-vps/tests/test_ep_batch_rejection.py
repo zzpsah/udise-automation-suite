@@ -12,14 +12,13 @@ from udise_vps import ep  # noqa: E402
 class FakeSession:
     school_id = "school-1"
 
-    def __init__(self):
+    def __init__(self, count=2):
         self.students = [
-            {"studentId": "student-1", "studentCodeNat": "PEN001",
-             "studentName": "First Student", "classId": 9, "rollNo": "1"},
-            {"studentId": "student-2", "studentCodeNat": "PEN002",
-             "studentName": "Second Student", "classId": 9, "rollNo": "2"},
+            {"studentId": f"student-{i}", "studentCodeNat": f"PEN{i:03d}",
+             "studentName": f"Student {i}", "classId": 9, "rollNo": str(i)}
+            for i in range(1, count + 1)
         ]
-        self.enrolments = {"student-1": {}, "student-2": {}}
+        self.enrolments = {student["studentId"]: {} for student in self.students}
         self.posts = []
 
     def student_detail(self, sid):
@@ -44,10 +43,12 @@ class FakeSession:
 
 
 def test_rejected_student_does_not_consume_ep_save_limit():
-    session = FakeSession()
+    # One rejection followed by five eligible students must still allow
+    # five confirmed saves when the operator selects a limit of five.
+    session = FakeSession(count=6)
     approved_plan = {
-        "PEN001": {"changes": {"admnNumber": "1"}},
-        "PEN002": {"changes": {"admnNumber": "2"}},
+        student["studentCodeNat"]: {"changes": {"admnNumber": str(i)}}
+        for i, student in enumerate(session.students, 1)
     }
 
     with patch.object(ep, "load_subject_rules", return_value={}), \
@@ -57,16 +58,14 @@ def test_rejected_student_does_not_consume_ep_save_limit():
             class_scope_name="IX",
             limit=0,
             allow_submit=True,
-            max_submissions=1,
+            max_submissions=5,
             approved_plan=approved_plan,
         )
 
-    assert session.posts == ["student-1", "student-2"], session.posts
-    assert [(r.pen, r.status) for r in results] == [
-        ("PEN001", "SKIPPED_GP_REQUIRED"),
-        ("PEN002", "SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK"),
-    ]
-    assert results[1].confirmed is True
+    assert session.posts == [f"student-{i}" for i in range(1, 7)], session.posts
+    assert results[0].status == "SKIPPED_GP_REQUIRED"
+    assert sum(result.confirmed for result in results) == 5
+    assert all(result.confirmed for result in results[1:])
 
 def test_regular_ep_rejection_is_classified_and_batch_continues():
     session = FakeSession()
