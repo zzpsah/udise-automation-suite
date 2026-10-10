@@ -363,7 +363,7 @@ def run_auto_gp(
             result.status = "READ_ERROR"
             result.detail = f"{type(exc).__name__}: {exc}"
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         # ------------------------------------------------ approved plan
@@ -509,14 +509,14 @@ def run_auto_gp(
             result.status = "PREVIEW"
             result.detail = f"{len(updates)} blank field(s) would be filled."
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         if max_submissions > 0 and submissions >= max_submissions:
             result.status = "LIMIT_REACHED"
             result.detail = f"AUTO_GP_MAX_SUBMISSIONS={max_submissions} reached."
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         # --------------------------------------------------------- one write
@@ -533,7 +533,7 @@ def run_auto_gp(
                     f"{body.get('message') or body.get('error') or 'rejected'}"
                 )
                 results.append(result)
-                print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+                print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 break
         except Exception as exc:
             # Transmitted state is unknown — read back before deciding anything.
@@ -554,7 +554,7 @@ def run_auto_gp(
             result.status = "UNCONFIRMED"
             result.detail = f"Read-back failed: {type(exc).__name__}: {exc}"
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             break
 
         mismatches = read_back_matches(verify, updates)
@@ -570,7 +570,7 @@ def run_auto_gp(
                 + (" (POST reported a transport error.)" if post_error else "")
             )
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
         else:
             result.status = "UNCONFIRMED"
             result.detail = (
@@ -578,7 +578,7 @@ def run_auto_gp(
                 "Manual review required."
             )
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             break
 
     confirmed = sum(1 for r in results if r.confirmed)
