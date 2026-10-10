@@ -121,11 +121,20 @@ def apply_gp_rules(fresh: dict, updates: dict) -> dict:
                         ("Unknown") is offered by the UI but rejected on write,
                         so it becomes the Under Investigation placeholder (9).
 
-    A rule applies to a field only when it is BLANK on the portal or already in
-    `updates`. A value the portal already holds is never overridden — the same
-    blank-only rule that governs every other field.
+    Most rules apply only to blank fields or fields already in `updates`.
+    Exception: natIndYN is a school-wide invariant for this deployment; all
+    enrolled students are Indian nationals, so an explicit No (2) is corrected
+    to Yes (1). Other existing values remain protected.
     """
     out = dict(updates)
+
+    # ----------------------------------------------------- Indian national
+    # User-confirmed school rule: enrolled students in this school are Indian
+    # nationals. Unlike ordinary blank-only defaults, an explicit No is a
+    # known incorrect value for this dataset and must be corrected to Yes.
+    # Do not add this field for other existing codes or for an unknown value.
+    if as_code(fresh.get("natIndYN")) == 2:
+        out["natIndYN"] = 1
 
     def writable(field_name: str) -> bool:
         """May this rule set the field?
