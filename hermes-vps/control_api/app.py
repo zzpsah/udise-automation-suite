@@ -1106,6 +1106,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "SKIPPED_ALREADY_UP_TO_DATE": "Skipped",
         "SKIPPED_CWSN": "Skipped",
         "SKIPPED_CWSN_UNEXPECTED": "Skipped",
+        "SKIPPED_GP_REQUIRED": "GP required",
         "SKIPPED_NOT_IN_APPROVED_PLAN": "Needs fresh preview",
         "NEEDS_FRESH_PREVIEW": "Needs fresh preview",
         "SKIPPED_STATE_CHANGED": "Live value changed",
