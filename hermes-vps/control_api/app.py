@@ -1112,6 +1112,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "SKIPPED_STATE_CHANGED": "Live value changed",
         "LIMIT_REACHED": "Save limit reached",
         "MANUAL_REVIEW": "Manual review",
+        "MANUAL_REVIEW_GP_INCOMPLETE": "GP incomplete — manual review",
         "FAILED": "Failed",
         "UNCONFIRMED": "Not confirmed",
         "READ_ERROR": "Read error",
