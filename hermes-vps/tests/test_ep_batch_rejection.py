@@ -67,3 +67,22 @@ def test_rejected_student_does_not_consume_ep_save_limit():
         ("PEN002", "SUCCESS_CONFIRMED_BY_RESPONSE_AND_READBACK"),
     ]
     assert results[1].confirmed is True
+
+def test_regular_ep_rejection_is_classified_and_batch_continues():
+    session = FakeSession()
+
+    with patch.object(ep, "load_subject_rules", return_value={}), \
+         patch.object(ep.time, "sleep", return_value=None):
+        results = ep.run_ep(
+            session,
+            class_scope_name="IX",
+            limit=0,
+            allow_submit=True,
+            max_submissions=1,
+            approved_plan=None,
+        )
+
+    assert session.posts == ["student-1", "student-2"], session.posts
+    assert results[0].status == "SKIPPED_GP_REQUIRED"
+    assert "ER1010" in results[0].detail
+    assert results[1].confirmed is True
