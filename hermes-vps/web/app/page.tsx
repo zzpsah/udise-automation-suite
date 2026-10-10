@@ -413,17 +413,12 @@ export default function Page(){
 
   useEffect(()=>{
     if(!jobId) return;
+    let terminalHandled=false;
     const poll=async()=>{
       const r=await fetch("/api/jobs/"+jobId,{cache:"no-store"});
       if(!r.ok) return;
       const d=await r.json();
       setJob(d);
-      if(d.job.stage==="ep"&&["completed","failed"].includes(d.job.status)){
-        setEshikshaReady(false);
-        // Refresh the server-side retained report after every EP run so the
-        // next batch uses it even if this run fetched it automatically.
-        await refreshEshikshaReportStatus(d.job.status==="completed");
-      }
       if(d.job.auto_write_job_id){
         const limit=Number(d.job.max_submissions); setMsg(`Preview verified. Server-side save is queued for ${limit===0?"all eligible":`up to ${limit}`} record(s); browser connection is no longer required.`);
         if(d.job.auto_write_job_id!==jobId){
@@ -431,7 +426,18 @@ export default function Page(){
           return;
         }
       }
-      if(["completed","failed"].includes(d.job.status)) clearInterval(timer);
+      if(["completed","failed"].includes(d.job.status)){
+        // Handle a terminal job exactly once. Without this guard, an in-flight
+        // interval poll can ask for report status repeatedly after completion.
+        if(terminalHandled) return;
+        terminalHandled=true;
+        clearInterval(timer);
+        if(d.job.stage==="ep"){
+          setEshikshaReady(false);
+          // One refresh after the EP run updates the cache for the next batch.
+          await refreshEshikshaReportStatus(d.job.status==="completed");
+        }
+      }
     };
     const timer=setInterval(poll,1800);poll();
     return ()=>clearInterval(timer);
