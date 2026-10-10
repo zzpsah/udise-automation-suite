@@ -480,7 +480,7 @@ already hold the specified values.
 | motherTongue | Hindi | `28` ✅ |
 | bloodGroup | Under Investigation | `9` ✅ |
 | cwsnYN | No | `2` ✅ |
-| natIndYN | Yes | `1` ✅ |
+| natIndYN | Yes | `1` ✅; if the fresh saved value is `2` (No), AUTO GP corrects it to `1` (Yes) under the school-confirmed Indian-national rule |
 | isBplYN | No | `1` ⚠️ (this is *Yes*) |
 
 **No GP writes are needed.** Preview confirms "nothing blank to fill".
@@ -611,7 +611,7 @@ udise-hermes-version/
 │   ├── constants.py         endpoints, class scopes, status model, dropdowns
 │   ├── session.py           auth, roster, detail reads, single-POST helper
 │   ├── subjects.py          verified subject / moi / exam-result code maps
-│   ├── general_profile.py   AUTO GP blank-only fill + read-back
+│   ├── general_profile.py   AUTO GP defaults, Indian-national correction + read-back
 │   ├── ep.py                Enrollment Profile (IX/X) + admission numbering
 │   ├── facility.py          Facility Profile blank-only fill
 │   ├── completion.py        Completion Overview status scan
