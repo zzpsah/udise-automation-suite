@@ -1102,6 +1102,34 @@ def run_ep(
                 results.append(result)
                 print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                 continue
+            # UDISE enforces GP -> EP: a student with formStatus=0 still
+            # needs the General Profile saved. Do not submit EP and let ER1010
+            # reject it; mark this student as blocked and continue safely.
+            try:
+                general = session.student_detail(sid)
+                form_status = int(general.get("formStatus"))
+            except (TypeError, ValueError):
+                form_status = None
+            except Exception as exc:
+                result.status = "MANUAL_REVIEW"
+                result.detail = (
+                    "Could not verify the General Profile prerequisite "
+                    f"({type(exc).__name__}). No EP POST sent; verify GP and retry."
+                )
+                results.append(result)
+                print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                continue
+            if form_status == 0:
+                result.status = "SKIPPED_GP_REQUIRED"
+                result.detail = (
+                    "General Profile is not saved (formStatus=0). "
+                    "Action: run the approved GP Preview/Save for this student, "
+                    "then refresh the EP Preview and retry. No EP POST sent."
+                )
+                results.append(result)
+                print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                continue
+
             # The portal rejects an EP write when an existing admission number
             # has no admission-start date. Never invent that date; route the
             # record to manual review and continue to the next approved item.
@@ -1127,11 +1155,25 @@ def run_ep(
                 if not response_success:
                     err = body.get("error")
                     msg = err.get("message") if isinstance(err, dict) else err
+                    message = str(msg or body.get("message") or "rejected")
+                    if "ER1010" in message or "save the General Profile" in message or "General Profile(GP)" in message:
+                        result.status = "SKIPPED_GP_REQUIRED"
+                        result.detail = (
+                            "Portal confirmed that General Profile must be saved first (ER1010). "
+                            "Action: run the approved GP Preview/Save, then refresh EP Preview and retry. "
+                            "No EP save was confirmed."
+                        )
+                        print(f"📋 EP_SAVE_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
+                        results.append(result)
+                        continue
                     result.status = "FAILED"
-                    result.detail = "HTTP %s; %s" % (status_code, msg or body.get("message") or "rejected")
+                    result.detail = "HTTP %s; %s" % (status_code, message)
                     print(f"📋 EP_APPROVED_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                     results.append(result)
-                    break
+                    # A definitive portal rejection belongs to this student. It
+                    # must not abort the whole selected batch; rejected records do
+                    # not consume the successful-submission limit.
+                    continue
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
@@ -1352,11 +1394,22 @@ def run_ep(
             if not response_success:
                 err = body.get("error")
                 msg = err.get("message") if isinstance(err, dict) else err
-                result.status = "FAILED"
-                result.detail = f"HTTP {status_code}; {msg or body.get('message') or 'rejected'}"
+                message = str(msg or body.get("message") or "rejected")
+                if "ER1010" in message or "save the General Profile" in message or "General Profile(GP)" in message:
+                    result.status = "SKIPPED_GP_REQUIRED"
+                    result.detail = (
+                        "Portal confirmed that General Profile must be saved first (ER1010). "
+                        "Action: verify this student's GP status, complete its approved GP save if needed, "
+                        "then refresh EP Preview and retry. No EP save was confirmed."
+                    )
+                else:
+                    result.status = "FAILED"
+                    result.detail = f"HTTP {status_code}; {message}"
                 results.append(result)
                 print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
-                break
+                # A definitive portal rejection is student-scoped. Continue the
+                # selected batch; rejected records do not consume the save limit.
+                continue
         except Exception as exc:
             post_error = exc
             print(
@@ -1415,17 +1468,25 @@ def run_ep(
     failed = sum(1 for r in results if r.status == "FAILED")
     unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
     manual_review = sum(1 for r in results if r.status == "MANUAL_REVIEW")
+    gp_required = sum(1 for r in results if r.status == "SKIPPED_GP_REQUIRED")
     if approved_plan is not None:
         print(
-            f"📋 EP outcome: confirmed={confirmed} | skipped={skipped} | manual-review={manual_review} | "
-            f"failed={failed} | unconfirmed={unconfirmed}", flush=True
+            f"📋 EP outcome: confirmed={confirmed} | skipped={skipped} | GP-required={gp_required} | "
+            f"manual-review={manual_review} | failed={failed} | unconfirmed={unconfirmed}", flush=True
         )
     if approved_plan is not None:
         not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
         state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
         limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
         print(
-            f"📋 eShikshaKosh save outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
+            f"📋 eShikshaKosh save outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | "
+            f"GP-required={gp_required} | limit-reached={limit_reached}",
+            flush=True,
+        )
+    if gp_required:
+        print(
+            f"⚠️ {gp_required} student(s) need GP saved before EP. Run the approved GP Preview/Save, "
+            "then refresh the EP Preview before retrying.",
             flush=True,
         )
 

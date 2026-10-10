@@ -1,0 +1,39 @@
+name: EP batch regression
+
+on:
+  pull_request:
+    paths:
+      - "hermes-vps/udise_vps/ep.py"
+      - "hermes-vps/control_api/app.py"
+      - "hermes-vps/tests/**"
+      - ".github/workflows/ep-batch-regression.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "hermes-vps/udise_vps/ep.py"
+      - "hermes-vps/control_api/app.py"
+      - "hermes-vps/tests/**"
+      - ".github/workflows/ep-batch-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  ep-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hermes-vps
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: hermes-vps/requirements.txt
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest -r requirements-control.txt
+      - name: Verify Python syntax
+        run: python -m compileall -q udise_vps control_api
+      - name: Run EP batch and result-table regressions
+        run: python -m pytest -q tests/test_ep_batch_rejection.py tests/test_ep_result_table.py

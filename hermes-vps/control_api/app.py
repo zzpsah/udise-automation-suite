@@ -1106,6 +1106,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "SKIPPED_ALREADY_UP_TO_DATE": "Skipped",
         "SKIPPED_CWSN": "Skipped",
         "SKIPPED_CWSN_UNEXPECTED": "Skipped",
+        "SKIPPED_GP_REQUIRED": "GP required",
         "SKIPPED_NOT_IN_APPROVED_PLAN": "Needs fresh preview",
         "NEEDS_FRESH_PREVIEW": "Needs fresh preview",
         "SKIPPED_STATE_CHANGED": "Live value changed",
@@ -1479,7 +1480,7 @@ def _run_job_unlocked(job_id: str) -> None:
                     f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmation required - CWSN=Yes",
                 )
         else:
-            _event(job_id, "Completed successfully — review saved, skipped/already-filled, and other counts above.")
+            _event(job_id, "Run finished — review saved, skipped/already-filled, failed, and other counts above.")
         if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting:
             try:
                 _queue_automatic_write(job_id)
