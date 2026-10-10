@@ -1394,14 +1394,21 @@ def run_ep(
             if not response_success:
                 err = body.get("error")
                 msg = err.get("message") if isinstance(err, dict) else err
-                result.status = "FAILED"
-                result.detail = f"HTTP {status_code}; {msg or body.get('message') or 'rejected'}"
+                message = str(msg or body.get("message") or "rejected")
+                if "ER1010" in message or "save the General Profile" in message or "General Profile(GP)" in message:
+                    result.status = "SKIPPED_GP_REQUIRED"
+                    result.detail = (
+                        "Portal confirmed that General Profile must be saved first (ER1010). "
+                        "Action: verify this student's GP status, complete its approved GP save if needed, "
+                        "then refresh EP Preview and retry. No EP save was confirmed."
+                    )
+                else:
+                    result.status = "FAILED"
+                    result.detail = f"HTTP {status_code}; {message}"
                 results.append(result)
                 print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
-                # The server returned a definitive rejection, so this student's
-                # write did not succeed. Record it and move on to the next
-                # approved student; only an unknown transport/read-back state
-                # should stop the batch.
+                # A definitive portal rejection is student-scoped. Continue the
+                # selected batch; rejected records do not consume the save limit.
                 continue
         except Exception as exc:
             post_error = exc
