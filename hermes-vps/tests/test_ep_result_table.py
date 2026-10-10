@@ -19,6 +19,14 @@ def test_ep_result_table_lists_students() -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
         from control_api import app
 
+        # GP-prerequisite and other EP_SAVE_RESULT lines must be retained by the
+        # live progress filter so the final per-student table can include them.
+        visible, current, total = app._progress_line(
+            "📋 EP_SAVE_RESULT status=SKIPPED_GP_REQUIRED pen=PEN005 name=Laxmi Kumari detail=ER1010: save General Profile first"
+        )
+        assert visible is not None and "Laxmi Kumari" in visible and "ER1010" in visible
+        assert current is None and total is None
+
         job_id = "b" * 32
         now = int(time.time())
         with app._db() as conn:
