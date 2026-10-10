@@ -77,3 +77,31 @@ def test_ep_result_table_lists_students() -> None:
 if __name__ == "__main__":
     test_ep_result_table_lists_students()
     print("1/1 passed")
+
+
+def test_gp_result_table_includes_normalized_manual_review_event() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        os.environ["UDISE_CONTROL_STATE"] = str(root / "state")
+        os.environ["UDISE_CONTROL_RUNTIME"] = str(root / "runtime")
+        os.environ["UDISE_CONTROL_TOKEN_FILE"] = str(root / "token")
+        os.environ["UDISE_VPS_RUNNER"] = str(root / "runner")
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import importlib
+        from control_api import app
+        importlib.reload(app)
+        job_id = "d" * 32
+        now = int(time.time())
+        with app._db() as conn:
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview) VALUES(?,?,?,?,?,?,?,?,?)",
+                (job_id, now, now, "completed", "gp", "IX", "school", "session", 1),
+            )
+            conn.execute(
+                "INSERT INTO events(job_id,created_at,level,message) VALUES(?,?,?,?)",
+                (job_id, now, "info", "GP-UPDATE: 23136932470 - LAXMI KUMARI - Manual Review Gp Incomplete - Portal formStatus=0; no eligible blank AUTO-GP fields were found."),
+            )
+        output = app._result_table_message(job_id, "gp")
+        assert "Status|PEN|Student|Reason / Action" in output
+        assert "Manual Review Gp Incomplete|23136932470|LAXMI KUMARI|Portal formStatus=0; no eligible blank AUTO-GP fields were found." in output
+        assert "Other|" not in output
