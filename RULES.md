@@ -16,3 +16,7 @@
 14. Update README, AI handoff, tasks, decisions, tests, and memory after material changes.
 
 10. **Indian nationality (natIndYN):** blank defaults to Yes (`1`); explicit No (`2`) is corrected to Yes (`1`) because the school confirms all enrolled students are Indian nationals. Other saved values are not silently overwritten.
+
+11. **Human-readable activity output:** For skipped students, display `SKIPPED`, the actual skip reason in plain language, and an action only when relevant. Remove generic messages such as “Preview if you expected a change.” Never claim “No change required” when the real reason is that the student is not in the approved plan. Do not imply a write occurred if no POST/write was sent.
+12. **Keep status, reason, and action distinct:** Status describes the outcome; reason explains why; action describes what the runner did or did not do. Use the real per-student outcome and preserve approved-plan and no-blind-write safeguards.
+13. **Production claims require evidence:** A pushed branch or open PR is not a production deployment. Verify merge commit, deployed version, service health, and relevant tests before marking a fix live.

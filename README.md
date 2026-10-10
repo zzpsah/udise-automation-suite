@@ -357,3 +357,19 @@ Supabase must remain optional so the notebook can be reused for other schools wi
 - `.env` files, secrets, or credentials.
 
 Older notebooks remain in Git history/repository as rollback evidence. They are not the maintained baseline.
+
+## October 2026 automation fixes and activity-message rules
+
+Recent control-plane/runner work is documented in the commit history and includes:
+
+- EP batch processing continues after a definitive per-student rejection; rejected students are reported as skipped and do not consume the successful-save limit. No blind retry is performed.
+- EP activity output exposes per-student save/prerequisite outcomes and distinguishes save-limit exhaustion from students absent from the approved plan.
+- GP incomplete records are reported as manual-review cases when the portal reports an incomplete form but there are no eligible blank AUTO-GP fields; the runner does not send an empty POST to force completion.
+- GP result lines and the activity results table include student identity (PEN and name) wherever the source data provides it. Stored normalized GP result records are parsed into the activity table.
+- School-confirmed nationality rule: blank `natIndYN` defaults to Yes (`1`), and explicit No (`2`) is proposed as Yes (`1`) because the school confirms all enrolled students are Indian nationals. Existing Yes is preserved; unknown codes and unrelated populated fields are not silently rewritten. This rule is implemented on branch `fix/gp-nationality-clean` in PR #10 and is **not production until merged and deployed**.
+
+### Human-readable skipped outcomes
+
+Activity messages must be understandable to school staff. For skipped records, show the concise status `SKIPPED`, the actual reason in plain language, and an action only when it adds useful information. Remove generic instructions such as “Preview if you expected a change.” Do not conflate “not included in approved changes” with “no change required.” Preserve the approved-plan gate, never imply a write occurred when none did, and retain technical detail only where it helps explain the outcome.
+
+Suggested shape: `SKIPPED` / `Reason: Not included in approved changes` / `Action: No data was modified` (only when accurate for that path). Each message must reflect the actual runner outcome, not a guessed generic explanation.

@@ -27,3 +27,9 @@ executes a portal write automatically.
 
 ## Planned AUTO EP
 First source mode is uploaded e-ShikshaKosh data. Matching remains storage-independent so later adapters may reuse the same normalized schema.
+
+## 2026-10-10 — Human-readable skipped outcomes
+The activity UI is for school staff, not developers. Show a concise `SKIPPED` status, a specific plain-language reason, and an action only when it adds useful information. Remove generic “Preview if you expected a change” instructions. Do not collapse “not in approved plan” into “no change required.” Approved-plan gates and truthful no-write reporting remain mandatory.
+
+## 2026-10-10 — School-confirmed Indian nationality correction
+For this school, the operator confirms all enrolled students are Indian nationals. GP may propose explicit `natIndYN=2` (No) -> `natIndYN=1` (Yes); blank defaults to Yes. Preserve existing Yes and do not silently rewrite unknown codes or unrelated populated fields. Implementation and tests are on PR #10; until merge and production verification, this is not considered deployed.
