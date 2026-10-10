@@ -1170,7 +1170,10 @@ def run_ep(
                     result.detail = "HTTP %s; %s" % (status_code, message)
                     print(f"📋 EP_APPROVED_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
                     results.append(result)
-                    break
+                    # A definitive portal rejection belongs to this student. It
+                    # must not abort the whole selected batch; rejected records do
+                    # not consume the successful-submission limit.
+                    continue
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
@@ -1395,7 +1398,11 @@ def run_ep(
                 result.detail = f"HTTP {status_code}; {msg or body.get('message') or 'rejected'}"
                 results.append(result)
                 print(f"📋 EP_RESULT status={result.status} pen={result.pen} name={result.name} detail={result.detail}", flush=True)
-                break
+                # The server returned a definitive rejection, so this student's
+                # write did not succeed. Record it and move on to the next
+                # approved student; only an unknown transport/read-back state
+                # should stop the batch.
+                continue
         except Exception as exc:
             post_error = exc
             print(
