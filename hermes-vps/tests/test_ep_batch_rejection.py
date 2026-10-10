@@ -85,3 +85,23 @@ def test_regular_ep_rejection_is_classified_and_batch_continues():
     assert results[0].status == "SKIPPED_GP_REQUIRED"
     assert "ER1010" in results[0].detail
     assert results[1].confirmed is True
+
+
+def test_ep_summary_separates_limit_reached_from_other(capsys):
+    session = FakeSession(count=7)
+    approved_plan = {
+        student["studentCodeNat"]: {"changes": {"admnNumber": str(i)}}
+        for i, student in enumerate(session.students, 1)
+    }
+    with patch.object(ep, "load_subject_rules", return_value={}), \
+         patch.object(ep.time, "sleep", return_value=None):
+        results = ep.run_ep(
+            session, class_scope_name="IX", limit=0, allow_submit=True,
+            max_submissions=5, approved_plan=approved_plan,
+        )
+    output = capsys.readouterr().out
+    assert sum(r.confirmed for r in results) == 5
+    assert sum(r.status == "LIMIT_REACHED" for r in results) == 1
+    assert "Save limit reached             : 1 (not attempted)" in output
+    assert "Other / inspect status         : 0" not in output
+    assert "Nothing to fill" not in output

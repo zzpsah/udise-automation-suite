@@ -1463,21 +1463,25 @@ def run_ep(
 
     confirmed = sum(1 for r in results if r.confirmed)
     preview = sum(1 for r in results if r.status == "PREVIEW")
-    skipped = sum(1 for r in results if r.status.startswith("SKIPPED"))
-    other = len(results) - confirmed - preview - skipped
+    no_change = sum(1 for r in results if r.status in {"NO_CHANGE", "SKIPPED_ALREADY_UP_TO_DATE"})
+    not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
+    state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
+    limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
     failed = sum(1 for r in results if r.status == "FAILED")
     unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
-    manual_review = sum(1 for r in results if r.status == "MANUAL_REVIEW")
+    manual_review = sum(1 for r in results if r.status in {"MANUAL_REVIEW", "MANUAL_REVIEW_GP_INCOMPLETE"})
     gp_required = sum(1 for r in results if r.status == "SKIPPED_GP_REQUIRED")
+    classified = {"SUCCESS_CONFIRMED", "SUCCESS_CONFIRMED_AFTER_POST_ERROR", "PREVIEW",
+                  "NO_CHANGE", "SKIPPED_ALREADY_UP_TO_DATE", "SKIPPED_NOT_IN_APPROVED_PLAN",
+                  "SKIPPED_STATE_CHANGED", "SKIPPED_GP_REQUIRED", "LIMIT_REACHED", "FAILED",
+                  "UNCONFIRMED", "MANUAL_REVIEW", "MANUAL_REVIEW_GP_INCOMPLETE"}
+    other = sum(1 for r in results if r.status not in classified and not r.confirmed)
     if approved_plan is not None:
         print(
-            f"📋 EP outcome: confirmed={confirmed} | skipped={skipped} | GP-required={gp_required} | "
+            f"📋 EP outcome: confirmed={confirmed} | no-change={no_change} | not-in-plan={not_in_plan} | GP-required={gp_required} | "
             f"manual-review={manual_review} | failed={failed} | unconfirmed={unconfirmed}", flush=True
         )
     if approved_plan is not None:
-        not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
-        state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
-        limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
         print(
             f"📋 eShikshaKosh save outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | "
             f"GP-required={gp_required} | limit-reached={limit_reached}",
@@ -1490,14 +1494,28 @@ def run_ep(
             flush=True,
         )
 
-    print("\n" + "━" * 30)
-    print(f"✅ Saved + confirmed : {confirmed}")
+    print("\n" + "━" * 38)
+    print(f"✅ Saved + confirmed              : {confirmed}")
+    if no_change:
+        print(f"•  Already filled / no change     : {no_change}")
     if preview:
-        print(f"👁️  Preview only      : {preview}")
-    if skipped:
-        print(f"•  Nothing to fill   : {skipped}")
+        print(f"👁️  Preview only                   : {preview}")
+    if not_in_plan:
+        print(f"↻  Not in approved plan           : {not_in_plan}")
+    if state_changed:
+        print(f"⚠️  Live state changed             : {state_changed}")
+    if gp_required:
+        print(f"⛔ GP save required                : {gp_required}")
+    if limit_reached:
+        print(f"⏸️  Save limit reached             : {limit_reached} (not attempted)")
+    if manual_review:
+        print(f"🔎 Manual review                   : {manual_review}")
+    if failed:
+        print(f"❌ Failed                          : {failed}")
+    if unconfirmed:
+        print(f"❔ Unconfirmed                     : {unconfirmed}")
     if other:
-        print(f"⚠️  Other             : {other}")
-    print("━" * 30)
+        print(f"⚠️  Other / inspect status         : {other}")
+    print("━" * 38)
 
     return results
