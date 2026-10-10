@@ -62,3 +62,7 @@ The existing Oracle promotion timer may update the checkout automatically, but t
 - No live student records were modified during the code/CI validation described above.
 - A GP-required result is an individual student's portal response/status; it does not prove that the entire class's GP workflow failed. Investigate that student's state rather than rerunning GP for every student by default.
 - Preview coverage and save execution are distinct. The selected save limit governs successful save submissions, not how many students the preview may inspect.
+
+## GP incomplete with no eligible AUTO fields
+
+The GP runner now distinguishes `formStatus=0` from ordinary `NO_CHANGE`. If the portal still marks GP incomplete while all configured AUTO-GP fields appear populated, the result is `MANUAL_REVIEW_GP_INCOMPLETE` with the student's PEN/name and an instruction to inspect and save the incomplete required field in the portal. The runner does not overwrite populated values or send an empty/forced GP POST. The same diagnosis is applied when a saved GP preview plan has no changes for that student.

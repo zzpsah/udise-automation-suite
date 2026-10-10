@@ -390,6 +390,13 @@ def run_auto_gp(
                         "Reason: CWSN has an unexpected saved value, so automatic GP update is blocked. "
                         "Action: Verify the CWSN value manually and correct it in the portal if required. No POST sent."
                     )
+                elif str(fresh.get("formStatus", "")).strip() == "0":
+                    result.status = "MANUAL_REVIEW_GP_INCOMPLETE"
+                    result.detail = (
+                        "Reason: Portal formStatus=0 (GP incomplete), but no eligible blank AUTO-GP fields were found. "
+                        "Action: Open this student's General Profile in the portal, identify the incomplete/invalid required field, "
+                        "correct it manually, save GP, then refresh EP Preview. Existing values were not overwritten; no POST sent."
+                    )
                 else:
                     result.detail = (
                         "Reason: Current GP has no eligible blank fields to save. "
@@ -482,10 +489,18 @@ def run_auto_gp(
             continue
 
         if not updates:
-            result.status = "NO_CHANGE"
-            result.detail = "Fresh GP has no blank AUTO fields."
+            if str(fresh.get("formStatus", "")).strip() == "0":
+                result.status = "MANUAL_REVIEW_GP_INCOMPLETE"
+                result.detail = (
+                    "Portal formStatus=0 (GP incomplete), but no eligible blank AUTO-GP fields were found. "
+                    "Open GP in the portal, identify and correct the incomplete/invalid required field, save GP, "
+                    "then refresh EP Preview. Existing values were preserved; no POST sent."
+                )
+            else:
+                result.status = "NO_CHANGE"
+                result.detail = "Fresh GP has no blank AUTO fields."
             results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} detail={result.detail}", flush=True)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         result.changes = updates
