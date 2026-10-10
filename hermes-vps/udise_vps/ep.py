@@ -1454,17 +1454,25 @@ def run_ep(
     failed = sum(1 for r in results if r.status == "FAILED")
     unconfirmed = sum(1 for r in results if r.status == "UNCONFIRMED")
     manual_review = sum(1 for r in results if r.status == "MANUAL_REVIEW")
+    gp_required = sum(1 for r in results if r.status == "SKIPPED_GP_REQUIRED")
     if approved_plan is not None:
         print(
-            f"📋 EP outcome: confirmed={confirmed} | skipped={skipped} | manual-review={manual_review} | "
-            f"failed={failed} | unconfirmed={unconfirmed}", flush=True
+            f"📋 EP outcome: confirmed={confirmed} | skipped={skipped} | GP-required={gp_required} | "
+            f"manual-review={manual_review} | failed={failed} | unconfirmed={unconfirmed}", flush=True
         )
     if approved_plan is not None:
         not_in_plan = sum(1 for r in results if r.status == "SKIPPED_NOT_IN_APPROVED_PLAN")
         state_changed = sum(1 for r in results if r.status == "SKIPPED_STATE_CHANGED")
         limit_reached = sum(1 for r in results if r.status == "LIMIT_REACHED")
         print(
-            f"📋 eShikshaKosh save outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | limit-reached={limit_reached}",
+            f"📋 eShikshaKosh save outcome: not-in-plan={not_in_plan} | state-changed={state_changed} | "
+            f"GP-required={gp_required} | limit-reached={limit_reached}",
+            flush=True,
+        )
+    if gp_required:
+        print(
+            f"⚠️ {gp_required} student(s) need GP saved before EP. Run the approved GP Preview/Save, "
+            "then refresh the EP Preview before retrying.",
             flush=True,
         )
 
