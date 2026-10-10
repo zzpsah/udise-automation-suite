@@ -31,6 +31,7 @@ def test_ep_result_table_lists_students() -> None:
             events = [
                 ("EP_RESULT", "SUCCESS_CONFIRMED", "PEN001", "Ravi Kumar", "Saved and verified"),
                 ("EP_SAVE_RESULT", "SKIPPED_NOT_IN_APPROVED_PLAN", "PEN002", "Sunita Devi", "Student was not in the save plan; no POST sent."),
+                ("EP_SAVE_RESULT", "SKIPPED_GP_REQUIRED", "PEN005", "Laxmi Kumari", "Portal confirmed General Profile prerequisite (ER1010); no EP save confirmed."),
                 ("EP_SAVE_RESULT", "LIMIT_REACHED", "PEN003", "Amit Kumar", "Save limit (1) reached; no POST sent."),
                 ("EP_SAVE_RESULT", "SKIPPED_STATE_CHANGED", "PEN004", "Pooja Devi", "Live EP values changed since preview: admnNumber. No POST sent."),
             ]
@@ -44,6 +45,7 @@ def test_ep_result_table_lists_students() -> None:
         assert "Status|PEN|Student|Reason / Action" in output
         assert "Saved + confirmed|PEN001|Ravi Kumar|Saved and verified" in output
         assert "Needs fresh preview|PEN002|Sunita Devi|Student was not in the save plan; no POST sent." in output
+        assert "GP required|PEN005|Laxmi Kumari|Portal confirmed General Profile prerequisite (ER1010); no EP save confirmed." in output
         assert "Save limit reached|PEN003|Amit Kumar|Save limit (1) reached; no POST sent." in output
         assert "Live value changed|PEN004|Pooja Devi|Live EP values changed since preview: admnNumber. No POST sent." in output
 
