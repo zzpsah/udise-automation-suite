@@ -1144,10 +1144,21 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         result_pattern = re.compile(result_patterns[stage])
         for message in messages:
             match = result_pattern.search(message)
-            if not match:
+            if match:
+                status, pen, name, detail = match.groups()
+                label = labels.get(status, status.replace("_", " ").title())
+            elif stage == "gp":
+                # _progress_line normalizes GP_RESULT events to GP-UPDATE before
+                # storing them. Parse that persisted representation too, otherwise
+                # uncommon statuses (e.g. GP incomplete/manual review) disappear
+                # from the final activity result table and are counted as Other.
+                normalized = re.search(r"GP-UPDATE:\s*(\S+)\s+-\s*(.*?)\s+-\s*(.*?)\s+-\s*(.*)$", message)
+                if not normalized:
+                    continue
+                pen, name, label, detail = normalized.groups()
+                label = re.sub(r"\s+", " ", label).strip()
+            else:
                 continue
-            status, pen, name, detail = match.groups()
-            label = labels.get(status, status.replace("_", " ").title())
             safe_name = re.sub(r"\s+", " ", name).strip().replace("|", "/")
             safe_detail = re.sub(r"\s+", " ", detail).strip().replace("|", "/")
             result_rows.append((label, pen, safe_name, safe_detail))
