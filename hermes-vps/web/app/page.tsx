@@ -257,24 +257,28 @@ export default function Page(){
     return ()=>clearInterval(t);
   },[sessionToken,sessionId]);
 
+  async function refreshEshikshaReportStatus(showReadyMessage=false):Promise<boolean>{
+    if(!sessionId) return false;
+    try {
+      const r=await fetch(`/api/eshiksha-report-status?session_id=${encodeURIComponent(sessionId)}&year=${encodeURIComponent(eshikshaYear)}`,{cache:"no-store"});
+      if(!r.ok) return false;
+      const d=await r.json();
+      const ready=Boolean(d.ready);
+      setEshikshaReportReady(ready);
+      if(ready){
+        // A retained report is sufficient for the next batch; the temporary
+        // live login is not required once the source workbook exists.
+        setEshikshaReady(false);
+        if(showReadyMessage) setMsg("Saved eShikshaKosh report is ready for this session. You can run another EP batch without reconnecting.");
+      }
+      return ready;
+    } catch { return false; }
+  }
+
   useEffect(()=>{
     if(!sessionId || stage!=="ep") return;
     let cancelled=false;
-    (async()=>{
-      try {
-        const r=await fetch(`/api/eshiksha-report-status?session_id=${encodeURIComponent(sessionId)}&year=${encodeURIComponent(eshikshaYear)}`,{cache:"no-store"});
-        if(!r.ok) return;
-        const d=await r.json();
-        if(cancelled) return;
-        if(d.ready){
-          setEshikshaReportReady(true);
-          setEshikshaReady(false);
-          setMsg("Saved eShikshaKosh report is ready for this session. You can continue the next EP batch without reconnecting.");
-        } else {
-          setEshikshaReportReady(false);
-        }
-      } catch { /* Keep the existing manual connection/upload fallback available. */ }
-    })();
+    (async()=>{ if(!cancelled) await refreshEshikshaReportStatus(true); })();
     return ()=>{cancelled=true};
   },[sessionId,stage,eshikshaYear]);
 
@@ -391,7 +395,12 @@ export default function Page(){
     if(!sessionId){setMsg("Connect a secure UDISE session first.");return}
     if(!school.trim()){setMsg("Enter the school URL or 7-digit internal ID.");return}
     if(selected?.requires_class&&!selected.classes.includes(klass)){setMsg(`${selected.label} is not available for Class ${klass}.`);return}
-    if(selected?.id==="ep"&&!(["X","XII"].includes(klass))&&!eshikshaReady&&!eshikshaReportReady){await connectEshiksha();return}
+    if(selected?.id==="ep"&&!(["X","XII"].includes(klass))&&!eshikshaReady&&!eshikshaReportReady){
+      // State can be stale after a report was fetched inside the previous EP
+      // preview. Ask the server before redirecting the user to login again.
+      const retained=await refreshEshikshaReportStatus(false);
+      if(!retained){await connectEshiksha();return}
+    }
     if(selected?.mode==="write" && saveLimit===-1){const n=Number.parseInt(customSaveLimit,10);if(!Number.isInteger(n)||n<1||n>10000){setMsg("Enter a custom save limit from 1 to 10000.");return}setSaveLimit(n)}
     setMsg(selected?.mode==="write"?"Preparing and saving…":"Preparing the workflow…");setJob(null);setJobId("");
     const r=await fetch("/api/jobs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
@@ -409,7 +418,12 @@ export default function Page(){
       if(!r.ok) return;
       const d=await r.json();
       setJob(d);
-      if(d.job.stage==="ep"&&["completed","failed"].includes(d.job.status)) setEshikshaReady(false);
+      if(d.job.stage==="ep"&&["completed","failed"].includes(d.job.status)){
+        setEshikshaReady(false);
+        // Refresh the server-side retained report after every EP run so the
+        // next batch uses it even if this run fetched it automatically.
+        await refreshEshikshaReportStatus(d.job.status==="completed");
+      }
       if(d.job.auto_write_job_id){
         const limit=Number(d.job.max_submissions); setMsg(`Preview verified. Server-side save is queued for ${limit===0?"all eligible":`up to ${limit}`} record(s); browser connection is no longer required.`);
         if(d.job.auto_write_job_id!==jobId){
