@@ -32,7 +32,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest -r requirements.txt
+          python -m pip install pytest -r requirements-control.txt
       - name: Verify Python syntax
         run: python -m compileall -q udise_vps control_api
       - name: Run EP batch and result-table regressions
