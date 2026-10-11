@@ -309,3 +309,19 @@ A separate Next.js UI was deployed from `zzpsah/eshikshakosh-automation` at **ht
 - Keep eShikshaKosh and UDISE repositories/projects/deployments independent.
 - UDISE development was paused by the operator while the standalone eShikshaKosh app was being set up. Treat the above as the next audit queue, not as authorization to change production or staging without the operator resuming UDISE work.
 - Preserve unrelated working-tree modifications; never use broad reset/clean commands.
+
+## Development checkpoint — 10 October 2026
+
+### Recently completed and verified in repository
+- EP batch rejection handling, EP result/prerequisite visibility, save-limit vs approved-plan status separation, GP incomplete/manual-review handling, GP identity in results, and normalized GP results in the activity table are recorded in recent commits. Targeted validation recorded for these changes passed.
+- PR #10 (`fix: correct Indian nationality No in GP`) is pushed to `fix/gp-nationality-clean` at commit `bab79dbba33315ba0493f81e541fa0d34f5ccb6d`. It adds `natIndYN=2` -> `1` for this school, blank default Yes, regression tests, and docs. Existing Yes and unrelated populated fields are preserved. PR #10 is still open at this checkpoint; do not call it merged or deployed.
+- Validation recorded for PR #10: `tests/test_general_profile.py` 31/31 passed; targeted EP batch rejection, synthetic control API, preview report, and snapshot tests 9 passed; `git diff --check` passed. A separate `test_ep_result_table.py` run could not open its SQLite DB path and must not be represented as a passing test. No live portal writes were performed.
+
+### Operator-approved activity wording
+The user rejected the generic line “Not In Approved Plan. Preview if you expected a change. No POST sent.” Keep activity messages human-readable: concise `SKIPPED` status, actual plain-language reason, and action only when relevant. Remove generic preview instructions. Distinguish “not included in approved changes” from “no change required.” Never misreport writes or weaken the approved-plan gate.
+
+### Current next steps
+1. Add the activity-message change to implementation/tests and document it.
+2. Continue through the PR workflow; verify PR #10 merge before calling the nationality fix production-ready.
+3. After any production deployment, verify the deployed commit/version and health endpoint before asking the operator to run GP Preview.
+4. Do not perform live portal writes without the normal explicit bounded approval and fresh read-back process.

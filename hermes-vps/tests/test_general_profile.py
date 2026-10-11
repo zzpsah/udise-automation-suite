@@ -53,6 +53,34 @@ def _():
     assert gp.as_code("abc") is None
 
 
+# ------------------------------------------------------- Indian nationality
+
+@check("indian_national_no_is_corrected_to_yes")
+def _():
+    """School-confirmed invariant: natIndYN=No blocks GP completion."""
+    status, changes = gp.build_auto_gp_changes(
+        {"natIndYN": 2, "cwsnYN": 2, "formStatus": 0}, "23390103598"
+    )
+    assert status == "PREVIEW", (status, changes)
+    assert changes.get("natIndYN") == 1, changes
+
+
+@check("indian_national_yes_is_preserved")
+def _():
+    status, changes = gp.build_auto_gp_changes(
+        {"natIndYN": 1, "cwsnYN": 2, "formStatus": 0}, "23390103598"
+    )
+    assert changes.get("natIndYN") != 1, changes
+
+
+@check("indian_national_blank_is_defaulted_to_yes")
+def _():
+    status, changes = gp.build_auto_gp_changes(
+        {"natIndYN": 0, "cwsnYN": 2, "formStatus": 0}, "23390103598"
+    )
+    assert changes.get("natIndYN") == 1, changes
+
+
 # ------------------------------------------------------------- blood group
 
 @check("blood_group_blank_fills_under_investigation")

@@ -45,3 +45,12 @@
 - [x] Document UDISE production and standalone eShikshaKosh deployment as separate projects.
 - [x] Record that `udise-login-staging` must remain untouched.
 - [ ] Resume UDISE runtime/UI audit only when UDISE work is resumed by the operator.
+
+## October 10, 2026 — latest work
+- [x] Continue EP batch after definitive student-level rejection; report skipped reason and do not count rejection against successful-save cap.
+- [x] Expose EP prerequisite/save outcomes and correct save-limit vs approved-plan classifications.
+- [x] Report GP incomplete/manual-review when no eligible blank AUTO-GP fields exist; do not send an empty POST.
+- [x] Include PEN/name in GP result lines and normalize stored GP results into the activity table.
+- [x] Push PR #10 with school-confirmed Indian nationality correction (`natIndYN` No -> Yes) and regression tests; PR is open and not deployed yet.
+- [ ] Simplify activity wording: `SKIPPED` + actual plain-language reason + relevant action only; remove “Preview if you expected a change” and similar generic messages. Add/adjust tests for each real skip path.
+- [ ] Merge PR #10 and verify the actual production deployed commit and health before reporting the nationality fix as live.

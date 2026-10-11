@@ -20,3 +20,11 @@
 - Reaffirmed the Facility blank-only rule and protection of existing Yes values.
 - Recorded that the standalone eShikshaKosh downloader is a separate deployment at https://eshikakoshapp.vercel.app; its secure report backend/download flow remains pending.
 - UDISE production remains https://udise-auto.vercel.app. Do not modify the separate udise-login-staging project.
+
+## 2026-10-10 — GP/EP outcomes and nationality correction
+- EP batch runner continues after definitive per-student rejection; rejected students receive explicit skipped outcomes and do not consume the successful-save cap. Blind POST retries remain prohibited.
+- EP result reporting distinguishes prerequisite failures, approved-plan exclusions, and save-limit outcomes.
+- GP incomplete records with no eligible blank AUTO-GP fields are routed to manual review rather than sending an empty write.
+- GP results and activity tables include PEN/name identity and normalized stored GP result records.
+- PR #10 (`fix/gp-nationality-clean`) adds the school-confirmed `natIndYN` No-to-Yes correction and tests. The branch is pushed; PR remains open at this checkpoint, so it is not production/deployed.
+- Operator approved simpler activity wording: show `SKIPPED`, the real reason, and relevant action only; remove generic “Preview if you expected a change” text. This UX requirement is documented for implementation.
