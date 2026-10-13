@@ -1,4 +1,5 @@
 name: Isolated UDISE UI Preview (GitHub Pages)
+# Publishes only the static preview/ directory; never deploys Vercel.
 
 on:
   push:
