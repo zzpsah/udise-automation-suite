@@ -1538,7 +1538,7 @@ def _run_job_unlocked(job_id: str) -> None:
                     f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmation required - CWSN=Yes",
                 )
         elif manual_waiting:
-            _event(job_id, f"GP-UPDATE: {len(manual_data)} student(s) need manual GP fields. Autofill fields remain hidden; no writes have started.")
+            _event(job_id, f"GP-UPDATE: {len(manual_data)} student(s) need manual GP fields. Autofill fields remain hidden; eligible approved-plan saves are initialized separately before manual review is shown.")
             for item in manual_data.values():
                 fields = ", ".join(str(x) for x in item.get("fields", []))
                 _event(job_id, f"GP-MANUAL-INPUT: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Required fields: {fields}")
@@ -1950,6 +1950,30 @@ def _job_dict(row: sqlite3.Row) -> dict:
             d["auto_write_job_message"] = str(child["message"] or "") if child else "Automatic save job was not found."
         else:
             d["auto_write_job_status"] = None
+            # During preview finalization, the parent is marked awaiting_input
+            # just before _queue_automatic_write creates/links its child. Report
+            # that narrow transition explicitly so the UI cannot expose the
+            # manual queue during the polling race.
+            if bool(d.get("auto_save")) and d.get("status") == "awaiting_input":
+                job_dir = JOBS / str(d.get("id"))
+                pending_path = job_dir / "gp-manual-pending.json"
+                plan_path = job_dir / "approved-plan.json"
+                pending = _json_read(pending_path) if pending_path.is_file() else {}
+                plan = _json_read(plan_path) if plan_path.is_file() else {}
+                if isinstance(pending, dict) and pending and isinstance(plan, dict) and plan:
+                    with _db() as conn:
+                        queue_error = conn.execute(
+                            "SELECT 1 FROM events WHERE job_id=? AND level='error' AND message LIKE '%Automatic Save%queue write%' LIMIT 1",
+                            (str(d.get("id")),),
+                        ).fetchone()
+                    d["auto_write_job_status"] = "failed" if queue_error else "preparing"
+                    d["auto_write_job_message"] = (
+                        "Automatic GP save could not be queued; inspect the queue-write error."
+                        if queue_error else "Eligible GP save batch is being initialized before manual review."
+                    )
+                else:
+                    d["auto_write_job_status"] = "no_changes"
+                    d["auto_write_job_message"] = "No automatic-only GP entries remain; manual review can proceed."
     return d
 
 

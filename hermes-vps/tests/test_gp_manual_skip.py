@@ -95,6 +95,44 @@ def test_skip_manual_gp_candidate_defers_without_write() -> None:
         assert not (all_dir / "approved-plan.json").exists()
 
 
+def test_job_dict_hides_manual_queue_during_auto_save_initialization() -> None:
+    """An awaiting-input GP parent is still processing while its child is linked."""
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        os.environ["UDISE_CONTROL_STATE"] = str(root / "state")
+        os.environ["UDISE_CONTROL_RUNTIME"] = str(root / "runtime")
+        os.environ["UDISE_CONTROL_TOKEN_FILE"] = str(root / "token")
+        os.environ["UDISE_VPS_RUNNER"] = str(root / "runner")
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import importlib
+        from control_api import app
+        importlib.reload(app)
+        now = int(time.time())
+        job_id = "c" * 32
+        with app._db() as conn:
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,auto_save) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (job_id, now, now, "awaiting_input", "gp", "IX", "school", "session", 1, "Manual review pending", 1),
+            )
+        job_dir = app.JOBS / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        (job_dir / "gp-manual-pending.json").write_text(json.dumps({"PEN1": {"pen":"PEN1","name":"Manual Student","fields":["address"]}}))
+        (job_dir / "approved-plan.json").write_text(json.dumps({"PEN2": {"pen":"PEN2","name":"Eligible Student","changes":{"motherTongue":42}}}))
+        with app._db() as conn:
+            row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        state = app._job_dict(row)
+        assert state["auto_write_job_status"] == "preparing"
+        assert "initialized" in state["auto_write_job_message"]
+
+        # A preview with manual candidates but no automatic entries must not
+        # wait forever for a child that correctly will not be created.
+        (job_dir / "approved-plan.json").write_text("{}")
+        with app._db() as conn:
+            row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        state = app._job_dict(row)
+        assert state["auto_write_job_status"] == "no_changes"
+
+
 def test_skip_all_supported_gp_classes() -> None:
     """The manual GP queue lifecycle is class-agnostic for IX/X/XI/XII."""
     with tempfile.TemporaryDirectory() as directory:
@@ -140,4 +178,5 @@ def test_skip_all_supported_gp_classes() -> None:
 if __name__ == "__main__":
     test_skip_manual_gp_candidate_defers_without_write()
     test_skip_all_supported_gp_classes()
-    print("2/2 passed")
+    test_job_dict_hides_manual_queue_during_auto_save_initialization()
+    print("3/3 passed")
