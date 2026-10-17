@@ -402,8 +402,10 @@ def read_back_matches(fresh: dict, expected: dict) -> list:
     mismatches = []
     for key, want in expected.items():
         got = fresh.get(key)
-        if key == "bloodGroup":
-            if str(got) != str(want):
+        if key in {"bloodGroup", "pincode"}:
+            # Portal serializes PIN codes as integers even when the approved
+            # manual form stores them as strings. Compare their text forms.
+            if str(got).strip() != str(want).strip():
                 mismatches.append(key)
         elif isinstance(want, int):
             if str(got) != str(want):
@@ -627,6 +629,7 @@ def run_auto_gp(
                 result.status = "UNCONFIRMED"
                 result.detail = "Fresh GP does not confirm: " + ", ".join(mismatches) + "."
                 results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
             result.read_back = "All approved fields confirmed"
             result.status = "SUCCESS_CONFIRMED"

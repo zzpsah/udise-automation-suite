@@ -415,6 +415,14 @@ def _():
     assert missing == [], missing
 
 
+@check("read_back_matches_normalizes_numeric_pincode")
+def _():
+    """The portal returns PIN as an integer while manual input is text."""
+    assert gp.read_back_matches({"pincode": 847303}, {"pincode": "847303"}) == []
+    assert gp.read_back_matches({"pincode": 847302}, {"pincode": "847303"}) == ["pincode"]
+    assert gp.read_back_matches({"socCatId": 1}, {"socCatId": 1}) == []
+
+
 print()
 if FAILED:
     print(f"{len(PASSED)}/{len(PASSED) + len(FAILED)} passed")
