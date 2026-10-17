@@ -1259,9 +1259,18 @@ def _queue_automatic_write(preview_job_id: str) -> str:
                         _json_write(plan_path, plan)
                         _event(preview_job_id, f"GP-MANUAL-INPUT: excluded {len(overlap)} pending student(s) from the automatic write plan.")
             if not isinstance(plan, dict) or not plan:
-                _event(preview_job_id, "ℹ️ No eligible changes in the approved preview plan; no write job was created.")
-                with _db() as conn:
-                    conn.execute("UPDATE jobs SET updated_at=?,message=? WHERE id=?", (int(time.time()), "Completed — no changes to save.", preview_job_id))
+                pending_manual = {}
+                if preview["stage"] == "gp":
+                    pending_path = JOBS / preview_job_id / "gp-manual-pending.json"
+                    pending_manual = _json_read(pending_path) if pending_path.is_file() else {}
+                if isinstance(pending_manual, dict) and pending_manual:
+                    _event(preview_job_id, f"ℹ️ No automatic-only GP entries to save; {len(pending_manual)} student(s) remain in manual review. The workflow is not blocked.")
+                    with _db() as conn:
+                        conn.execute("UPDATE jobs SET updated_at=?,message=? WHERE id=?", (int(time.time()), f"Manual review pending for {len(pending_manual)} student(s); no automatic-only changes in this batch.", preview_job_id))
+                else:
+                    _event(preview_job_id, "ℹ️ No eligible changes in the approved preview plan; no write job was created.")
+                    with _db() as conn:
+                        conn.execute("UPDATE jobs SET updated_at=?,message=? WHERE id=?", (int(time.time()), "Completed — no changes to save.", preview_job_id))
                 return ""
         write_job_id = uuid.uuid4().hex
         now = int(time.time())
