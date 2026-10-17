@@ -96,8 +96,11 @@ def _db() -> sqlite3.Connection:
     ):
         if name not in columns:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {definition}")
+    # A preview may legitimately have multiple bounded write children: first
+    # the auto-eligible GP subset, then the manually completed subset.
+    conn.execute("DROP INDEX IF EXISTS jobs_one_approval")
     conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS jobs_one_approval "
+        "CREATE INDEX IF NOT EXISTS jobs_approved_from "
         "ON jobs(approved_from) WHERE approved_from IS NOT NULL"
     )
     conn.execute("""
@@ -1216,8 +1219,11 @@ def _queue_automatic_write(preview_job_id: str) -> str:
         preview = conn.execute("SELECT * FROM jobs WHERE id=?", (preview_job_id,)).fetchone()
         if not preview:
             raise RuntimeError("Preview job disappeared before automatic save")
-        if preview["status"] not in {"completed", "awaiting_confirmation"} or not bool(preview["preview"]):
-            raise RuntimeError("Automatic save requires a completed preview or an explicitly confirmed GP CWSN preview")
+        allowed_parent_states = {"completed", "awaiting_confirmation"}
+        if preview["stage"] == "gp":
+            allowed_parent_states.add("awaiting_input")
+        if preview["status"] not in allowed_parent_states or not bool(preview["preview"]):
+            raise RuntimeError("Automatic save requires a completed preview or a GP preview awaiting manual input")
         if preview["stage"] == "gp" and preview["status"] == "awaiting_confirmation":
             pending_path = JOBS / preview_job_id / "cwsn-pending.json"
             if pending_path.is_file() and _json_read(pending_path):
@@ -1263,6 +1269,11 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             "UPDATE jobs SET auto_write_job_id=?,updated_at=? WHERE id=?",
             (write_job_id, now, preview_job_id),
         )
+    child_dir = JOBS / write_job_id
+    child_dir.mkdir(parents=True, exist_ok=True)
+    source_plan = JOBS / preview_job_id / "approved-plan.json"
+    if source_plan.is_file():
+        _json_write(child_dir / "approved-plan.json", _json_read(source_plan))
     _event(preview_job_id, "🔐 Preview complete; authorized automatic save started. Browser connection is no longer required.")
     if preview["stage"] == "gp":
         plan = _json_read(JOBS / preview_job_id / "approved-plan.json") if (JOBS / preview_job_id / "approved-plan.json").is_file() else {}
@@ -1305,7 +1316,9 @@ def _run_job_unlocked(job_id: str) -> None:
             if is_preview:
                 cmd += ["--plan-out", str(out_dir / "approved-plan.json")]
             else:
-                plan_path = JOBS / str(row["approved_from"]) / "approved-plan.json"
+                plan_path = out_dir / "approved-plan.json"
+                if not plan_path.is_file():
+                    plan_path = JOBS / str(row["approved_from"]) / "approved-plan.json"
                 if not plan_path.is_file():
                     raise RuntimeError("Approved GP write plan is unavailable; generate a new preview")
                 cmd += ["--plan", str(plan_path)]
@@ -1503,7 +1516,7 @@ def _run_job_unlocked(job_id: str) -> None:
                 _event(job_id, f"GP-MANUAL-INPUT: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Required fields: {fields}")
         else:
             _event(job_id, "Run finished — review saved, skipped/already-filled, failed, and other counts above.")
-        if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting and not manual_waiting:
+        if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting:
             try:
                 _queue_automatic_write(job_id)
             except Exception as auto_exc:
@@ -1553,6 +1566,16 @@ def create_job(body: JobIn, authorization: str | None = Header(default=None)) ->
     if stage.get("requires_class"):
         if not body.class_name or body.class_name not in stage["classes"]:
             raise HTTPException(400, "Select a supported class")
+    with _db() as conn:
+        duplicate = conn.execute(
+            "SELECT id,status FROM jobs WHERE session_id=? AND school=? AND stage=? "
+            "AND COALESCE(class_name,'')=COALESCE(?,'') AND preview=1 "
+            "AND status IN ('queued','running','awaiting_input','awaiting_confirmation') "
+            "ORDER BY created_at DESC LIMIT 1",
+            (body.session_id, body.school, body.stage, body.class_name),
+        ).fetchone()
+    if duplicate:
+        return {"job_id": str(duplicate["id"]), "status": str(duplicate["status"]), "reused": True}
     session_data = _load_session(body.session_id)
     effective_school = str(session_data.get("school_id") or body.school).strip()
     if not effective_school:
@@ -1680,6 +1703,8 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
     plan_path = job_dir / "approved-plan.json"
     pending = _json_read(pending_path) if pending_path.is_file() else {}
     plan = _json_read(plan_path) if plan_path.is_file() else {}
+    manual_plan_path = job_dir / "gp-manual-plan.json"
+    manual_plan = _json_read(manual_plan_path) if manual_plan_path.is_file() else {}
     submitted = body.get("students") if isinstance(body, dict) else None
     if not isinstance(pending, dict) or not pending or not isinstance(plan, dict) or not isinstance(submitted, dict):
         raise HTTPException(400, "Manual GP input payload is empty or invalid")
@@ -1715,28 +1740,40 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
         cleaned[key] = current
     if errors:
         raise HTTPException(422, {"message": "Correct the highlighted manual fields", "errors": errors})
+    manual_write_plan = {}
     for key, values in cleaned.items():
-        item = plan.get(key)
+        item = manual_plan.get(key)
+        if not isinstance(item, dict):
+            item = plan.get(key)
         if not isinstance(item, dict):
             raise HTTPException(409, f"Approved preview entry missing for student {key}")
         changes = dict(item.get("changes") or {})
         changes.update(values)
+        item = dict(item)
         item["changes"] = changes
-        plan[key] = item
-    _json_write(plan_path, plan)
-    _json_write(pending_path, {})
+        manual_write_plan[key] = item
+    if not manual_write_plan:
+        raise HTTPException(400, "No manual GP write entries were produced")
+    write_job_id = uuid.uuid4().hex
+    now = int(time.time())
+    child_dir = JOBS / write_job_id
+    child_dir.mkdir(parents=True, exist_ok=True)
+    _json_write(child_dir / "approved-plan.json", manual_write_plan)
     with _db() as conn:
+        conn.execute(
+            """INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,
+                   preview,message,approved_from,approved_at,max_submissions,auto_save)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (write_job_id, now, now, "queued", "gp", preview["class_name"], preview["school"],
+             preview["session_id"], 0, "Manual GP subset approved; save and read-back verification queued",
+             job_id, now, int(preview["max_submissions"] or 0), 0),
+        )
         conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=? WHERE id=?",
-                     (int(time.time()), "Manual GP fields validated; queuing verified save.", job_id))
-    _event(job_id, f"GP-MANUAL-INPUT: verified manual values accepted for {len(cleaned)} student(s); approved plan updated.")
-    try:
-        write_job_id = _queue_automatic_write(job_id)
-    except Exception as exc:
-        with _db() as conn:
-            conn.execute("UPDATE jobs SET status='awaiting_input',updated_at=?,message=? WHERE id=?",
-                         (int(time.time()), "Manual values accepted but write queue failed; retry after inspecting the job.", job_id))
-        raise HTTPException(500, f"Manual values validated but the save could not be queued: {exc}") from exc
-    return {"job_id": job_id, "write_job_id": write_job_id, "students": len(cleaned), "queued": bool(write_job_id)}
+                     (now, "Manual values validated; manual subset queued separately.", job_id))
+    _json_write(pending_path, {})
+    _event(job_id, f"GP-MANUAL-INPUT: verified values accepted for {len(manual_write_plan)} student(s); queued as a separate write batch.")
+    threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
+    return {"job_id": job_id, "write_job_id": write_job_id, "students": len(manual_write_plan), "queued": True}
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")

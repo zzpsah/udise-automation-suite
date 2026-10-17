@@ -51,6 +51,7 @@ def _write_plan(path: str | None, results) -> None:
     payload = {}
     cwsn_pending = {}
     manual_pending = {}
+    manual_plan = {}
     for result in results:
         status = str(getattr(result, "status", ""))
         changes = getattr(result, "proposed", None) or getattr(result, "changes", {}) or {}
@@ -61,9 +62,15 @@ def _write_plan(path: str | None, results) -> None:
         manual_fields = list(getattr(result, "manual_fields", []) or [])
         item = {"pen": pen, "student_id": sid, "name": name, "father_name": father_name, "changes": changes}
         if status == "PREVIEW" and isinstance(changes, dict) and (changes or manual_fields) and (pen or sid):
-            payload[pen or sid] = item
+            key = pen or sid
             if manual_fields:
-                manual_pending[pen or sid] = {**item, "fields": manual_fields}
+                # Keep unresolved students out of the first write plan. Their
+                # automatic changes are retained and merged only after verified
+                # manual values are supplied.
+                manual_pending[key] = {**item, "fields": manual_fields}
+                manual_plan[key] = item
+            else:
+                payload[key] = item
         elif status == "CWSN_CONFIRM_REQUIRED" and (pen or sid):
             cwsn_pending[pen or sid] = item
     target = Path(path)
@@ -74,6 +81,9 @@ def _write_plan(path: str | None, results) -> None:
     )
     (target.parent / "gp-manual-pending.json").write_text(
         json.dumps(manual_pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    (target.parent / "gp-manual-plan.json").write_text(
+        json.dumps(manual_plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
 
