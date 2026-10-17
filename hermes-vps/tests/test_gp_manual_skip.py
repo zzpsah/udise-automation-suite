@@ -260,22 +260,23 @@ def test_manual_gp_address_validation_matches_udise_portal() -> None:
             )
         job_dir = app.JOBS / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
-        pending = {"PEN1": {"pen":"PEN1", "student_id":"S1", "name":"Student One", "fields":["address", "pincode", "minorityId"]}}
+        pending = {"PEN1": {"pen":"PEN1", "student_id":"S1", "name":"Student One", "fields":["address", "pincode", "minorityId", "socCatId"]}}
         item = {"pen":"PEN1", "student_id":"S1", "name":"Student One", "changes":{"motherTongue":42}}
         (job_dir / "gp-manual-pending.json").write_text(json.dumps(pending), encoding="utf-8")
         (job_dir / "approved-plan.json").write_text(json.dumps({"PEN1":item}), encoding="utf-8")
         (job_dir / "gp-manual-plan.json").write_text(json.dumps({"PEN1":item}), encoding="utf-8")
         try:
-            app.submit_gp_manual(job_id, {"students":{"PEN1":{"address":"Jale", "pincode":"847302", "minorityId":"7"}}}, authorization="test")
+            app.submit_gp_manual(job_id, {"students":{"PEN1":{"address":"Jale", "pincode":"847302", "minorityId":"7", "socCatId":"4"}}}, authorization="test")
             raise AssertionError("short address should be rejected")
         except HTTPException as exc:
             assert exc.status_code == 422
             assert "10–150 characters" in str(exc.detail)
-        result = app.submit_gp_manual(job_id, {"students":{"PEN1":{"address":"Jale, Darbhanga, Bihar", "pincode":"847302", "minorityId":"7"}}}, authorization="test")
+        result = app.submit_gp_manual(job_id, {"students":{"PEN1":{"address":"Jale, Darbhanga, Bihar", "pincode":"847302", "minorityId":"7", "socCatId":"4"}}}, authorization="test")
         assert result["queued"] is True and result["students"] == 1
         child = app.JOBS / result["write_job_id"] / "approved-plan.json"
         saved = json.loads(child.read_text(encoding="utf-8"))
         assert saved["PEN1"]["changes"]["address"] == "Jale, Darbhanga, Bihar"
+        assert saved["PEN1"]["changes"]["socCatId"] == 4
 
 
 def test_approved_gp_batch_only_processes_allowlisted_students() -> None:

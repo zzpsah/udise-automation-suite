@@ -1736,7 +1736,7 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
     submitted = body.get("students") if isinstance(body, dict) else None
     if not isinstance(pending, dict) or not pending or not isinstance(plan, dict) or not isinstance(submitted, dict):
         raise HTTPException(400, "Manual GP input payload is empty or invalid")
-    allowed = {"address", "pincode", "minorityId"}
+    allowed = {"address", "pincode", "minorityId", "socCatId"}
     errors = []
     cleaned = {}
     # Partial review is intentional: validate only students the operator
@@ -1772,6 +1772,11 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
             elif field == "minorityId":
                 if value not in {"1", "2", "3", "4", "5", "6", "7"}:
                     errors.append(f"{item.get('name') or key}: select a valid minority type")
+                else:
+                    current[field] = int(value)
+            elif field == "socCatId":
+                if value not in {"1", "2", "3", "4"}:
+                    errors.append(f"{item.get('name') or key}: select a valid social category")
                 else:
                     current[field] = int(value)
         cleaned[key] = current

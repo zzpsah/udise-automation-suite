@@ -291,6 +291,12 @@ def missing_mandatory_gp_fields(fresh: dict) -> list[str]:
         minority = None
     if minority not in {1, 2, 3, 4, 5, 6, 7}:
         missing.append("minorityId")
+    try:
+        social_category = int(float(str(fresh.get("socCatId")).strip()))
+    except (TypeError, ValueError):
+        social_category = None
+    if social_category not in {1, 2, 3, 4}:
+        missing.append("socCatId")
     for field_name in ("isBplYN", "ewsYN", "natIndYN", "ooscYN"):
         if str(fresh.get(field_name) or "").strip() not in {"1", "2"}:
             missing.append(field_name)

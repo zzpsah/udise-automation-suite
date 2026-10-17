@@ -65,6 +65,7 @@ class FakePortal:
             record.setdefault("address", "TEST ADDRESS")
             record.setdefault("pincode", "841232")
             record.setdefault("minorityId", 7)
+            record.setdefault("socCatId", 1)
             record.setdefault("isBplYN", 2)
             record.setdefault("ewsYN", 2)
             record.setdefault("natIndYN", 1)
@@ -221,7 +222,7 @@ def test_unexpected_cwsn_code_is_automatically_set_to_no():
 
 def test_preview_exposes_only_non_autofill_fields_for_manual_input():
     portal = FakePortal({"1": {
-        "cwsnYN": 1, "address": "", "pincode": "", "minorityId": None,
+        "cwsnYN": 1, "address": "", "pincode": "", "minorityId": None, "socCatId": None,
         "isBplYN": None, "ewsYN": None, "natIndYN": None, "ooscYN": None,
     }})
     portal.students = [student("1", "PEN-MANUAL", name="Manual Student")]
@@ -230,7 +231,7 @@ def test_preview_exposes_only_non_autofill_fields_for_manual_input():
 
     assert not portal.posts
     assert results[0].status == "PREVIEW"
-    assert set(results[0].manual_fields) == {"address", "pincode", "minorityId"}
+    assert set(results[0].manual_fields) == {"address", "pincode", "minorityId", "socCatId"}
     assert results[0].changes.get("cwsnYN") == 2
     assert results[0].changes.get("natIndYN") == 1
     print("PASS test_preview_exposes_only_non_autofill_fields_for_manual_input")

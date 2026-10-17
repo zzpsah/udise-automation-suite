@@ -400,16 +400,16 @@ def _():
 @check("mandatory_gp_preflight_blocks_missing_personal_data")
 def _():
     missing = gp.missing_mandatory_gp_fields({
-        "address": "", "pincode": 0, "minorityId": 0,
+        "address": "", "pincode": 0, "minorityId": 0, "socCatId": 0,
         "isBplYN": 2, "ewsYN": 2, "natIndYN": 1, "ooscYN": 2,
     })
-    assert missing == ["address", "pincode", "minorityId"], missing
+    assert missing == ["address", "pincode", "minorityId", "socCatId"], missing
 
 
 @check("mandatory_gp_preflight_accepts_valid_values")
 def _():
     missing = gp.missing_mandatory_gp_fields({
-        "address": "verified address", "pincode": "841232", "minorityId": 7,
+        "address": "verified address", "pincode": "841232", "minorityId": 7, "socCatId": 4,
         "isBplYN": 2, "ewsYN": 2, "natIndYN": 1, "ooscYN": 2,
     })
     assert missing == [], missing
@@ -422,3 +422,4 @@ if FAILED:
         print(f"  FAIL {name}: {exc}")
     sys.exit(1)
 print(f"{len(PASSED)}/{len(PASSED)} passed")
+
