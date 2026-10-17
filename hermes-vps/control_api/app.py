@@ -1297,23 +1297,39 @@ def _queue_automatic_write(preview_job_id: str) -> str:
             "UPDATE jobs SET auto_write_job_id=?,updated_at=? WHERE id=?",
             (write_job_id, now, preview_job_id),
         )
+    # Once the child row exists, setup or thread-start errors must make it
+    # terminal. Otherwise the UI can wait forever on a phantom "running" job
+    # and keep the manual queue hidden.
     child_dir = JOBS / write_job_id
-    child_dir.mkdir(parents=True, exist_ok=True)
-    source_plan = JOBS / preview_job_id / "approved-plan.json"
-    if source_plan.is_file():
-        _json_write(child_dir / "approved-plan.json", _json_read(source_plan))
-    _event(preview_job_id, "🔐 Preview complete; authorized automatic save started. Browser connection is no longer required.")
-    if preview["stage"] == "gp":
-        plan = _json_read(JOBS / preview_job_id / "approved-plan.json") if (JOBS / preview_job_id / "approved-plan.json").is_file() else {}
-        if isinstance(plan, dict):
-            for item in plan.values():
-                changes = item.get("changes") if isinstance(item, dict) else {}
-                if isinstance(changes, dict) and str(changes.get("cwsnYN")) == "2":
-                    _event(
-                        write_job_id,
-                        f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmed CWSN=No - Saving and verifying",
-                    )
-    threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
+    try:
+        child_dir.mkdir(parents=True, exist_ok=True)
+        source_plan = JOBS / preview_job_id / "approved-plan.json"
+        if source_plan.is_file():
+            _json_write(child_dir / "approved-plan.json", _json_read(source_plan))
+        _event(preview_job_id, "🔐 Preview complete; authorized automatic save started. Browser connection is no longer required.")
+        if preview["stage"] == "gp":
+            plan = _json_read(JOBS / preview_job_id / "approved-plan.json") if (JOBS / preview_job_id / "approved-plan.json").is_file() else {}
+            if isinstance(plan, dict):
+                for item in plan.values():
+                    changes = item.get("changes") if isinstance(item, dict) else {}
+                    if isinstance(changes, dict) and str(changes.get("cwsnYN")) == "2":
+                        _event(
+                            write_job_id,
+                            f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmed CWSN=No - Saving and verifying",
+                        )
+        worker = threading.Thread(target=_run_job, args=(write_job_id,), daemon=True)
+        worker.start()
+    except Exception as exc:
+        detail = re.sub(r"[A-Za-z0-9_-]{24,}", "[redacted]", str(exc))[:500] or type(exc).__name__
+        failure = f"FAILURE · Component: {preview['stage'].upper()} Automatic Save · Operation: initialize/start write job · Detail: {detail}"
+        with _db() as conn:
+            conn.execute(
+                "UPDATE jobs SET status='failed',updated_at=?,message=?,error=? WHERE id=?",
+                (int(time.time()), failure, failure, write_job_id),
+            )
+        _event(write_job_id, failure, "error")
+        _event(preview_job_id, failure, "error")
+        raise RuntimeError(failure) from exc
     return write_job_id
 
 
