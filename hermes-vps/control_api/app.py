@@ -1162,6 +1162,9 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
                     continue
                 pen, name, label, detail = normalized.groups()
                 label = re.sub(r"\s+", " ", label).strip()
+                if label.lower() in {"other", "others"}:
+                    label = "Unclassified result — reason not mapped"
+                    detail = f"Runner emitted a generic Other status; inspect this detail for the actual outcome. {detail}"
             else:
                 continue
             safe_name = re.sub(r"\s+", " ", name).strip().replace("|", "/")

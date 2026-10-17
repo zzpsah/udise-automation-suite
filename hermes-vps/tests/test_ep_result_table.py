@@ -132,3 +132,30 @@ def test_gp_unknown_status_is_explained_instead_of_other_bucket() -> None:
         output = app._result_table_message(job_id, "gp")
         assert "Unclassified status (UNMAPPED_STATUS) — inspect reason/action|PEN999|Test Student|Portal returned a status not recognized by this version." in output
         assert "Other|" not in output
+
+
+def test_gp_normalized_other_label_explains_what_other_means() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        os.environ["UDISE_CONTROL_STATE"] = str(root / "state")
+        os.environ["UDISE_CONTROL_RUNTIME"] = str(root / "runtime")
+        os.environ["UDISE_CONTROL_TOKEN_FILE"] = str(root / "token")
+        os.environ["UDISE_VPS_RUNNER"] = str(root / "runner")
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import importlib
+        from control_api import app
+        importlib.reload(app)
+        job_id = "a" * 32
+        now = int(time.time())
+        with app._db() as conn:
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview) VALUES(?,?,?,?,?,?,?,?,?)",
+                (job_id, now, now, "completed", "gp", "X", "school", "session", 1),
+            )
+            conn.execute(
+                "INSERT INTO events(job_id,created_at,level,message) VALUES(?,?,?,?)",
+                (job_id, now, "info", "GP-UPDATE: PEN123 - Test Student - Others - Portal response did not match a known result status."),
+            )
+        output = app._result_table_message(job_id, "gp")
+        assert "Unclassified result — reason not mapped|PEN123|Test Student|Runner emitted a generic Other status" in output
+        assert "Other|" not in output
