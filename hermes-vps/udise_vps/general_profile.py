@@ -74,6 +74,12 @@ def approved_gp_conflicts(fresh: dict[str, Any], changes: dict[str, Any]) -> lis
         live = fresh.get(field_name)
         if field_name == "cwsnYN" and str(value) == "2" and str(live) in CWSN_SKIP_CODES:
             continue
+        # School-approved invariant: enrolled students in this school are
+        # Indian nationals. build_auto_gp_changes/apply_gp_rules deliberately
+        # corrects a live No (2) to Yes (1), so stale detection must permit this
+        # specific, explicit policy transition rather than reject every run.
+        if field_name == "natIndYN" and str(value) == "1" and as_code(live) == 2:
+            continue
         if field_name in INVALID_AUTO_GP_CODES and str(live).strip() == "9":
             continue
         if not is_blank(live) and str(live) != str(value):

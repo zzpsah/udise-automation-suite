@@ -187,19 +187,21 @@ def test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale() -> N
     assert approved_gp_conflicts({"natIndYN": 9}, {"natIndYN": 1}) == []
     assert approved_gp_conflicts({"isBplYN": "9"}, {"isBplYN": 2}) == []
     assert approved_gp_conflicts({"natIndYN": 1}, {"natIndYN": 2}) == ["natIndYN"]
+    # The school's explicit Indian-national invariant intentionally corrects No to Yes.
+    assert approved_gp_conflicts({"natIndYN": 2}, {"natIndYN": 1}) == []
     assert approved_gp_conflicts({"cwsnYN": 1}, {"cwsnYN": 2}) == []
 
     # If the first portal snapshot has a conflicting value but an immediate
     # fresh re-read shows the field blank/invalid, use the latest snapshot.
     chosen, conflicts, retried = reconcile_approved_gp_conflicts(
-        {"natIndYN": 2}, {"natIndYN": None}, {"natIndYN": 1}
+        {"ewsYN": 1}, {"ewsYN": None}, {"ewsYN": 2}
     )
-    assert chosen == {"natIndYN": None} and conflicts == [] and retried is True
+    assert chosen == {"ewsYN": None} and conflicts == [] and retried is True
     # A persistent valid conflict remains blocking; never overwrite it.
     chosen, conflicts, retried = reconcile_approved_gp_conflicts(
-        {"natIndYN": 2}, {"natIndYN": 2}, {"natIndYN": 1}
+        {"ewsYN": 1}, {"ewsYN": 1}, {"ewsYN": 2}
     )
-    assert chosen == {"natIndYN": 2} and conflicts == ["natIndYN"] and retried is False
+    assert chosen == {"ewsYN": 1} and conflicts == ["ewsYN"] and retried is False
     # Never retry around a conflicting explicitly entered manual field.
     chosen, conflicts, retried = reconcile_approved_gp_conflicts(
         {"address": "Old verified address"}, {"address": "Old verified address"},
