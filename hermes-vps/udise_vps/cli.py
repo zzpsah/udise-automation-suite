@@ -166,6 +166,15 @@ def cmd_gp(args) -> int:
         path = out / preview_report.default_filename("gp", session.school_id, args.klass)
         preview_report.write_preview_workbook("gp", results, str(path))
         print(f"REPORT_READY={path.resolve()}")
+    else:
+        out = _output_dir(args)
+        path = out / preview_report.default_result_filename("gp", session.school_id, args.klass)
+        preview_report.write_preview_workbook(
+            "gp", results, str(path),
+            report_mode="WRITE RESULTS - portal outcomes and verification status",
+            details_sheet="Student Results",
+        )
+        print(f"REPORT_READY={path.resolve()}")
     return 0
 
 
@@ -244,6 +253,14 @@ def cmd_ep(args) -> int:
             "ep", results, str(path), eshiksha_rows=report_rows,
         )
         print(f"REPORT_READY={path.resolve()}")
+    else:
+        path = out / preview_report.default_result_filename("ep", session.school_id, args.klass)
+        preview_report.write_preview_workbook(
+            "ep", results, str(path),
+            report_mode="WRITE RESULTS - portal outcomes and verification status",
+            details_sheet="Student Results",
+        )
+        print(f"REPORT_READY={path.resolve()}")
     return 0
 
 
@@ -263,6 +280,15 @@ def cmd_facility(args) -> int:
         out = _output_dir(args)
         path = out / preview_report.default_filename("facility", session.school_id, args.klass)
         preview_report.write_preview_workbook("facility", results, str(path))
+        print(f"REPORT_READY={path.resolve()}")
+    else:
+        out = _output_dir(args)
+        path = out / preview_report.default_result_filename("facility", session.school_id, args.klass)
+        preview_report.write_preview_workbook(
+            "facility", results, str(path),
+            report_mode="WRITE RESULTS - portal outcomes and verification status",
+            details_sheet="Student Results",
+        )
         print(f"REPORT_READY={path.resolve()}")
     return 0
 

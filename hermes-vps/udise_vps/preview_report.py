@@ -68,21 +68,23 @@ def write_preview_workbook(
     path: str,
     *,
     eshiksha_rows: list[dict] | None = None,
+    report_mode: str = "PREVIEW ONLY - NO PORTAL WRITE",
+    details_sheet: str = "Proposed Changes",
 ) -> str:
-    """Write a no-save preview workbook, optionally with masked eShiksha rows."""
+    """Write a workbook for a preview or a completed save run."""
     wb = Workbook()
     summary = wb.active
     summary.title = "Summary"
     counts = Counter(str(getattr(result, "status", "UNKNOWN")) for result in results)
     summary_rows = [
         {"Item": "Stage", "Value": stage.upper()},
-        {"Item": "Mode", "Value": "PREVIEW ONLY - NO PORTAL WRITE"},
+        {"Item": "Mode", "Value": report_mode},
         {"Item": "Students checked", "Value": len(results)},
         {"Item": "Generated", "Value": datetime.now().isoformat(timespec="seconds")},
     ] + [{"Item": f"Status: {status}", "Value": count} for status, count in sorted(counts.items())]
     _write_rows(summary, summary_rows)
 
-    proposed = wb.create_sheet("Proposed Changes")
+    proposed = wb.create_sheet(details_sheet)
     _write_rows(proposed, _result_rows(results), [
         "PEN", "Student ID (system)", "Name", "Class", "Status",
         "Field", "Proposed Value", "Reason",
@@ -164,3 +166,9 @@ def default_filename(stage: str, school_id: str, scope: str) -> str:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     clean_scope = scope.replace(" ", "")
     return f"UDISE_{stage.upper()}_Preview_{school_id}_{clean_scope}_{stamp}.xlsx"
+
+
+def default_result_filename(stage: str, school_id: str, scope: str) -> str:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    clean_scope = scope.replace(" ", "")
+    return f"UDISE_{stage.upper()}_Save_Result_{school_id}_{clean_scope}_{stamp}.xlsx"
