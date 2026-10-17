@@ -445,12 +445,14 @@ export default function Page(){
     for(const [key,item] of Object.entries(pending)){
       const values:Record<string,string>={};
       for(const field of item.fields) values[field]=manualGpValues[key]?.[field]||"";
-      if(item.fields.every(field=>Boolean(values[field].trim()))) students[key]=values;
-      else if(item.fields.some(field=>Boolean(values[field].trim()))) incomplete.push(item.name||key);
+      const address=String(values.address||"").trim();
+      const invalidAddress=item.fields.includes("address")&&(address.length<10||address.length>150);
+      if(item.fields.every(field=>Boolean(values[field].trim()))&&!invalidAddress) students[key]=values;
+      else if(item.fields.some(field=>Boolean(values[field].trim()))||invalidAddress) incomplete.push(invalidAddress?`${item.name||key} (address must be 10–150 characters)`:item.name||key);
     }
     if(!Object.keys(students).length){
       setManualGpBusy(false);
-      setMsg(incomplete.length?`Finish all required fields for at least one student: ${incomplete.join(", ")}. Other students can remain untouched.`:"Fill all required fields for at least one student, then save. You do not need to fill every student.");
+      setMsg(incomplete.length?`Complete valid manual fields before saving: ${incomplete.join(", ")}. Address must be 10–150 characters. Other students can remain untouched.`:"Fill all required fields for at least one student, then save. You do not need to fill every student.");
       return;
     }
     const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/submit-gp-manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({students})});
@@ -461,7 +463,7 @@ export default function Page(){
       setMsg(clientFailure("UDISE General Profile","Validate manual fields",errors||d.detail?.message||d.detail||d.error||"Unknown error"));
       return;
     }
-    setMsg(`Queued ${d.students} reviewed student(s) for save and verification.${d.remaining_students?` ${d.remaining_students} student(s) remain pending; fill them only when ready.`:" No manual entries remain."}`);
+    setMsg(`Queued ${d.students} reviewed student(s) for save and verification.${incomplete.length?` Still pending (not submitted): ${incomplete.join(", ")}.`:""}${d.remaining_students?` ${d.remaining_students} student(s) remain pending; fill them only when ready.`:" No manual entries remain."}`);
     // Keep the parent preview open while manual students remain so the operator
     // can submit another subset without waiting for every student's details.
     if(d.write_job_id && !d.remaining_students) setJobId(d.write_job_id);
