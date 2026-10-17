@@ -1758,8 +1758,10 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
                 continue
             value = str(values.get(field, "")).strip()
             if field == "address":
-                if not value or len(value) > 250:
-                    errors.append(f"{item.get('name') or key}: address is required (max 250 characters)")
+                # Match the live UDISE portal validator; otherwise a value can
+                # pass our UI/API checks and fail only after a real POST.
+                if len(value) < 10 or len(value) > 150:
+                    errors.append(f"{item.get('name') or key}: address must be 10–150 characters, as required by UDISE")
                 else:
                     current[field] = value
             elif field == "pincode":

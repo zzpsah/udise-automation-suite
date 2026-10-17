@@ -178,7 +178,9 @@ def test_skip_all_supported_gp_classes() -> None:
 def test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale() -> None:
     """Stale AUTO defaults are omitted, while verified manual fields can proceed."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from udise_vps.general_profile import approved_gp_conflicts, resolve_approved_gp_changes
+    from udise_vps.general_profile import (
+        approved_gp_conflicts, reconcile_approved_gp_conflicts, resolve_approved_gp_changes,
+    )
 
     # The same invalid code 9 treated as eligible during preview must not be
     # rejected as a stale nonblank value during save.
@@ -186,6 +188,24 @@ def test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale() -> N
     assert approved_gp_conflicts({"isBplYN": "9"}, {"isBplYN": 2}) == []
     assert approved_gp_conflicts({"natIndYN": 1}, {"natIndYN": 2}) == ["natIndYN"]
     assert approved_gp_conflicts({"cwsnYN": 1}, {"cwsnYN": 2}) == []
+
+    # If the first portal snapshot has a conflicting value but an immediate
+    # fresh re-read shows the field blank/invalid, use the latest snapshot.
+    chosen, conflicts, retried = reconcile_approved_gp_conflicts(
+        {"natIndYN": 2}, {"natIndYN": None}, {"natIndYN": 1}
+    )
+    assert chosen == {"natIndYN": None} and conflicts == [] and retried is True
+    # A persistent valid conflict remains blocking; never overwrite it.
+    chosen, conflicts, retried = reconcile_approved_gp_conflicts(
+        {"natIndYN": 2}, {"natIndYN": 2}, {"natIndYN": 1}
+    )
+    assert chosen == {"natIndYN": 2} and conflicts == ["natIndYN"] and retried is False
+    # Never retry around a conflicting explicitly entered manual field.
+    chosen, conflicts, retried = reconcile_approved_gp_conflicts(
+        {"address": "Old verified address"}, {"address": "Old verified address"},
+        {"address": "New verified address"}, {"address"}
+    )
+    assert conflicts == ["address"] and retried is False
 
     changes = {"motherTongue": 28, "isBplYN": 2, "address": "Verified address", "pincode": "843001", "minorityId": 1}
     updates, blocking, skipped = resolve_approved_gp_changes(
@@ -206,9 +226,52 @@ def test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale() -> N
     assert updates == {} and blocking == ["isBplYN"] and skipped == []
 
 
+def test_manual_gp_address_validation_matches_udise_portal() -> None:
+    """Reject short addresses before queueing a write; accept portal-valid lengths."""
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        os.environ["UDISE_CONTROL_STATE"] = str(root / "state")
+        os.environ["UDISE_CONTROL_RUNTIME"] = str(root / "runtime")
+        os.environ["UDISE_CONTROL_TOKEN_FILE"] = str(root / "token")
+        os.environ["UDISE_VPS_RUNNER"] = str(root / "runner")
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import importlib
+        from fastapi import HTTPException
+        from control_api import app
+        importlib.reload(app)
+        app.require_api = lambda authorization: None
+        app.threading.Thread = lambda *args, **kwargs: type("NoStart", (), {"start": lambda self: None})()
+        now = int(time.time())
+        job_id = "e" * 32
+        with app._db() as conn:
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (job_id, now, now, "awaiting_input", "gp", "IX", "school", "session", 1, "Manual review"),
+            )
+        job_dir = app.JOBS / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        pending = {"PEN1": {"pen":"PEN1", "student_id":"S1", "name":"Student One", "fields":["address", "pincode", "minorityId"]}}
+        item = {"pen":"PEN1", "student_id":"S1", "name":"Student One", "changes":{"motherTongue":42}}
+        (job_dir / "gp-manual-pending.json").write_text(json.dumps(pending), encoding="utf-8")
+        (job_dir / "approved-plan.json").write_text(json.dumps({"PEN1":item}), encoding="utf-8")
+        (job_dir / "gp-manual-plan.json").write_text(json.dumps({"PEN1":item}), encoding="utf-8")
+        try:
+            app.submit_gp_manual(job_id, {"students":{"PEN1":{"address":"Jale", "pincode":"847302", "minorityId":"7"}}}, authorization="test")
+            raise AssertionError("short address should be rejected")
+        except HTTPException as exc:
+            assert exc.status_code == 422
+            assert "10–150 characters" in str(exc.detail)
+        result = app.submit_gp_manual(job_id, {"students":{"PEN1":{"address":"Jale, Darbhanga, Bihar", "pincode":"847302", "minorityId":"7"}}}, authorization="test")
+        assert result["queued"] is True and result["students"] == 1
+        child = app.JOBS / result["write_job_id"] / "approved-plan.json"
+        saved = json.loads(child.read_text(encoding="utf-8"))
+        assert saved["PEN1"]["changes"]["address"] == "Jale, Darbhanga, Bihar"
+
+
 if __name__ == "__main__":
     test_skip_manual_gp_candidate_defers_without_write()
     test_skip_all_supported_gp_classes()
     test_job_dict_hides_manual_queue_during_auto_save_initialization()
     test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale()
-    print("4/4 passed")
+    test_manual_gp_address_validation_matches_udise_portal()
+    print("5/5 passed")

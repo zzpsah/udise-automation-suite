@@ -81,6 +81,29 @@ def approved_gp_conflicts(fresh: dict[str, Any], changes: dict[str, Any]) -> lis
     return conflicts
 
 
+def reconcile_approved_gp_conflicts(
+    fresh: dict[str, Any],
+    reread: dict[str, Any],
+    changes: dict[str, Any],
+    manual_fields: set[str] | None = None,
+) -> tuple[dict[str, Any], list[str], bool]:
+    """Accept a second fresh read only when it resolves transient AUTO conflicts.
+
+    The portal has returned inconsistent GP snapshots for the same student. A
+    second read may be used to establish current state, but never to bypass a
+    conflict on an operator-entered manual field. A persistent valid-value
+    conflict remains blocking and is not overwritten.
+    """
+    manual_fields = set(manual_fields or ())
+    conflicts = approved_gp_conflicts(fresh, changes)
+    if not conflicts or any(field in manual_fields for field in conflicts):
+        return fresh, conflicts, False
+    reread_conflicts = approved_gp_conflicts(reread, changes)
+    if len(reread_conflicts) < len(conflicts):
+        return reread, reread_conflicts, True
+    return fresh, conflicts, False
+
+
 def resolve_approved_gp_changes(
     changes: dict[str, Any], conflicts: list[str], manual_fields: set[str] | None = None
 ) -> tuple[dict[str, Any], list[str], list[str]]:
@@ -487,8 +510,28 @@ def run_auto_gp(
             # change the live Yes value to No. It is expected that the fresh
             # read still shows Yes immediately before the POST, so this
             # authorized transition must not be treated as a state conflict.
-            conflicts = approved_gp_conflicts(fresh, changes)
             manual_fields = set(plan.get("manual_fields") or []) if isinstance(plan, dict) else set()
+            conflicts = approved_gp_conflicts(fresh, changes)
+            if conflicts and not any(field in manual_fields for field in conflicts):
+                # Read the student once more before declaring a stale conflict.
+                # Only a second snapshot that itself matches the approved value
+                # or remains blank/invalid can clear the transient conflict.
+                try:
+                    time.sleep(0.25)
+                    reread = session.student_detail(sid)
+                    fresh, conflicts, reconciled = reconcile_approved_gp_conflicts(
+                        fresh, reread, changes, manual_fields
+                    )
+                    if reconciled:
+                        print(
+                            f"ℹ️ {pen}: a transient GP value mismatch resolved on immediate re-read; "
+                            "using the latest GP snapshot.", flush=True,
+                        )
+                except Exception as exc:
+                    print(
+                        f"⚠️ {pen}: could not re-check a stale GP conflict ({type(exc).__name__}); "
+                        "preserving the no-write safeguard.", flush=True,
+                    )
             updates, blocking_conflicts, skipped_auto_conflicts = resolve_approved_gp_changes(
                 changes, conflicts, manual_fields
             )
