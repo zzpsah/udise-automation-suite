@@ -1862,11 +1862,20 @@ def skip_gp_manual_student(job_id: str, body: dict, authorization: str | None = 
         _event(job_id, f"GP-MANUAL-SKIPPED: {str(item.get('pen') or deferred_key)} - {str(item.get('name') or 'Student')} - Deferred by operator; no GP fields were submitted and no write was sent.")
     _json_write(skipped_path, skipped)
     _json_write(pending_path, pending)
-    write_job_id = str(preview["auto_write_job_id"] or "").strip()
+    # Once manual fields have been submitted, the manual write is a separate
+    # child job from the earlier automatic batch. When the last pending student
+    # is skipped, return the newest child so the UI follows the manual result,
+    # not the older auto-save summary (which used to show 127 not-in-plan rows).
+    with _db() as conn:
+        child = conn.execute(
+            "SELECT id,status FROM jobs WHERE approved_from=? ORDER BY created_at DESC LIMIT 1",
+            (job_id,),
+        ).fetchone()
+    write_job_id = str(child["id"] if child else preview["auto_write_job_id"] or "").strip()
     if write_job_id:
         with _db() as conn:
-            child = conn.execute("SELECT status FROM jobs WHERE id=? AND approved_from=?", (write_job_id, job_id)).fetchone()
-        if not child:
+            valid_child = conn.execute("SELECT status FROM jobs WHERE id=? AND approved_from=?", (write_job_id, job_id)).fetchone()
+        if not valid_child:
             write_job_id = ""
     if pending:
         message = f"{len(deferred_items)} candidate(s) deferred; {len(pending)} student(s) remain for manual GP review. Deferred students were not changed."

@@ -57,11 +57,19 @@ def test_skip_manual_gp_candidate_defers_without_write() -> None:
         assert any("GP-MANUAL-SKIPPED" in event for event in events)
         assert not (job_dir / "approved-plan.json").exists()
 
+        # If a manual subset was submitted, skipping the final pending student
+        # must follow that newer manual child, not the older automatic child.
+        manual_write_id = "e" * 32
+        with app._db() as conn:
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,approved_from) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (manual_write_id, now + 1, now + 1, "completed", "gp", "X", "school", "session", 0, "Manual subset completed", job_id),
+            )
         final = app.skip_gp_manual_student(job_id, {"student_key": "PEN2"}, authorization="test")
         with app._db() as conn:
             final_status = conn.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()["status"]
         assert final["remaining_students"] == 0
-        assert final["write_job_id"] == write_job_id
+        assert final["write_job_id"] == manual_write_id
         assert final_status == "completed"
         assert "approved-plan save job" in final["message"]
 
