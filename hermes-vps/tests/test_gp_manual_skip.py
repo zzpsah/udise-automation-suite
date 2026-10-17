@@ -175,8 +175,33 @@ def test_skip_all_supported_gp_classes() -> None:
             assert stored_class == class_name, class_name
 
 
+def test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale() -> None:
+    """Stale AUTO defaults are omitted, while verified manual fields can proceed."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from udise_vps.general_profile import resolve_approved_gp_changes
+
+    changes = {"motherTongue": 28, "isBplYN": 2, "address": "Verified address", "pincode": "843001", "minorityId": 1}
+    updates, blocking, skipped = resolve_approved_gp_changes(
+        changes, ["isBplYN"], {"address", "pincode", "minorityId"}
+    )
+    assert updates == {"motherTongue": 28, "address": "Verified address", "pincode": "843001", "minorityId": 1}
+    assert blocking == [] and skipped == ["isBplYN"]
+
+    # If an explicitly entered manual value conflicts with the live record,
+    # preserve the no-overwrite safeguard and do not submit any part of it.
+    updates, blocking, skipped = resolve_approved_gp_changes(
+        changes, ["address", "isBplYN"], {"address", "pincode", "minorityId"}
+    )
+    assert updates == {} and blocking == ["address"] and skipped == []
+
+    # Ordinary approved plans keep their original all-or-nothing stale check.
+    updates, blocking, skipped = resolve_approved_gp_changes(changes, ["isBplYN"])
+    assert updates == {} and blocking == ["isBplYN"] and skipped == []
+
+
 if __name__ == "__main__":
     test_skip_manual_gp_candidate_defers_without_write()
     test_skip_all_supported_gp_classes()
     test_job_dict_hides_manual_queue_during_auto_save_initialization()
-    print("3/3 passed")
+    test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale()
+    print("4/4 passed")

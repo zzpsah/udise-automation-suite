@@ -58,6 +58,26 @@ def as_code(value) -> int | None:
         return None
 
 
+def resolve_approved_gp_changes(
+    changes: dict[str, Any], conflicts: list[str], manual_fields: set[str] | None = None
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    """Filter stale AUTO defaults in a manual batch without weakening manual safeguards.
+
+    Returns (safe_updates, blocking_conflicts, skipped_auto_conflicts). Ordinary
+    approved plans remain all-or-nothing; only a manual-entry batch may omit
+    stale AUTO fields and proceed with independent verified fields.
+    """
+    manual_fields = set(manual_fields or ())
+    if not manual_fields:
+        return ({} if conflicts else dict(changes), list(conflicts), [])
+    blocking = [field for field in conflicts if field in manual_fields]
+    if blocking:
+        return {}, blocking, []
+    skipped_auto = [field for field in conflicts if field not in manual_fields]
+    safe = {field: value for field, value in changes.items() if field not in skipped_auto}
+    return safe, [], skipped_auto
+
+
 def student_rng(pen: str, seed: int = 20261003) -> random.Random:
     """A per-student RNG seeded from the PEN.
 
@@ -455,13 +475,19 @@ def run_auto_gp(
                 and not is_blank(fresh.get(f))
                 and str(fresh.get(f)) != str(v)
             ]
-            if conflicts:
+            manual_fields = set(plan.get("manual_fields") or []) if isinstance(plan, dict) else set()
+            updates, blocking_conflicts, skipped_auto_conflicts = resolve_approved_gp_changes(
+                changes, conflicts, manual_fields
+            )
+            if blocking_conflicts:
+                detail_prefix = "Manually entered fields changed since review: " if manual_fields else "Live GP values changed since preview: "
                 result.status = "SKIPPED_STATE_CHANGED"
-                result.detail = "Live GP values changed since preview: " + ", ".join(conflicts) + ". No POST sent."
+                result.detail = detail_prefix + ", ".join(blocking_conflicts) + ". No POST sent."
                 results.append(result)
                 print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
-            updates = dict(changes)
+            if skipped_auto_conflicts:
+                result.detail = "Skipped stale AUTO defaults that changed since preview: " + ", ".join(skipped_auto_conflicts) + "; continuing with verified manual fields and unchanged eligible fields."
             result.changes = updates
             if max_submissions > 0 and submissions >= max_submissions:
                 result.status = "LIMIT_REACHED"

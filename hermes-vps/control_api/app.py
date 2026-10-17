@@ -1786,6 +1786,10 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
         changes.update(values)
         item = dict(item)
         item["changes"] = changes
+        # Distinguish fields explicitly verified/entered by the operator from
+        # AUTO defaults captured earlier at preview time. The runner may omit
+        # stale AUTO defaults, but must never override a conflicting manual value.
+        item["manual_fields"] = sorted(values.keys())
         manual_write_plan[key] = item
     if not manual_write_plan:
         raise HTTPException(400, "No manual GP write entries were produced")
