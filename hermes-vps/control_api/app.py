@@ -1472,11 +1472,16 @@ def _run_job_unlocked(job_id: str) -> None:
                 raise RuntimeError(f"{stage.upper()} approved plan is invalid JSON; no write job was queued")
         pending_cwsn = out_dir / "cwsn-pending.json"
         pending_data = _json_read(pending_cwsn) if pending_cwsn.is_file() else {}
+        pending_manual_path = out_dir / "gp-manual-pending.json"
+        manual_data = _json_read(pending_manual_path) if pending_manual_path.is_file() else {}
         cwsn_waiting = bool(is_preview and stage == "gp" and isinstance(pending_data, dict) and pending_data)
+        manual_waiting = bool(is_preview and stage == "gp" and isinstance(manual_data, dict) and manual_data)
         with _db() as conn:
             scoped_total = conn.execute("SELECT progress_total FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
-            final_status = "awaiting_confirmation" if cwsn_waiting else "completed"
+            final_status = "awaiting_confirmation" if cwsn_waiting else ("awaiting_input" if manual_waiting else "completed")
             final_message = _result_table_message(job_id, stage, awaiting_confirmation=cwsn_waiting)
+            if manual_waiting:
+                final_message = f"GP preview ready — {len(manual_data)} student(s) need verified manual fields before saving."
             conn.execute("UPDATE jobs SET status=?,updated_at=?,message=?,result_path=? WHERE id=?",
                          (final_status, int(time.time()), final_message, rp, job_id))
         if scoped_total:
@@ -1491,9 +1496,14 @@ def _run_job_unlocked(job_id: str) -> None:
                     job_id,
                     f"GP-UPDATE: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Father: {str(item.get('father_name') or 'Not available')} - Confirmation required - CWSN=Yes",
                 )
+        elif manual_waiting:
+            _event(job_id, f"GP-UPDATE: {len(manual_data)} student(s) need manual GP fields. Autofill fields remain hidden; no writes have started.")
+            for item in manual_data.values():
+                fields = ", ".join(str(x) for x in item.get("fields", []))
+                _event(job_id, f"GP-MANUAL-INPUT: {str(item.get('pen') or '')} - {str(item.get('name') or '')} - Required fields: {fields}")
         else:
             _event(job_id, "Run finished — review saved, skipped/already-filled, failed, and other counts above.")
-        if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting:
+        if is_preview and bool(row["auto_save"]) and stage in {"gp", "ep", "facility", "finalize"} and not cwsn_waiting and not manual_waiting:
             try:
                 _queue_automatic_write(job_id)
             except Exception as auto_exc:
@@ -1595,7 +1605,7 @@ def cancel_job(job_id: str, authorization: str | None = Header(default=None)) ->
         row = conn.execute("SELECT id,status FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not row:
         raise HTTPException(404, "Job not found")
-    if row["status"] not in {"running","queued","awaiting_confirmation"}:
+    if row["status"] not in {"running","queued","awaiting_confirmation","awaiting_input"}:
         return {"job_id": job_id, "status": row["status"], "cancelled": False}
     with _ACTIVE_PROCS_GUARD:
         _CANCELLED_JOBS.add(job_id)
@@ -1653,6 +1663,80 @@ def confirm_cwsn(job_id: str, authorization: str | None = Header(default=None)) 
     except Exception as exc:
         raise HTTPException(500, f"Could not queue the confirmed GP save: {exc}") from exc
     return {"job_id": job_id, "write_job_id": write_job_id, "confirmed": len(pending)}
+
+
+@app.post("/api/v1/jobs/{job_id}/submit-gp-manual")
+def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header(default=None)) -> dict:
+    """Validate verified operator-entered GP fields, merge them into this preview, then queue its write."""
+    require_api(authorization)
+    with _db() as conn:
+        preview = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not preview:
+        raise HTTPException(404, "GP preview job not found")
+    if preview["stage"] != "gp" or not bool(preview["preview"]) or preview["status"] != "awaiting_input":
+        raise HTTPException(409, "Only a GP preview awaiting manual input can be submitted")
+    job_dir = JOBS / job_id
+    pending_path = job_dir / "gp-manual-pending.json"
+    plan_path = job_dir / "approved-plan.json"
+    pending = _json_read(pending_path) if pending_path.is_file() else {}
+    plan = _json_read(plan_path) if plan_path.is_file() else {}
+    submitted = body.get("students") if isinstance(body, dict) else None
+    if not isinstance(pending, dict) or not pending or not isinstance(plan, dict) or not isinstance(submitted, dict):
+        raise HTTPException(400, "Manual GP input payload is empty or invalid")
+    allowed = {"address", "pincode", "minorityId"}
+    errors = []
+    cleaned = {}
+    for key, item in pending.items():
+        values = submitted.get(key)
+        if not isinstance(values, dict):
+            errors.append(f"{item.get('name') or key}: enter all required fields")
+            continue
+        current = {}
+        for field in item.get("fields", []):
+            if field not in allowed:
+                errors.append(f"{item.get('name') or key}: unsupported manual field {field}")
+                continue
+            value = str(values.get(field, "")).strip()
+            if field == "address":
+                if not value or len(value) > 250:
+                    errors.append(f"{item.get('name') or key}: address is required (max 250 characters)")
+                else:
+                    current[field] = value
+            elif field == "pincode":
+                if not re.fullmatch(r"[0-9]{6}", value):
+                    errors.append(f"{item.get('name') or key}: PIN code must be exactly six digits")
+                else:
+                    current[field] = value
+            elif field == "minorityId":
+                if value not in {"1", "2", "3", "4", "5", "6", "7"}:
+                    errors.append(f"{item.get('name') or key}: select a valid minority type")
+                else:
+                    current[field] = int(value)
+        cleaned[key] = current
+    if errors:
+        raise HTTPException(422, {"message": "Correct the highlighted manual fields", "errors": errors})
+    for key, values in cleaned.items():
+        item = plan.get(key)
+        if not isinstance(item, dict):
+            raise HTTPException(409, f"Approved preview entry missing for student {key}")
+        changes = dict(item.get("changes") or {})
+        changes.update(values)
+        item["changes"] = changes
+        plan[key] = item
+    _json_write(plan_path, plan)
+    _json_write(pending_path, {})
+    with _db() as conn:
+        conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=? WHERE id=?",
+                     (int(time.time()), "Manual GP fields validated; queuing verified save.", job_id))
+    _event(job_id, f"GP-MANUAL-INPUT: verified manual values accepted for {len(cleaned)} student(s); approved plan updated.")
+    try:
+        write_job_id = _queue_automatic_write(job_id)
+    except Exception as exc:
+        with _db() as conn:
+            conn.execute("UPDATE jobs SET status='awaiting_input',updated_at=?,message=? WHERE id=?",
+                         (int(time.time()), "Manual values accepted but write queue failed; retry after inspecting the job.", job_id))
+        raise HTTPException(500, f"Manual values validated but the save could not be queued: {exc}") from exc
+    return {"job_id": job_id, "write_job_id": write_job_id, "students": len(cleaned), "queued": bool(write_job_id)}
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")
@@ -1714,6 +1798,13 @@ def _job_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d.pop("session_id", None)
     d["has_result"] = bool(d.pop("result_path", None))
+    if d.get("stage") == "gp":
+        pending_path = JOBS / str(d.get("id")) / "gp-manual-pending.json"
+        try:
+            pending = _json_read(pending_path) if pending_path.is_file() else {}
+        except Exception:
+            pending = {}
+        d["gp_manual_pending"] = pending if isinstance(pending, dict) else {}
     return d
 
 

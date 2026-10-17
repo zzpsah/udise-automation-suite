@@ -81,6 +81,25 @@ def _():
     assert changes.get("natIndYN") == 1, changes
 
 
+
+
+@check("cwsn_yes_is_normalized_to_no")
+def _():
+    status, changes = gp.build_auto_gp_changes(
+        {"cwsnYN": 1, "natIndYN": 1, "isBplYN": 2, "ewsYN": 2, "ooscYN": 2}, "PEN-CWSN"
+    )
+    assert status == "PREVIEW", (status, changes)
+    assert changes.get("cwsnYN") == 2, changes
+
+
+@check("unexpected_cwsn_code_is_normalized_to_no")
+def _():
+    status, changes = gp.build_auto_gp_changes(
+        {"cwsnYN": 9, "natIndYN": 1, "isBplYN": 2, "ewsYN": 2, "ooscYN": 2}, "PEN-CWSN-9"
+    )
+    assert status == "PREVIEW", (status, changes)
+    assert changes.get("cwsnYN") == 2, changes
+
 # ------------------------------------------------------------- blood group
 
 @check("blood_group_blank_fills_under_investigation")
@@ -361,6 +380,39 @@ def _():
     assert payload["impairmentType"] == []
     assert payload["disabilityCerti"] == 9
     assert payload["impairmentPercent"] == ""
+
+
+@check("auto_gp_repairs_invalid_yes_no_placeholder_9")
+def _():
+    fresh = {
+        "isBplYN": 9, "ewsYN": 9, "natIndYN": 9, "ooscYN": 9,
+        "cwsnYN": 2, "bloodGroup": 3, "motherTongue": 42,
+    }
+    status, changes = gp.build_auto_gp_changes(fresh, "TEST-PEN")
+    assert status == "PREVIEW", (status, changes)
+    assert changes.get("isBplYN") == 2, changes
+    assert changes.get("ewsYN") == 2, changes
+    assert changes.get("natIndYN") == 1, changes
+    assert changes.get("ooscYN") == 2, changes
+    assert "cwsnYN" not in changes, changes
+
+
+@check("mandatory_gp_preflight_blocks_missing_personal_data")
+def _():
+    missing = gp.missing_mandatory_gp_fields({
+        "address": "", "pincode": 0, "minorityId": 0,
+        "isBplYN": 2, "ewsYN": 2, "natIndYN": 1, "ooscYN": 2,
+    })
+    assert missing == ["address", "pincode", "minorityId"], missing
+
+
+@check("mandatory_gp_preflight_accepts_valid_values")
+def _():
+    missing = gp.missing_mandatory_gp_fields({
+        "address": "verified address", "pincode": "841232", "minorityId": 7,
+        "isBplYN": 2, "ewsYN": 2, "natIndYN": 1, "ooscYN": 2,
+    })
+    assert missing == [], missing
 
 
 print()

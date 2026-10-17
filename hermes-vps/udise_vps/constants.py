@@ -63,7 +63,8 @@ EWS_NO = 2
 # Categories that can never be EWS: SC, ST, OBC.
 EWS_EXCLUDED_CATEGORIES = {2, 3, 4}
 
-# Fresh CWSN values that force a full skip + manual review.
+# Legacy code groups retained for compatibility with older reports. AUTO GP
+# now normalizes all CWSN values other than No (2) to No without confirmation.
 CWSN_SKIP_CODES = {"1"}
 CWSN_UNEXPECTED_SKIP = {"3", "4", "5", "6", "7", "8", "9"}
 

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires_class:boolean;description:string;preview_enabled?:boolean;approval_enabled?:boolean};
 type SchoolPreset={internal_id:string;udise_code:string;name:string};
 type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
-type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;auto_write_job_id?:string;error?:string};events:{id:number;message:string;level:string}[]};
+type ManualGpStudent={pen:string;student_id:string;name:string;father_name?:string;fields:string[]};
+type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;auto_write_job_id?:string;error?:string;gp_manual_pending?:Record<string,ManualGpStudent>};events:{id:number;message:string;level:string}[]};
 type EshikshaPreview={ready:boolean;source:string;school_name:string;udise:string;total:number;class_counts:Record<string,number>;preview_limit:number;rows:Array<Record<string,string>>};
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
@@ -52,7 +53,7 @@ const WORKFLOW_INFO: Record<string,{title:string;steps:string[]}> = {
 const STAGE_META: Record<string,{icon:string;short:string;fills:string[]}> = {
   students: {icon:"P1",short:"Export the current masked roster",fills:["Read-only","Masked Aadhaar"]},
   snapshot: {icon:"RA",short:"Export a full read-only audit workbook with class-wise pending counts",fills:["Class IX / X / XI / XII student totals","GP pending: blank eligible fields by class","EP pending: admission, language and subject gaps by class","Facility pending: blank measurements and Yes/No fields by class","Completion status and Issues sheets; read-only, no portal changes"]},
-  gp: {icon:"P3",short:"Blank fields only; existing values are never overwritten",fills:["4.1.12 Mother Tongue → Hindi (42) or Bhojpuri (28)","Blood Group → Under Investigation (9)","4.1.14 BPL → No (2)","4.1.15 AAY → Not Applicable (9) when BPL is No","4.1.16 EWS → No (2)","4.1.17 CWSN → No (2); existing Yes is manual review","4.1.18 Indian National → Yes (1)","4.1.19 Out-of-School-Child → No (2)"]},
+  gp: {icon:"P3",short:"Blank fields only; existing values are never overwritten",fills:["4.1.12 Mother Tongue → Hindi (42) or Bhojpuri (28)","Blood Group → Under Investigation (9)","4.1.14 BPL → No (2)","4.1.15 AAY → Not Applicable (9) when BPL is No","4.1.16 EWS → No (2)","4.1.17 CWSN → No (2), including existing Yes or invalid values","4.1.18 Indian National → Yes (1)","4.1.19 Out-of-School-Child → No (2)"]},
   ep: {icon:"P4",short:"Blank EP fields only; existing values are never overwritten",fills:["4.2.1 Admission No. → matched eShikshaKosh value, then Roll No. fallback","No match/ambiguous → temporary 0001, 0002… sequence shown for Excel review","4.2.9 language pair → Urdu/HIN or Hindi/Sanskrit by minority status","Subjects 3–6 → Mathematics 401, Science 402, Social Science 404, English 612","Invalid previous-year result → None / Not Studying with null dependent fields","Class XI stream → eShikshaKosh stream when the portal permits it"]},
   facility: {icon:"P4",short:"Blank facility fields only; existing values are never overwritten",fills:["Classes IX–X boys: Height → 140–160 cm; Weight → 38–55 kg","Classes IX–X girls: Height → 135–155 cm; Weight → 34–50 kg (lower than boys)","Classes XI–XII boys: Height → 150–170 cm; Weight → 42–60 kg","Classes XI–XII girls: Height → 146–166 cm; Weight → 38–56 kg","4.3.6 Distance → 1–3 km or 3–5 km","Parent education → Secondary or Equivalent","Facilities Provided = No → Olympiads/Competitions = No, NCC = No, NSS = No, Scouts & Guides = No when blank/unanswered","Existing Yes in any dependent field is never overwritten; report for manual review","Blank/unanswered Yes/No facility fields → No"]},
   completion: {icon:"P5",short:"Export the current stage status",fills:["GP / EP / Facility status","Pending and completed records"]},
@@ -98,7 +99,8 @@ export default function Page(){
   const [msg,setMsg]=useState("");
   const [saveLimit,setSaveLimit]=useState(1);
   const [customSaveLimit,setCustomSaveLimit]=useState("");
-  const [cwsnConfirmBusy,setCwsnConfirmBusy]=useState(false);
+  const [manualGpValues,setManualGpValues]=useState<Record<string,Record<string,string>>>({});
+  const [manualGpBusy,setManualGpBusy]=useState(false);
   const [sessionHydrated,setSessionHydrated]=useState(false);
 
   const SESSION_STORAGE_KEY="udise_active_session";
@@ -374,20 +376,24 @@ export default function Page(){
     setMsg("Workflow cancelled.");
   }
 
-  async function confirmCwsn(){
-    if(!jobId||cwsnConfirmBusy) return;
-    const ok=window.confirm("Confirm CWSN = No for every listed student? The system will set CWSN to No and then save and fresh-read each record.");
-    if(!ok) return;
-    setCwsnConfirmBusy(true);
-    setMsg("CWSN confirmation received. Starting verified GP saves…");
-    const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/confirm-cwsn",{method:"POST"});
+  async function submitManualGpFields(){
+    if(!jobId||manualGpBusy||!job?.job.gp_manual_pending) return;
+    setManualGpBusy(true);
+    setMsg("Validating manual GP fields for each student…");
+    const students:Record<string,Record<string,string>>={};
+    for(const [key,item] of Object.entries(job.job.gp_manual_pending)){
+      students[key]={};
+      for(const field of item.fields) students[key][field]=manualGpValues[key]?.[field]||"";
+    }
+    const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/submit-gp-manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({students})});
     const d=await r.json().catch(()=>({}));
-    setCwsnConfirmBusy(false);
+    setManualGpBusy(false);
     if(!r.ok){
-      setMsg(clientFailure("UDISE General Profile","Confirm CWSN=No",d.detail||d.error||"Unknown error"));
+      const errors=Array.isArray(d.detail?.errors)?d.detail.errors.join(" · "):"";
+      setMsg(clientFailure("UDISE General Profile","Validate manual fields",errors||d.detail?.message||d.detail||d.error||"Unknown error"));
       return;
     }
-    setMsg("CWSN=No confirmed. Verified GP save is now running.");
+    setMsg("Manual fields validated. Verified GP saves are now running for the reviewed batch.");
     if(d.write_job_id) setJobId(d.write_job_id);
   }
 
@@ -419,6 +425,17 @@ export default function Page(){
       if(!r.ok) return;
       const d=await r.json();
       setJob(d);
+      const pending=d.job.gp_manual_pending as Record<string,ManualGpStudent>|undefined;
+      if(pending&&Object.keys(pending).length){
+        setManualGpValues(previous=>{
+          const next={...previous};
+          for(const [key,item] of Object.entries(pending)){
+            next[key]={...(next[key]||{})};
+            for(const field of item.fields) if(next[key][field]===undefined) next[key][field]="";
+          }
+          return next;
+        });
+      }
       if(d.job.auto_write_job_id){
         const limit=Number(d.job.max_submissions); setMsg(`Preview verified. Server-side save is queued for ${limit===0?"all eligible":`up to ${limit}`} record(s); browser connection is no longer required.`);
         if(d.job.auto_write_job_id!==jobId){
@@ -535,23 +552,33 @@ export default function Page(){
           </div>}
 
           <div className="run-row">
-            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>{job&&["running","awaiting_confirmation"].includes(job.job.status)&&<button type="button" className="secondary-button" onClick={cancelJob}>Cancel</button>}
+            <button className="run-button" disabled={(selected?.mode==="write"&&!selected.preview_enabled)||Boolean(selected?.requires_class&&!selected.classes.includes(klass))} onClick={startJob}>{selected?.id==="ep"&&klass!=="X"&&!eshikshaReady&&!eshikshaReportReady?"Connect eShikshaKosh":selected?.mode==="write"?"Run & Save":"Run"}</button>{job&&["running","awaiting_confirmation","awaiting_input"].includes(job.job.status)&&<button type="button" className="secondary-button" onClick={cancelJob}>Cancel</button>}
           </div>
         </section>
         </>}
       </div>
 
       <aside className="card output-card">
-        <div className="output-title"><div><span className="eyebrow">ACTIVITY &amp; RESULT</span><h2>{job?"Workflow progress":"Ready to begin"}</h2></div>{job&&<span className="badge">{job.job.status==="running"?"Running":job.job.status==="awaiting_confirmation"?"Awaiting confirmation":job.job.status==="cancelled"?"Cancelled":job.job.status==="queued"?"Starting":job.job.status}</span>}</div>
+        <div className="output-title"><div><span className="eyebrow">ACTIVITY &amp; RESULT</span><h2>{job?"Workflow progress":"Ready to begin"}</h2></div>{job&&<span className="badge">{job.job.status==="running"?"Running":job.job.status==="awaiting_confirmation"?"Awaiting confirmation":job.job.status==="awaiting_input"?"Manual input needed":job.job.status==="cancelled"?"Cancelled":job.job.status==="queued"?"Starting":job.job.status}</span>}</div>
         {!job&&<div className="empty-output"><span className="status-mark">STATUS</span><strong>{msg||"Connect UDISE and choose a workflow."}</strong><p>Progress and downloadable results will appear here.</p></div>}
         {job&&<div className="job-output">
           {String(job.job.message||msg).startsWith("RESULT_TABLE") ? (()=>{const rows=String(job.job.message||"").split("\n").slice(1).filter(Boolean).map(x=>x.split("|")); return <table className="result-table"><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=>i===0?<th key={j}>{c}</th>:<td key={j}>{c}</td>)}</tr>)}</tbody></table>})() : <div className="friendly-message">{job.job.message||msg}</div>}
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
-          {job.events.some(e=>e.message.includes("GP_CWSN_CONFIRM_REQUIRED"))&&job.job.stage==="gp"&&job.job.status==="awaiting_confirmation"&&!job.job.auto_write_job_id&&<div className="error-box" role="alert">
-            <strong>CWSN confirmation required</strong>
-            <span>Students with CWSN=Yes are listed below with PEN, Name and Father&apos;s Name. Verify them before confirming. The system will set CWSN=No, save each record, and perform a fresh read-back verification.</span>
-            <button type="button" className="run-button" onClick={confirmCwsn} disabled={cwsnConfirmBusy}>{cwsnConfirmBusy?"Confirming…":"Confirm CWSN = No & Continue"}</button>
-          </div>}
+          {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&job.job.gp_manual_pending&&Object.keys(job.job.gp_manual_pending).length>0&&<section className="gp-manual-review" aria-label="General Profile manual review">
+            <div className="gp-manual-heading"><strong>Manual fields needed</strong><span>{Object.keys(job.job.gp_manual_pending).length} student(s) · Autofilled fields are hidden</span></div>
+            <p>Enter verified school-record information only. Each student has a separate table; no changes will be submitted until you select Save reviewed batch.</p>
+            {Object.entries(job.job.gp_manual_pending).map(([key,item],index)=><article className="gp-student-review" key={key}>
+              <div className="gp-student-title"><strong>{index+1}. {item.name||"Student"}</strong><span>PEN: {item.pen||key}</span>{item.father_name&&<small>Father: {item.father_name}</small>}</div>
+              <table className="gp-manual-table"><thead><tr><th>Required field</th><th>Enter verified value</th></tr></thead><tbody>
+                {item.fields.map(field=><tr key={field}><th scope="row">{field==="address"?"Address":field==="pincode"?"PIN code":field==="minorityId"?"Minority type":field}</th><td>
+                  {field==="address"?<input aria-label={`${item.name} address`} maxLength={250} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))} placeholder="Enter address from school records"/>:
+                   field==="pincode"?<input aria-label={`${item.name} PIN code`} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value.replace(/[^0-9]/g,"").slice(0,6)}}))} placeholder="6-digit PIN"/>:
+                   field==="minorityId"?<select aria-label={`${item.name} minority type`} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))}><option value="">Select option</option><option value="1">Muslim</option><option value="2">Christian</option><option value="3">Sikh</option><option value="4">Buddhist</option><option value="5">Jain</option><option value="6">Zoroastrian</option><option value="7">Not applicable</option></select>:<input aria-label={`${item.name} ${field}`} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))}/>}</td></tr>)}
+              </tbody></table>
+            </article>)}
+            <button type="button" className="run-button" onClick={submitManualGpFields} disabled={manualGpBusy}>{manualGpBusy?"Validating…":"Save reviewed batch and continue"}</button>
+            <small>All required fields are validated before any write job is queued. The system then verifies each student's saved values.</small>
+          </section>}
           <ul className="events" aria-live="polite">{job.events.slice(-50).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{String(e.message||"").replace(/^LIVE\s*[·•:-]\s*/i,"")}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
           {job.job.error&&<div className="error-box"><strong>Workflow stopped</strong><span>{job.job.error}</span></div>}

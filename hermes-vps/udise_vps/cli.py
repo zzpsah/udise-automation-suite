@@ -50,6 +50,7 @@ def _write_plan(path: str | None, results) -> None:
         return
     payload = {}
     cwsn_pending = {}
+    manual_pending = {}
     for result in results:
         status = str(getattr(result, "status", ""))
         changes = getattr(result, "proposed", None) or getattr(result, "changes", {}) or {}
@@ -57,9 +58,12 @@ def _write_plan(path: str | None, results) -> None:
         sid = str(getattr(result, "student_id", "") or "")
         name = str(getattr(result, "name", "") or "")
         father_name = str(getattr(result, "father_name", "") or "")
+        manual_fields = list(getattr(result, "manual_fields", []) or [])
         item = {"pen": pen, "student_id": sid, "name": name, "father_name": father_name, "changes": changes}
-        if status == "PREVIEW" and isinstance(changes, dict) and changes and (pen or sid):
+        if status == "PREVIEW" and isinstance(changes, dict) and (changes or manual_fields) and (pen or sid):
             payload[pen or sid] = item
+            if manual_fields:
+                manual_pending[pen or sid] = {**item, "fields": manual_fields}
         elif status == "CWSN_CONFIRM_REQUIRED" and (pen or sid):
             cwsn_pending[pen or sid] = item
     target = Path(path)
@@ -67,6 +71,9 @@ def _write_plan(path: str | None, results) -> None:
     target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (target.parent / "cwsn-pending.json").write_text(
         json.dumps(cwsn_pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    (target.parent / "gp-manual-pending.json").write_text(
+        json.dumps(manual_pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
 

@@ -4,7 +4,7 @@ No network. These verify the safety rules the notebook enforces are actually
 preserved in the ported code:
 
   - blank-only fill; existing values preserved
-  - CWSN=Yes skips entirely
+  - CWSN is normalized to No without a review gate
   - preview never writes
   - one POST only; never replayed
   - success requires fresh read-back
@@ -58,6 +58,17 @@ class FakePortal:
         submit_new_status=6,
     ):
         self.records = {str(k): dict(v) for k, v in records.items()}
+        # Ordinary test records have valid required portal fields unless a test
+        # explicitly overrides a field. Missing-data behavior is covered by
+        # direct tests of missing_mandatory_gp_fields.
+        for record in self.records.values():
+            record.setdefault("address", "TEST ADDRESS")
+            record.setdefault("pincode", "841232")
+            record.setdefault("minorityId", 7)
+            record.setdefault("isBplYN", 2)
+            record.setdefault("ewsYN", 2)
+            record.setdefault("natIndYN", 1)
+            record.setdefault("ooscYN", 2)
         self.persist_gp = persist_gp
         self.fail_gp = fail_gp
         self.persist_before_fail = persist_before_fail
@@ -183,27 +194,46 @@ def test_untouched_fields_are_carried_into_payload():
     print("PASS test_untouched_fields_are_carried_into_payload")
 
 
-def test_cwsn_yes_is_skipped():
-    """CWSN=Yes must skip entirely — no POST at all."""
+def test_cwsn_yes_is_automatically_set_to_no():
+    """CWSN=Yes is normalized to No and saved without a confirmation gate."""
     portal = FakePortal({"1": {"cwsnYN": 1, "isBplYN": None}})
     portal.students = [student("1", "PEN1")]
 
     results = general_profile.run_auto_gp(portal, allow_submit=True)
 
-    assert not portal.posts, "CWSN=Yes must never POST"
-    assert results[0].status == "SKIPPED_CWSN"
-    print("PASS test_cwsn_yes_is_skipped")
+    assert len(portal.posts) == 1
+    assert portal.posts[0][1]["cwsnYN"] == 2
+    assert results[0].confirmed
+    print("PASS test_cwsn_yes_is_automatically_set_to_no")
 
 
-def test_unexpected_cwsn_code_is_skipped():
+def test_unexpected_cwsn_code_is_automatically_set_to_no():
     portal = FakePortal({"1": {"cwsnYN": 5, "isBplYN": None}})
     portal.students = [student("1", "PEN1")]
 
     results = general_profile.run_auto_gp(portal, allow_submit=True)
 
+    assert len(portal.posts) == 1
+    assert portal.posts[0][1]["cwsnYN"] == 2
+    assert results[0].confirmed
+    print("PASS test_unexpected_cwsn_code_is_automatically_set_to_no")
+
+
+def test_preview_exposes_only_non_autofill_fields_for_manual_input():
+    portal = FakePortal({"1": {
+        "cwsnYN": 1, "address": "", "pincode": "", "minorityId": None,
+        "isBplYN": None, "ewsYN": None, "natIndYN": None, "ooscYN": None,
+    }})
+    portal.students = [student("1", "PEN-MANUAL", name="Manual Student")]
+
+    results = general_profile.run_auto_gp(portal, allow_submit=False)
+
     assert not portal.posts
-    assert results[0].status == "SKIPPED_CWSN_UNEXPECTED"
-    print("PASS test_unexpected_cwsn_code_is_skipped")
+    assert results[0].status == "PREVIEW"
+    assert set(results[0].manual_fields) == {"address", "pincode", "minorityId"}
+    assert results[0].changes.get("cwsnYN") == 2
+    assert results[0].changes.get("natIndYN") == 1
+    print("PASS test_preview_exposes_only_non_autofill_fields_for_manual_input")
 
 
 def test_preview_never_writes():

@@ -4,8 +4,8 @@ Ported from the notebook's AUTO GP cell. Behaviour preserved exactly:
 
   - only a genuinely blank current value is filled
   - existing nonblank saved values are preserved
-  - fresh CWSN=Yes skips the student entirely (manual review)
-  - unexpected nonblank CWSN codes are also skipped
+  - CWSN is normalized to No (2) automatically, without a review gate
+  - unexpected CWSN codes are normalized to No rather than skipped
   - one POST only; never blindly replayed
   - success requires a fresh read-back matching every submitted field
 """
@@ -25,8 +25,6 @@ from .constants import (
     BLOOD_GROUP_API_ACCEPTED,
     BLOOD_GROUP_UNDER_INVESTIGATION,
     CLASS_LABEL,
-    CWSN_SKIP_CODES,
-    CWSN_UNEXPECTED_SKIP,
     EWS_EXCLUDED_CATEGORIES,
     EWS_NO,
     MOTHER_TONGUE_CHOICES,
@@ -88,19 +86,22 @@ def build_auto_gp_changes(fresh: dict, pen: str) -> tuple[str, dict]:
 
     This is the single source of truth for stage-level GP pending counts.
     ``formStatus`` is an overall completion status, not proof that any GP
-    AUTO field is blank.
+    AUTO field is blank. For yes/no AUTO fields, portal code 9 is an invalid
+    placeholder (the API requires 1 or 2), so treat it like a blank. CWSN is
+    normalized to No (2) by the school-approved invariant, including Yes or
+    unexpected portal codes; it never triggers a manual confirmation gate.
     """
-    fresh_cwsn = str(fresh.get("cwsnYN"))
-    if fresh_cwsn in CWSN_SKIP_CODES:
-        return "CWSN_CONFIRM_REQUIRED", {"cwsnYN": 2}
-    if fresh_cwsn in CWSN_UNEXPECTED_SKIP:
-        return "SKIPPED_CWSN_UNEXPECTED", {}
-
+    # School policy: CWSN is always set to No (2). This is an automatic
+    # default, not a review gate; Yes and unexpected codes are normalized too.
+    invalid_auto_codes = {"isBplYN", "ewsYN", "natIndYN", "ooscYN"}
     updates = {
         field_name: default
         for field_name, default in AUTO_GP_DEFAULTS.items()
         if is_blank(fresh.get(field_name))
+        or (field_name in invalid_auto_codes and str(fresh.get(field_name)).strip() == "9")
     }
+    if as_code(fresh.get("cwsnYN")) != 2:
+        updates["cwsnYN"] = 2
     if "motherTongue" in updates:
         updates["motherTongue"] = pick_mother_tongue(student_rng(pen))
     updates = apply_gp_rules(fresh, updates)
@@ -190,6 +191,7 @@ class GpResult:
     detail: str = ""
     changes: dict = field(default_factory=dict)
     read_back: str = ""
+    manual_fields: list[str] = field(default_factory=list)
 
     @property
     def confirmed(self) -> bool:
@@ -197,6 +199,31 @@ class GpResult:
             "SUCCESS_CONFIRMED",
             "SUCCESS_CONFIRMED_AFTER_POST_ERROR",
         }
+
+
+def missing_mandatory_gp_fields(fresh: dict) -> list[str]:
+    """Return portal-mandatory GP fields that cannot safely be submitted.
+
+    These checks mirror observed validation errors. Address, PIN code and
+    minority type are not guessed by AUTO-GP; they must come from verified
+    student data. Yes/no fields must carry a valid 1/2 code.
+    """
+    missing = []
+    if not str(fresh.get("address") or "").strip():
+        missing.append("address")
+    pin = "".join(ch for ch in str(fresh.get("pincode") or "") if ch.isdigit())
+    if len(pin) != 6:
+        missing.append("pincode")
+    try:
+        minority = int(float(str(fresh.get("minorityId")).strip()))
+    except (TypeError, ValueError):
+        minority = None
+    if minority not in {1, 2, 3, 4, 5, 6, 7}:
+        missing.append("minorityId")
+    for field_name in ("isBplYN", "ewsYN", "natIndYN", "ooscYN"):
+        if str(fresh.get(field_name) or "").strip() not in {"1", "2"}:
+            missing.append(field_name)
+    return missing
 
 
 def build_gp_payload(original: dict, updates: dict) -> dict:
@@ -442,6 +469,19 @@ def run_auto_gp(
                 results.append(result)
                 print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
                 continue
+            effective_gp = dict(fresh)
+            effective_gp.update(updates)
+            required_missing = missing_mandatory_gp_fields(effective_gp)
+            if required_missing:
+                result.status = "MANUAL_REVIEW_GP_INCOMPLETE"
+                result.detail = (
+                    "Reason: mandatory GP fields are missing/invalid: " + ", ".join(required_missing) + ". "
+                    "Action: enter verified address/PIN/minority details in the portal and refresh Preview; "
+                    "AUTO-GP will not invent personal data. No POST sent."
+                )
+                results.append(result)
+                print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
+                continue
             payload = build_gp_payload(fresh, updates)
             try:
                 status_code, body = session.post_once("/p0/api/cy/students/%s" % sid, json_body=payload)
@@ -450,13 +490,13 @@ def run_auto_gp(
                     result.detail = "HTTP %s; %s" % (status_code, body.get("message") or body.get("error") or "rejected")
                     results.append(result)
                     print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-                    break
+                    continue
             except Exception as exc:
                 result.status = "UNCONFIRMED"
                 result.detail = "POST transport error: %s; state unknown." % type(exc).__name__
                 results.append(result)
                 print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-                break
+                continue
             submissions += 1
             time.sleep(2)
             try:
@@ -466,13 +506,13 @@ def run_auto_gp(
                 result.detail = "Read-back failed: %s: %s" % (type(exc).__name__, exc)
                 results.append(result)
                 print(f"📋 GP_APPROVED_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-                break
+                continue
             mismatches = read_back_matches(verify, updates)
             if mismatches:
                 result.status = "UNCONFIRMED"
                 result.detail = "Fresh GP does not confirm: " + ", ".join(mismatches) + "."
                 results.append(result)
-                break
+                continue
             result.read_back = "All approved fields confirmed"
             result.status = "SUCCESS_CONFIRMED"
             result.detail = "Approved preview values saved and confirmed by fresh GP read-back."
@@ -482,41 +522,38 @@ def run_auto_gp(
 
         # ------------------------------------------------- shared eligibility
         eligibility, updates = build_auto_gp_changes(fresh, pen)
-        if eligibility == "CWSN_CONFIRM_REQUIRED":
-            result.status = eligibility
-            result.detail = "Fresh GP shows CWSN=Yes. User confirmation required before setting CWSN=No; no POST sent."
-            result.changes = updates
-            results.append(result)
-            print(f"📋 GP_CWSN_CONFIRM_REQUIRED pen={pen} name={name} detail={result.detail}", flush=True)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-            continue
-        if eligibility == "SKIPPED_CWSN_UNEXPECTED":
-            result.status = eligibility
-            result.detail = f"Unexpected CWSN code {fresh.get('cwsnYN')}. Manual review."
+
+        effective_gp = dict(fresh)
+        effective_gp.update(updates)
+        required_missing = missing_mandatory_gp_fields(effective_gp)
+        result.manual_fields = list(required_missing)
+        result.changes = updates
+
+        if not allow_submit and (updates or required_missing):
+            result.status = "PREVIEW"
+            detail_parts = []
+            if updates:
+                detail_parts.append(f"{len(updates)} autofill field(s) ready")
+            if required_missing:
+                detail_parts.append("manual input required: " + ", ".join(required_missing))
+            result.detail = "; ".join(detail_parts) + "."
             results.append(result)
             print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
 
         if not updates:
-            if str(fresh.get("formStatus", "")).strip() == "0":
+            if required_missing:
+                result.status = "MANUAL_REVIEW_GP_INCOMPLETE"
+                result.detail = "Mandatory GP fields need verified manual input: " + ", ".join(required_missing) + ". No POST sent."
+            elif str(fresh.get("formStatus", "")).strip() == "0":
                 result.status = "MANUAL_REVIEW_GP_INCOMPLETE"
                 result.detail = (
-                    "Portal formStatus=0 (GP incomplete), but no eligible blank AUTO-GP fields were found. "
-                    "Open GP in the portal, identify and correct the incomplete/invalid required field, save GP, "
-                    "then refresh EP Preview. Existing values were preserved; no POST sent."
+                    "Portal formStatus=0, but no eligible blank AUTO-GP fields were found. "
+                    "Check the portal's remaining required fields and refresh Preview. No POST sent."
                 )
             else:
                 result.status = "NO_CHANGE"
                 result.detail = "Fresh GP has no blank AUTO fields."
-            results.append(result)
-            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-            continue
-
-        result.changes = updates
-
-        if not allow_submit:
-            result.status = "PREVIEW"
-            result.detail = f"{len(updates)} blank field(s) would be filled."
             results.append(result)
             print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
             continue
@@ -529,6 +566,19 @@ def run_auto_gp(
             continue
 
         # --------------------------------------------------------- one write
+        effective_gp = dict(fresh)
+        effective_gp.update(updates)
+        required_missing = missing_mandatory_gp_fields(effective_gp)
+        if required_missing:
+            result.status = "MANUAL_REVIEW_GP_INCOMPLETE"
+            result.detail = (
+                "Mandatory GP fields are missing/invalid: " + ", ".join(required_missing) + ". "
+                "Enter verified address/PIN/minority details in the portal and refresh Preview; "
+                "AUTO-GP will not invent personal data. No POST sent."
+            )
+            results.append(result)
+            print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
+            continue
         payload = build_gp_payload(fresh, updates)
         post_error = None
         try:
@@ -543,7 +593,7 @@ def run_auto_gp(
                 )
                 results.append(result)
                 print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-                break
+                continue
         except Exception as exc:
             # Transmitted state is unknown — read back before deciding anything.
             post_error = exc
@@ -564,8 +614,7 @@ def run_auto_gp(
             result.detail = f"Read-back failed: {type(exc).__name__}: {exc}"
             results.append(result)
             print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-            break
-
+            continue
         mismatches = read_back_matches(verify, updates)
 
         if not mismatches:
@@ -588,8 +637,7 @@ def run_auto_gp(
             )
             results.append(result)
             print(f"📋 GP_RESULT status={result.status} pen={pen} name={name} detail={result.detail}", flush=True)
-            break
-
+            continue
     confirmed = sum(1 for r in results if r.confirmed)
     no_change = sum(1 for r in results if r.status == "NO_CHANGE")
     previewed = sum(1 for r in results if r.status == "PREVIEW")
