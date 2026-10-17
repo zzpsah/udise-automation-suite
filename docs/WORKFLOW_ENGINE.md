@@ -23,13 +23,20 @@ Students, GP, EP, Facility, Completion, Issues.
 ### completion
 Current status and status-3 ready set.
 
-## GP
+## GP — all supported class scopes
 
-Blank-only defaults. Existing nonblank values are preserved.
+The GP workflow supports **IX, X, XI, and XII**, as well as grouped scopes offered by the current UI (IX+X, IX–XI, XI+XII, and all IX–XII). The selected class/group must be passed through to the runner; never silently fall back to Class IX. Run-scope selection is independent: **All students** or **First N students**.
 
-Existing CWSN=Yes → skip/manual review.
+1. Read current GP values for the selected scope and build a preview-bound approved plan.
+2. Propose only eligible blank/default fields. Existing nonblank values remain protected; stale preview values are skipped after a fresh pre-write read.
+3. Process the approved eligible changes first. If manual-only records are present, their queue must not block eligible students' save batch.
+4. After the automatic save batch finishes, show the remaining manual-input candidates. The operator may submit completed entries for a subset, skip one candidate, or choose **Skip All**.
+5. Skipping only defers those candidates; it must never create a GP write for them. The remaining manual queue can continue independently, and deferred candidates can be reconsidered in a fresh preview.
+6. Confirm writes only after fresh read-back. Keep each student's PEN/name, outcome, and reason visible; do not summarize a class with a misleading count of unresolved manual candidates as if all were blocked.
 
-GP payload requires identity block plus editable fields.
+Existing CWSN=Yes → skip/manual review. Required manual fields must come from verified school records; never invent student data.
+
+GP payload requires the portal identity block plus editable fields. These rules are shared across IX/X/XI/XII, while class-specific portal contracts still need to be respected.
 
 ## EP
 

@@ -128,6 +128,10 @@ AUTO GP defaults are applied **only when the portal value is blank**:
 
 If current CWSN is already **Yes**, AUTO GP makes no change for that student and marks the record for manual review.
 
+**Manual-review queue and result workbook:** GP handles eligible students independently from records that need manual input. The server processes the preview-approved eligible save plan first; the manual queue appears after that batch finishes. You can enter verified fields for the students ready to proceed, **Skip this student**, or **Skip All N Students**. Skipping defers candidates and sends no GP write for them. It must not cancel or rewrite the approved plan for other students. Deferred candidates can be reconsidered by generating a fresh preview. The activity panel's **Download Excel workbook** remains available for the job result; inspect student-level outcomes before starting another run. If you use a manually prepared workbook, verify it against the selected class and current roster before submitting anything.
+
+The GP class selector supports IX, X, XI, XII, grouped IX+X, IX–XI, XI+XII, and All IX–XII. The selected scope must be preserved from preview through save and read-back; a request for one class must never silently run against another class. This class-wide statement applies to GP only and must not be used to infer EP XI/XII support.
+
 AUTO GP has two independent scopes:
 
 - **Class scope:** IX, X, XI, XII, IX and X, IX to XI, XI and XII, All IX–XII.

@@ -33,3 +33,9 @@ If a write may have been transmitted but the client saw timeout/connection loss:
 - status 6 never re-finalized.
 - status 0/1/2/unknown never finalized.
 - Enrollment IX/X behavior unchanged while XI work is added.
+- GP manual review is independent of eligible approved-plan saves.
+- GP individual Skip and Skip All defer candidates without writing their data.
+- GP skip/queue lifecycle is covered for Class IX, X, XI, and XII.
+- GP grouped class scope is preserved from selector through job metadata; no implicit fallback to IX.
+- GP result workbook and activity events retain student identity, status, and actionable reason.
+- Manual review appears after the automatic save child reaches a terminal state; skipped students do not inflate the eligible save count.

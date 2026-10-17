@@ -95,6 +95,49 @@ def test_skip_manual_gp_candidate_defers_without_write() -> None:
         assert not (all_dir / "approved-plan.json").exists()
 
 
+def test_skip_all_supported_gp_classes() -> None:
+    """The manual GP queue lifecycle is class-agnostic for IX/X/XI/XII."""
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        os.environ["UDISE_CONTROL_STATE"] = str(root / "state")
+        os.environ["UDISE_CONTROL_RUNTIME"] = str(root / "runtime")
+        os.environ["UDISE_CONTROL_TOKEN_FILE"] = str(root / "token")
+        os.environ["UDISE_VPS_RUNNER"] = str(root / "runner")
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import importlib
+        from control_api import app
+        importlib.reload(app)
+        app.require_api = lambda authorization: None
+        now = int(time.time())
+        for index, class_name in enumerate(("IX", "X", "XI", "XII"), start=1):
+            job_id = f"{index:032x}"
+            write_job_id = f"{index + 100:032x}"
+            with app._db() as conn:
+                conn.execute(
+                    "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,auto_write_job_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (job_id, now, now, "awaiting_input", "gp", class_name, "school", "session", 1, "Manual review pending", write_job_id),
+                )
+                conn.execute(
+                    "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,approved_from) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (write_job_id, now, now, "queued", "gp", class_name, "school", "session", 0, "Approved plan queued", job_id),
+                )
+            job_dir = app.JOBS / job_id
+            job_dir.mkdir(parents=True, exist_ok=True)
+            pending = {f"PEN-{class_name}": {"pen": f"PEN-{class_name}", "name": f"Student {class_name}", "fields": ["address"]}}
+            (job_dir / "gp-manual-pending.json").write_text(json.dumps(pending), encoding="utf-8")
+            result = app.skip_gp_manual_student(job_id, {"skip_all": True}, authorization="test")
+            left = json.loads((job_dir / "gp-manual-pending.json").read_text(encoding="utf-8"))
+            deferred = json.loads((job_dir / "gp-manual-skipped.json").read_text(encoding="utf-8"))
+            assert result["skip_all"] is True, class_name
+            assert result["remaining_students"] == 0, class_name
+            assert result["write_job_id"] == write_job_id, class_name
+            assert left == {} and f"PEN-{class_name}" in deferred, class_name
+            with app._db() as conn:
+                stored_class = conn.execute("SELECT class_name FROM jobs WHERE id=?", (job_id,)).fetchone()["class_name"]
+            assert stored_class == class_name, class_name
+
+
 if __name__ == "__main__":
     test_skip_manual_gp_candidate_defers_without_write()
-    print("1/1 passed")
+    test_skip_all_supported_gp_classes()
+    print("2/2 passed")

@@ -1,5 +1,11 @@
 # Project History
 
+## 2026-10-17 — GP manual queue and class-wide documentation
+- Added **Skip All** for GP manual-review candidates; skipped candidates are deferred with no write request.
+- GP eligible approved-plan saves run before the manual-review queue is surfaced; the independent save plan is preserved.
+- Documented GP class scope IX/X/XI/XII and supported grouped scopes across workflow, operator, and handoff instructions. This does not expand EP XI/XII support.
+- Added regression expectations for each single-class GP scope and for downloaded per-student results.
+
 ## 2026-09-23
 - v2.7.3 established as maintained baseline.
 - Preferred AUTO GP UI retained.

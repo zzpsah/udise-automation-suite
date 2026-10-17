@@ -144,6 +144,14 @@ Write workflows now use a server-side durable transition. The UI sends auto_save
 
 The write child performs a fresh pre-write read, one permitted POST per eligible record, and fresh read-back verification. Browser refresh/background suspension/disconnect does not cancel the server-side write child. The existing manual approval endpoint remains available as a recovery path. Read-only jobs never create a write child.
 
+### GP manual review and class coverage — 17 October 2026
+
+The GP UI supports the API's class scopes IX, X, XI, XII and the grouped scopes offered by the selector (IX+X, IX–XI, XI+XII, all IX–XII). Keep the selected class/group bound to the job all the way through preview, approved plan, write child, and read-back; never assume a class selector alone proves another module's support.
+
+When a GP preview has both eligible approved changes and candidates requiring manual input, the approved write batch is processed first. The manual-input UI is shown after that batch reaches a terminal state. Operators can submit complete verified fields for a subset, skip one candidate, or **Skip All**. Skip operations only move candidates to the deferred list; they must not submit those students' data or modify the separate approved-plan write. Deferred candidates can be reconsidered by generating a fresh preview. A manual candidate count is not the same as the count of eligible students remaining to save. Preserve per-student PEN/name/status/reason and inspect the downloaded result workbook.
+
+Regression coverage must include Skip All and the manual queue lifecycle for each single-class scope (IX, X, XI, XII), plus the UI/build checks. Synthetic tests do not prove a live portal write; record live evidence separately.
+
 ### Full Snapshot class scope
 
 The Control API now forwards the selected class as --class <IX|X|XI|XII> to the snapshot runner. This fixes the previous risk where a Class X request could use the runner's default/Class IX scope. Regression coverage verifies all four class selectors and confirms snapshot remains read-only.

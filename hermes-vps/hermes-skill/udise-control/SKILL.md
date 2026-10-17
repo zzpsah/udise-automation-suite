@@ -142,3 +142,12 @@ operational scripts directly.
 - Never blindly retry writes.
 - A POST is never considered saved without fresh read-back.
 - Class XI/XII EP remains blocked until portal support is freshly verified.
+
+## General Profile manual review and class scope
+
+- GP supports the class scopes returned by `capabilities` (currently IX, X, XI, XII and supported grouped scopes). Pass the exact selected scope; never silently substitute IX.
+- The approved eligible GP save batch must run before presenting the manual-input queue. Keep these counts separate: eligible approved changes, saved/verified changes, and manual-review candidates.
+- Manual GP fields must be taken from verified school records. Submit only students whose required fields are complete; other candidates must remain pending and must not block the submitted subset.
+- Offer the UI's **Skip this student** or **Skip All** action when available. These actions defer candidates only; they do not write GP data for skipped students and must not alter the separate approved-plan save job.
+- After saves, inspect the result workbook and preserve each student's PEN, name, status, and actionable reason. A successful HTTP response alone is not proof of save; fresh read-back is required.
+- These GP class scopes do not imply that EP supports XI/XII; follow the capabilities response and module-specific portal verification.
