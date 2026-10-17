@@ -1247,6 +1247,17 @@ def _queue_automatic_write(preview_job_id: str) -> str:
         plan_path = JOBS / preview_job_id / "approved-plan.json"
         if preview["stage"] in {"gp", "ep"} and plan_path.is_file():
             plan = _json_read(plan_path)
+            # Defense in depth: never let a stale/malformed GP plan include
+            # students that the authoritative manual queue still marks pending.
+            if preview["stage"] == "gp" and isinstance(plan, dict):
+                pending_path = JOBS / preview_job_id / "gp-manual-pending.json"
+                pending = _json_read(pending_path) if pending_path.is_file() else {}
+                if isinstance(pending, dict) and pending:
+                    overlap = set(plan).intersection(pending)
+                    if overlap:
+                        plan = {key: value for key, value in plan.items() if key not in pending}
+                        _json_write(plan_path, plan)
+                        _event(preview_job_id, f"GP-MANUAL-INPUT: excluded {len(overlap)} pending student(s) from the automatic write plan.")
             if not isinstance(plan, dict) or not plan:
                 _event(preview_job_id, "ℹ️ No eligible changes in the approved preview plan; no write job was created.")
                 with _db() as conn:
@@ -1711,7 +1722,14 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
     allowed = {"address", "pincode", "minorityId"}
     errors = []
     cleaned = {}
-    for key, item in pending.items():
+    # Partial review is intentional: validate only students the operator
+    # actually submitted. Other students remain pending and must not block
+    # an independent manual batch.
+    selected_keys = [key for key in submitted if key in pending]
+    if not selected_keys:
+        raise HTTPException(400, "Complete the required fields for at least one student before saving")
+    for key in selected_keys:
+        item = pending[key]
         values = submitted.get(key)
         if not isinstance(values, dict):
             errors.append(f"{item.get('name') or key}: enter all required fields")
@@ -1768,12 +1786,20 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
              preview["session_id"], 0, "Manual GP subset approved; save and read-back verification queued",
              job_id, now, int(preview["max_submissions"] or 0), 0),
         )
-        conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=? WHERE id=?",
-                     (now, "Manual values validated; manual subset queued separately.", job_id))
-    _json_write(pending_path, {})
-    _event(job_id, f"GP-MANUAL-INPUT: verified values accepted for {len(manual_write_plan)} student(s); queued as a separate write batch.")
+    remaining = {key: item for key, item in pending.items() if key not in selected_keys}
+    _json_write(pending_path, remaining)
+    if remaining:
+        _event(job_id, f"GP-MANUAL-INPUT: {len(manual_write_plan)} student(s) queued separately; {len(remaining)} student(s) remain pending. You can continue without filling them.")
+        with _db() as conn:
+            conn.execute("UPDATE jobs SET status='awaiting_input',updated_at=?,message=? WHERE id=?",
+                         (now, f"Manual GP batch queued; {len(remaining)} student(s) still need input.", job_id))
+    else:
+        _event(job_id, f"GP-MANUAL-INPUT: all pending manual entries submitted in {len(manual_write_plan)} student(s); queued as a separate write batch.")
+        with _db() as conn:
+            conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=? WHERE id=?",
+                         (now, "All manual entries submitted; manual batch queued separately.", job_id))
     threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
-    return {"job_id": job_id, "write_job_id": write_job_id, "students": len(manual_write_plan), "queued": True}
+    return {"job_id": job_id, "write_job_id": write_job_id, "students": len(manual_write_plan), "remaining_students": len(remaining), "queued": True}
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")

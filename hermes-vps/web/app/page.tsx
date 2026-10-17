@@ -9,7 +9,7 @@ type JobState={job:{id:string;status:string;stage:string;class_name?:string;prev
 
 function manualPendingForJob(state:JobState|null|undefined):Record<string,ManualGpStudent>{
   const direct=state?.job?.gp_manual_pending;
-  if(direct&&Object.keys(direct).length) return direct;
+  if(direct) return direct;
   // Compatibility fallback for API proxies/deployments that return the GP event
   // stream but omit the pending JSON property. The server still validates every
   // submitted value against its authoritative pending file before queuing writes.
@@ -400,9 +400,17 @@ export default function Page(){
     setManualGpBusy(true);
     setMsg("Validating manual GP fields for each student…");
     const students:Record<string,Record<string,string>>={};
+    const incomplete:string[]=[];
     for(const [key,item] of Object.entries(pending)){
-      students[key]={};
-      for(const field of item.fields) students[key][field]=manualGpValues[key]?.[field]||"";
+      const values:Record<string,string>={};
+      for(const field of item.fields) values[field]=manualGpValues[key]?.[field]||"";
+      if(item.fields.every(field=>Boolean(values[field].trim()))) students[key]=values;
+      else if(item.fields.some(field=>Boolean(values[field].trim()))) incomplete.push(item.name||key);
+    }
+    if(!Object.keys(students).length){
+      setManualGpBusy(false);
+      setMsg(incomplete.length?`Finish all required fields for at least one student: ${incomplete.join(", ")}. Other students can remain untouched.`:"Fill all required fields for at least one student, then save. You do not need to fill every student.");
+      return;
     }
     const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/submit-gp-manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({students})});
     const d=await r.json().catch(()=>({}));
@@ -412,8 +420,10 @@ export default function Page(){
       setMsg(clientFailure("UDISE General Profile","Validate manual fields",errors||d.detail?.message||d.detail||d.error||"Unknown error"));
       return;
     }
-    setMsg("Manual fields validated. Verified GP saves are now running for the reviewed batch.");
-    if(d.write_job_id) setJobId(d.write_job_id);
+    setMsg(`Queued ${d.students} reviewed student(s) for save and verification.${d.remaining_students?` ${d.remaining_students} student(s) remain pending; fill them only when ready.`:" No manual entries remain."}`);
+    // Keep the parent preview open while manual students remain so the operator
+    // can submit another subset without waiting for every student's details.
+    if(d.write_job_id && !d.remaining_students) setJobId(d.write_job_id);
   }
 
   async function startJob(){
@@ -455,7 +465,7 @@ export default function Page(){
           return next;
         });
       }
-      if(d.job.auto_write_job_id){
+      if(d.job.auto_write_job_id && !Object.keys(manualPendingForJob(d)).length){
         const limit=Number(d.job.max_submissions); setMsg(`Preview verified. Server-side save is queued for ${limit===0?"all eligible":`up to ${limit}`} record(s); browser connection is no longer required.`);
         if(d.job.auto_write_job_id!==jobId){
           setJobId(d.job.auto_write_job_id);
@@ -585,7 +595,7 @@ export default function Page(){
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
           {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&Object.keys(manualPendingForJob(job)).length>0&&<section className="gp-manual-review" aria-label="General Profile manual review">
             <div className="gp-manual-heading"><strong>Manual fields needed</strong><span>{Object.keys(manualPendingForJob(job)).length} student(s) · Autofilled fields are hidden</span></div>
-            <p>Enter verified school-record information only. Each student has a separate table; no changes will be submitted until you select Save reviewed batch.</p>
+            <p>Enter verified school-record information only. Complete the required fields for just the student(s) you are ready to review; leave other students blank and they will remain pending without blocking the batch.</p>
             {Object.entries(manualPendingForJob(job)).map(([key,item],index)=><article className="gp-student-review" key={key}>
               <div className="gp-student-title"><strong>{index+1}. {item.name||"Student"}</strong><span>PEN: {item.pen||key}</span>{item.father_name&&<small>Father: {item.father_name}</small>}</div>
               <table className="gp-manual-table"><thead><tr><th>Required field</th><th>Enter verified value</th></tr></thead><tbody>
@@ -595,8 +605,8 @@ export default function Page(){
                    field==="minorityId"?<select aria-label={`${item.name} minority type`} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))}><option value="">Select option</option><option value="1">Muslim</option><option value="2">Christian</option><option value="3">Sikh</option><option value="4">Buddhist</option><option value="5">Jain</option><option value="6">Zoroastrian</option><option value="7">Not applicable</option></select>:<input aria-label={`${item.name} ${field}`} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))}/>}</td></tr>)}
               </tbody></table>
             </article>)}
-            <button type="button" className="run-button" onClick={submitManualGpFields} disabled={manualGpBusy}>{manualGpBusy?"Validating…":"Save reviewed batch and continue"}</button>
-            <small>All required fields are validated before any write job is queued. The system then verifies each student's saved values.</small>
+            <button type="button" className="run-button" onClick={submitManualGpFields} disabled={manualGpBusy}>{manualGpBusy?"Validating…":"Save completed student entries and continue"}</button>
+            <small>Only students with all their required fields completed are submitted. Other students stay in the pending queue. Values are validated before a separate write job is queued, then each save is verified by read-back.</small>
           </section>}
           <ul className="events" aria-live="polite">{job.events.slice(-50).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{String(e.message||"").replace(/^LIVE\s*[·•:-]\s*/i,"")}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
