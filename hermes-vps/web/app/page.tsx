@@ -6,6 +6,23 @@ type SchoolPreset={internal_id:string;udise_code:string;name:string};
 type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
 type ManualGpStudent={pen:string;student_id:string;name:string;father_name?:string;fields:string[]};
 type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;auto_write_job_id?:string;error?:string;gp_manual_pending?:Record<string,ManualGpStudent>};events:{id:number;message:string;level:string}[]};
+
+function manualPendingForJob(state:JobState|null|undefined):Record<string,ManualGpStudent>{
+  const direct=state?.job?.gp_manual_pending;
+  if(direct&&Object.keys(direct).length) return direct;
+  // Compatibility fallback for API proxies/deployments that return the GP event
+  // stream but omit the pending JSON property. The server still validates every
+  // submitted value against its authoritative pending file before queuing writes.
+  const fallback:Record<string,ManualGpStudent>={};
+  if(state?.job?.stage!=="gp"||state.job.status!=="awaiting_input") return fallback;
+  for(const event of state.events||[]){
+    const m=String(event.message||"").match(/GP-MANUAL-INPUT:\s*([0-9]+)\s*-\s*(.*?)\s*-\s*Required fields:\s*(address(?:,\s*pincode)?(?:,\s*minorityId)?|pincode(?:,\s*minorityId)?|minorityId)\s*$/i);
+    if(!m) continue;
+    const fields=m[3].split(",").map(x=>x.trim()).filter(Boolean);
+    fallback[m[1]]={pen:m[1],student_id:"",name:m[2].trim(),fields};
+  }
+  return fallback;
+}
 type EshikshaPreview={ready:boolean;source:string;school_name:string;udise:string;total:number;class_counts:Record<string,number>;preview_limit:number;rows:Array<Record<string,string>>};
 
 const HERMES_FLOW_REFERENCE: Record<string,string> = {
@@ -377,11 +394,13 @@ export default function Page(){
   }
 
   async function submitManualGpFields(){
-    if(!jobId||manualGpBusy||!job?.job.gp_manual_pending) return;
+    if(!jobId||manualGpBusy) return;
+    const pending=manualPendingForJob(job);
+    if(!Object.keys(pending).length) return;
     setManualGpBusy(true);
     setMsg("Validating manual GP fields for each student…");
     const students:Record<string,Record<string,string>>={};
-    for(const [key,item] of Object.entries(job.job.gp_manual_pending)){
+    for(const [key,item] of Object.entries(pending)){
       students[key]={};
       for(const field of item.fields) students[key][field]=manualGpValues[key]?.[field]||"";
     }
@@ -425,7 +444,7 @@ export default function Page(){
       if(!r.ok) return;
       const d=await r.json();
       setJob(d);
-      const pending=d.job.gp_manual_pending as Record<string,ManualGpStudent>|undefined;
+      const pending=manualPendingForJob(d as JobState);
       if(pending&&Object.keys(pending).length){
         setManualGpValues(previous=>{
           const next={...previous};
@@ -564,10 +583,10 @@ export default function Page(){
         {job&&<div className="job-output">
           {String(job.job.message||msg).startsWith("RESULT_TABLE") ? (()=>{const rows=String(job.job.message||"").split("\n").slice(1).filter(Boolean).map(x=>x.split("|")); return <table className="result-table"><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=>i===0?<th key={j}>{c}</th>:<td key={j}>{c}</td>)}</tr>)}</tbody></table>})() : <div className="friendly-message">{job.job.message||msg}</div>}
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
-          {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&job.job.gp_manual_pending&&Object.keys(job.job.gp_manual_pending).length>0&&<section className="gp-manual-review" aria-label="General Profile manual review">
-            <div className="gp-manual-heading"><strong>Manual fields needed</strong><span>{Object.keys(job.job.gp_manual_pending).length} student(s) · Autofilled fields are hidden</span></div>
+          {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&Object.keys(manualPendingForJob(job)).length>0&&<section className="gp-manual-review" aria-label="General Profile manual review">
+            <div className="gp-manual-heading"><strong>Manual fields needed</strong><span>{Object.keys(manualPendingForJob(job)).length} student(s) · Autofilled fields are hidden</span></div>
             <p>Enter verified school-record information only. Each student has a separate table; no changes will be submitted until you select Save reviewed batch.</p>
-            {Object.entries(job.job.gp_manual_pending).map(([key,item],index)=><article className="gp-student-review" key={key}>
+            {Object.entries(manualPendingForJob(job)).map(([key,item],index)=><article className="gp-student-review" key={key}>
               <div className="gp-student-title"><strong>{index+1}. {item.name||"Student"}</strong><span>PEN: {item.pen||key}</span>{item.father_name&&<small>Father: {item.father_name}</small>}</div>
               <table className="gp-manual-table"><thead><tr><th>Required field</th><th>Enter verified value</th></tr></thead><tbody>
                 {item.fields.map(field=><tr key={field}><th scope="row">{field==="address"?"Address":field==="pincode"?"PIN code":field==="minorityId"?"Minority type":field}</th><td>
