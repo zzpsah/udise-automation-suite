@@ -270,10 +270,31 @@ def test_manual_gp_address_validation_matches_udise_portal() -> None:
         assert saved["PEN1"]["changes"]["address"] == "Jale, Darbhanga, Bihar"
 
 
+def test_approved_gp_batch_only_processes_allowlisted_students() -> None:
+    """A one-student manual batch must not count the other class students as outcomes."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from udise_vps.general_profile import filter_approved_gp_students
+    students = [
+        {"studentCodeNat": "PEN1", "studentId": "S1"},
+        {"studentCodeNat": "PEN2", "studentId": "S2"},
+        {"studentCodeNat": "PEN3", "studentId": "S3"},
+    ]
+    batch, excluded = filter_approved_gp_students(students, {"PEN2": {"changes": {"address": "Verified"}}})
+    assert batch == [students[1]]
+    assert excluded == 2
+    # Student-ID keys are also supported by approved plans.
+    batch, excluded = filter_approved_gp_students(students, {"S3": {"changes": {"address": "Verified"}}})
+    assert batch == [students[2]] and excluded == 2
+    # Preview mode without an approved plan retains the original class scope.
+    batch, excluded = filter_approved_gp_students(students, None)
+    assert batch == students and excluded == 0
+
+
 if __name__ == "__main__":
     test_skip_manual_gp_candidate_defers_without_write()
     test_skip_all_supported_gp_classes()
     test_job_dict_hides_manual_queue_during_auto_save_initialization()
     test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale()
     test_manual_gp_address_validation_matches_udise_portal()
-    print("5/5 passed")
+    test_approved_gp_batch_only_processes_allowlisted_students()
+    print("6/6 passed")

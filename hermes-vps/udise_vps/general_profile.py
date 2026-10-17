@@ -407,6 +407,19 @@ def read_back_matches(fresh: dict, expected: dict) -> list:
     return mismatches
 
 
+def filter_approved_gp_students(students: list[dict], approved_plan: dict | None) -> tuple[list[dict], int]:
+    """Limit an approved write run to its explicit PEN/student-ID allow-list."""
+    if approved_plan is None:
+        return list(students), 0
+    keys = {str(key).strip() for key in approved_plan}
+    matched = [
+        student for student in students
+        if str(student.get("studentCodeNat") or "").strip() in keys
+        or str(student.get("studentId") or student.get("id") or "").strip() in keys
+    ]
+    return matched, len(students) - len(matched)
+
+
 def run_auto_gp(
     session,
     *,
@@ -450,10 +463,18 @@ def run_auto_gp(
     if approved_plan is not None:
         pen_matches = sum(1 for student in selected if str(student.get("studentCodeNat") or "").strip() in approved_plan)
         sid_matches = sum(1 for student in selected if str(student.get("studentId") or student.get("id") or "").strip() in approved_plan)
+        # An approved plan is an explicit allow-list. Iterating all 128 students
+        # and labeling every non-member "not-in-plan" polluted a one-student
+        # manual batch with 127 irrelevant outcomes and hid the actual result.
+        # Only execute/read-back the students actually approved for this batch.
+        selected, excluded_outside_plan = filter_approved_gp_students(selected, approved_plan)
         print(
-            f"📋 GP approved plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches}",
+            f"📋 GP approved plan: entries={len(approved_plan)} | PEN matches={pen_matches} | student-ID matches={sid_matches} | "
+            f"batch students={len(selected)} | excluded outside plan={excluded_outside_plan} (not attempted)",
             flush=True,
         )
+        if not selected:
+            raise ValueError("Approved GP plan has no students matching the selected class/session; no writes attempted.")
 
     for position, student in enumerate(selected, 1):
         sid = str(student.get("studentId") or student.get("id") or "").strip()
@@ -753,7 +774,7 @@ def run_auto_gp(
     if previewed:
         print(f"👁️  Preview only      : {previewed}")
     if other:
-        print(f"⚠️  Other (see GP_RESULT events above) : {other}")
+        print(f"⚠️  Other (inspect per-student GP result events above) : {other}")
     print("━" * 30)
 
     return results
