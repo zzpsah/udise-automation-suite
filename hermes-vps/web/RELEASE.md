@@ -9,6 +9,9 @@ The console header and browser title use app/release.ts as the single source of 
 
 
 ## v2026.10.17.4 — 17 Oct 2026
-- Fix production Oracle connectivity by routing the control API through standard HTTPS (443), since Vercel requests to port 10000 were timing out.
-- Add the /api/v1 and /session path proxies on the existing HTTPS endpoint without replacing its root handler or the existing Funnel ports.
-- Update the Oracle public session URL to standard HTTPS so the existing-browser-session fallback opens on the correct host.
+- Diagnosed Vercel timeouts to the Tailscale Funnel upstream on ports 10000 and 443. The HTTPS path routing was validated locally, but Vercel still could not reach the Funnel endpoint.
+
+## v2026.10.17.5 — 17 Oct 2026
+- Route the production web app through a Cloudflare Quick Tunnel to the Oracle Control API after confirming Vercel cannot reach the Tailscale Funnel endpoint.
+- Use the same public upstream for secure browser-session fallback links.
+- Operational caveat: Cloudflare Quick Tunnels have no uptime guarantee and issue a new hostname if the tunnel process is restarted; replace with a named Cloudflare Tunnel for a durable production setup.
