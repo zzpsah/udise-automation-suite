@@ -1832,22 +1832,30 @@ def skip_gp_manual_student(job_id: str, body: dict, authorization: str | None = 
         raise HTTPException(404, "GP preview job not found")
     if preview["stage"] != "gp" or not bool(preview["preview"]) or preview["status"] != "awaiting_input":
         raise HTTPException(409, "Only a GP preview awaiting manual input can skip a candidate")
+    skip_all = bool(body.get("skip_all")) if isinstance(body, dict) else False
     key = str(body.get("student_key") or "").strip() if isinstance(body, dict) else ""
     job_dir = JOBS / job_id
     pending_path = job_dir / "gp-manual-pending.json"
     skipped_path = job_dir / "gp-manual-skipped.json"
     pending = _json_read(pending_path) if pending_path.is_file() else {}
-    if not isinstance(pending, dict) or key not in pending:
-        raise HTTPException(404, "This candidate is no longer in the manual GP queue")
-    item = pending.pop(key)
+    if not isinstance(pending, dict) or not pending:
+        raise HTTPException(404, "No students remain in the manual GP queue")
+    if skip_all:
+        deferred_items = dict(pending)
+        pending = {}
+    else:
+        if key not in pending:
+            raise HTTPException(404, "This candidate is no longer in the manual GP queue")
+        deferred_items = {key: pending.pop(key)}
     skipped = _json_read(skipped_path) if skipped_path.is_file() else {}
     if not isinstance(skipped, dict):
         skipped = {}
-    skipped[key] = {**item, "deferred_at": int(time.time()), "reason": "Skipped by operator; no GP write was sent"}
+    now = int(time.time())
+    for deferred_key, item in deferred_items.items():
+        skipped[deferred_key] = {**item, "deferred_at": now, "reason": "Skipped by operator; no GP write was sent"}
+        _event(job_id, f"GP-MANUAL-SKIPPED: {str(item.get('pen') or deferred_key)} - {str(item.get('name') or 'Student')} - Deferred by operator; no GP fields were submitted and no write was sent.")
     _json_write(skipped_path, skipped)
     _json_write(pending_path, pending)
-    _event(job_id, f"GP-MANUAL-SKIPPED: {str(item.get('pen') or key)} - {str(item.get('name') or 'Student')} - Deferred by operator; no GP fields were submitted and no write was sent.")
-    now = int(time.time())
     write_job_id = str(preview["auto_write_job_id"] or "").strip()
     if write_job_id:
         with _db() as conn:
@@ -1855,7 +1863,7 @@ def skip_gp_manual_student(job_id: str, body: dict, authorization: str | None = 
         if not child:
             write_job_id = ""
     if pending:
-        message = f"Candidate deferred; {len(pending)} student(s) remain for manual GP review. Skipped candidates were not changed."
+        message = f"{len(deferred_items)} candidate(s) deferred; {len(pending)} student(s) remain for manual GP review. Deferred students were not changed."
         status = "awaiting_input"
     elif write_job_id:
         message = f"Manual GP queue cleared. {len(skipped)} candidate(s) deferred without writes. The approved-plan save job is {write_job_id[:8]}; review its result for saved, stale, failed, or limit-reached entries."
@@ -1865,7 +1873,7 @@ def skip_gp_manual_student(job_id: str, body: dict, authorization: str | None = 
         status = "completed"
     with _db() as conn:
         conn.execute("UPDATE jobs SET status=?,updated_at=?,message=? WHERE id=?", (status, now, message, job_id))
-    return {"job_id": job_id, "skipped": True, "student_key": key, "remaining_students": len(pending), "deferred_students": len(skipped), "status": status, "write_job_id": write_job_id or None, "message": message}
+    return {"job_id": job_id, "skipped": True, "skip_all": skip_all, "skipped_now": len(deferred_items), "student_key": key or None, "remaining_students": len(pending), "deferred_students": len(skipped), "status": status, "write_job_id": write_job_id or None, "message": message}
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")
@@ -1934,6 +1942,14 @@ def _job_dict(row: sqlite3.Row) -> dict:
         except Exception:
             pending = {}
         d["gp_manual_pending"] = pending if isinstance(pending, dict) else {}
+        child_id = str(d.get("auto_write_job_id") or "").strip()
+        if child_id:
+            with _db() as conn:
+                child = conn.execute("SELECT status,message FROM jobs WHERE id=? AND approved_from=?", (child_id, str(d.get("id")))).fetchone()
+            d["auto_write_job_status"] = str(child["status"]) if child else "missing"
+            d["auto_write_job_message"] = str(child["message"] or "") if child else "Automatic save job was not found."
+        else:
+            d["auto_write_job_status"] = None
     return d
 
 

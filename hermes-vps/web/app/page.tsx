@@ -5,7 +5,7 @@ type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires
 type SchoolPreset={internal_id:string;udise_code:string;name:string};
 type Caps={classes:{id:string;label:string}[];stages:Stage[];school_presets?:SchoolPreset[]};
 type ManualGpStudent={pen:string;student_id:string;name:string;father_name?:string;fields:string[]};
-type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;auto_write_job_id?:string;error?:string;gp_manual_pending?:Record<string,ManualGpStudent>};events:{id:number;message:string;level:string}[]};
+type JobState={job:{id:string;status:string;stage:string;class_name?:string;preview:number;approved_from?:string;max_submissions?:number;progress_current:number;progress_total:number;message:string;has_result:boolean;auto_write_job_id?:string;auto_write_job_status?:string|null;auto_write_job_message?:string;error?:string;gp_manual_pending?:Record<string,ManualGpStudent>};events:{id:number;message:string;level:string}[]};
 
 function manualPendingForJob(state:JobState|null|undefined):Record<string,ManualGpStudent>{
   const direct=state?.job?.gp_manual_pending;
@@ -414,6 +414,26 @@ export default function Page(){
     if(!d.remaining_students&&d.write_job_id){setJobId(d.write_job_id);setMsg(`${d.deferred_students||0} candidate(s) skipped without writes. Continuing to approved-plan save job ${d.write_job_id.slice(0,8)}; review its verified results.`)}
   }
 
+  async function skipAllManualGpStudents(){
+    if(!jobId||manualGpSkipBusy||manualGpBusy) return;
+    const pending=manualPendingForJob(job);
+    const count=Object.keys(pending).length;
+    if(!count) return;
+    const ok=window.confirm(`Skip all ${count} students currently awaiting manual GP input? Their GP data will not be written. The already-approved eligible students will still be processed.`);
+    if(!ok) return;
+    setManualGpSkipBusy("__all__");
+    setMsg(`Deferring all ${count} manual GP candidates; eligible approved-plan entries remain unchanged…`);
+    const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/skip-gp-manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({skip_all:true})});
+    const d=await r.json().catch(()=>({}));
+    setManualGpSkipBusy(null);
+    if(!r.ok){setMsg(clientFailure("UDISE General Profile","Skip all manual candidates",d.detail||d.error||"Unknown error"));return;}
+    setManualGpValues(previous=>{const next={...previous};for(const key of Object.keys(pending))delete next[key];return next;});
+    const refreshed=await fetch("/api/jobs/"+encodeURIComponent(jobId),{cache:"no-store"});
+    if(refreshed.ok)setJob(await refreshed.json());
+    if(d.write_job_id){setJobId(d.write_job_id);setMsg(`Skipped ${d.skipped_now} manual candidate(s) without writes. Continuing approved-plan save job ${d.write_job_id.slice(0,8)}.`);}
+    else setMsg(d.message||`Skipped ${d.skipped_now} manual candidate(s). No data was written for those students.`);
+  }
+
   async function submitManualGpFields(){
     if(!jobId||manualGpBusy) return;
     const pending=manualPendingForJob(job);
@@ -614,9 +634,11 @@ export default function Page(){
         {job&&<div className="job-output">
           {String(job.job.message||msg).startsWith("RESULT_TABLE") ? (()=>{const rows=String(job.job.message||"").split("\n").slice(1).filter(Boolean).map(x=>x.split("|")); return <table className="result-table"><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=>i===0?<th key={j}>{c}</th>:<td key={j}>{c}</td>)}</tr>)}</tbody></table>})() : <div className="friendly-message">{job.job.message||msg}</div>}
           {job.job.progress_total>0&&<><div className="progress"><div style={{width:pct+"%"}}/></div><p className="progress-copy"><strong>{pct}%</strong><span>{job.job.progress_current}/{job.job.progress_total} students</span></p></>}
-          {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&Object.keys(manualPendingForJob(job)).length>0&&<section className="gp-manual-review" aria-label="General Profile manual review">
+          {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&job.job.auto_write_job_id&&job.job.auto_write_job_status!=="completed"&&job.job.auto_write_job_status!=="failed"&&<div className="friendly-message">Processing the approved GP changes first. Manual review will appear after this save batch finishes. Save job: {job.job.auto_write_job_status||"queued"}.</div>}
+          {job.job.stage==="gp"&&job.job.status==="awaiting_input"&&(!job.job.auto_write_job_id||["completed","failed","missing"].includes(String(job.job.auto_write_job_status)))&&Object.keys(manualPendingForJob(job)).length>0&&<section className="gp-manual-review" aria-label="General Profile manual review">
             <div className="gp-manual-heading"><strong>Manual fields needed</strong><span>{Object.keys(manualPendingForJob(job)).length} student(s) · Autofilled fields are hidden</span></div>
             <p>Enter verified school-record information only. Complete the required fields for just the student(s) you are ready to review; leave other students blank and they will remain pending without blocking the batch.</p>
+            <div className="gp-manual-actions"><button type="button" className="secondary-button" onClick={skipAllManualGpStudents} disabled={manualGpBusy||manualGpSkipBusy!==null}>{manualGpSkipBusy==="__all__"?"Skipping all…":`Skip All ${Object.keys(manualPendingForJob(job)).length} Students`}</button></div>
             {Object.entries(manualPendingForJob(job)).map(([key,item],index)=><article className="gp-student-review" key={key}>
               <div className="gp-student-title"><strong>{index+1}. {item.name||"Student"}</strong><span>PEN: {item.pen||key}</span>{item.father_name&&<small>Father: {item.father_name}</small>}<button type="button" className="secondary-button" onClick={()=>skipManualGpStudent(key,item)} disabled={manualGpBusy||manualGpSkipBusy!==null}>{manualGpSkipBusy===key?"Skipping…":"Skip this student"}</button></div>
               <table className="gp-manual-table"><thead><tr><th>Required field</th><th>Enter verified value</th></tr></thead><tbody>

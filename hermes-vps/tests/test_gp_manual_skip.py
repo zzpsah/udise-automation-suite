@@ -65,6 +65,35 @@ def test_skip_manual_gp_candidate_defers_without_write() -> None:
         assert final_status == "completed"
         assert "approved-plan save job" in final["message"]
 
+        # Skip All must defer every currently pending candidate in one request,
+        # while preserving the independent approved-plan save job.
+        all_job_id = "a" * 32
+        all_write_job_id = "b" * 32
+        with app._db() as conn:
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,auto_write_job_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (all_job_id, now, now, "awaiting_input", "gp", "X", "school", "session", 1, "Manual review pending", all_write_job_id),
+            )
+            conn.execute(
+                "INSERT INTO jobs(id,created_at,updated_at,status,stage,class_name,school,session_id,preview,message,approved_from) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (all_write_job_id, now, now, "queued", "gp", "X", "school", "session", 0, "Approved plan queued", all_job_id),
+            )
+        all_dir = app.JOBS / all_job_id
+        all_dir.mkdir(parents=True, exist_ok=True)
+        all_pending = {f"PEN{i}": {"pen": f"PEN{i}", "name": f"Student {i}", "fields": ["address"]} for i in range(3)}
+        (all_dir / "gp-manual-pending.json").write_text(json.dumps(all_pending), encoding="utf-8")
+        all_result = app.skip_gp_manual_student(all_job_id, {"skip_all": True}, authorization="test")
+        left = json.loads((all_dir / "gp-manual-pending.json").read_text(encoding="utf-8"))
+        deferred_all = json.loads((all_dir / "gp-manual-skipped.json").read_text(encoding="utf-8"))
+        with app._db() as conn:
+            all_status = conn.execute("SELECT status FROM jobs WHERE id=?", (all_job_id,)).fetchone()["status"]
+        assert all_result["skip_all"] is True and all_result["skipped_now"] == 3
+        assert all_result["remaining_students"] == 0 and all_result["write_job_id"] == all_write_job_id
+        assert left == {} and set(deferred_all) == set(all_pending)
+        assert all_status == "completed"
+        # Skip All must not modify the independent approved write plan.
+        assert not (all_dir / "approved-plan.json").exists()
+
 
 if __name__ == "__main__":
     test_skip_manual_gp_candidate_defers_without_write()
