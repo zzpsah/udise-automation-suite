@@ -1,5 +1,6 @@
 import "./styles.css";
-export const metadata = { title: "UDISE Operations Console", description: "Private Hermes VPS workflow console for UDISE operations" };
+import { APP_RELEASE } from "./release";
+export const metadata = { title: `UDISE Operations Console · v${APP_RELEASE.version}`, description: `UDISE Operations Console, release v${APP_RELEASE.version} dated ${APP_RELEASE.date}` };
 export default function RootLayout({children}:{children:React.ReactNode}) {
   return <html lang="en"><body>{children}</body></html>;
 }

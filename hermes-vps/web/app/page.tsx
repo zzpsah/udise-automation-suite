@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { APP_RELEASE } from "./release";
 
 type Stage={id:string;label:string;mode:"read"|"write";classes:string[];requires_class:boolean;description:string;preview_enabled?:boolean;approval_enabled?:boolean};
 type SchoolPreset={internal_id:string;udise_code:string;name:string};
@@ -96,6 +97,7 @@ export default function Page(){
   const [rememberUdise,setRememberUdise]=useState(false);
   const [captcha,setCaptcha]=useState("");
   const [captchaNonce,setCaptchaNonce]=useState(0);
+  const [captchaError,setCaptchaError]=useState("");
   const [loginBusy,setLoginBusy]=useState(false);
   const [eshikshaToken,setEshikshaToken]=useState("");
   const [eshikshaUrl,setEshikshaUrl]=useState("");
@@ -183,14 +185,24 @@ export default function Page(){
   async function beginUdiseLogin(){
     setLoginBusy(true);
     setCaptcha("");
+    setCaptchaError("");
     setMsg("Loading UDISE CAPTCHA…");
-    const r=await fetch("/api/udise-login/start",{method:"POST"});
-    const d=await r.json();
-    if(!r.ok){setLoginBusy(false);setMsg(d.error||d.detail||"Could not start UDISE login");return}
-    setLoginToken(d.token);
-    setCaptchaNonce(Date.now());
-    setLoginBusy(false);
-    setMsg("");
+    try{
+      const r=await fetch("/api/udise-login/start",{method:"POST",cache:"no-store"});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.error||d.detail||"Could not start UDISE login");
+      if(!d.token) throw new Error("Login service returned no CAPTCHA session token");
+      setLoginToken(d.token);
+      setCaptchaNonce(Date.now());
+      setMsg("");
+    }catch(error){
+      setLoginToken("");
+      const detail=error instanceof Error?error.message:"Network error";
+      setCaptchaError("CAPTCHA could not be started. Select Refresh CAPTCHA to try again.");
+      setMsg("UDISE login setup failed: "+detail);
+    }finally{
+      setLoginBusy(false);
+    }
   }
 
   async function submitUdiseLogin(){
@@ -534,7 +546,7 @@ export default function Page(){
 
   const pct=job?.job.progress_total?Math.min(100,Math.round(job.job.progress_current*100/job.job.progress_total)):0;
   return <main>
-    <div className="hero"><div><span className="eyebrow">HERMES VPS</span><h1>UDISE Operations Console</h1></div><span className="privacy-pill">Secure control plane</span></div>
+    <div className="hero"><div><span className="eyebrow">UDISE CONSOLE · RELEASE v{APP_RELEASE.version}</span><h1>UDISE Operations Console</h1><small className="release-date">Released {APP_RELEASE.date}</small></div><span className="privacy-pill">Secure control plane</span></div>
     <div className="workspace">
       <div className="controls">
         <section className="card setup-card">
@@ -543,9 +555,10 @@ export default function Page(){
             <label>Username<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="section-udise username" name="udise-login-username" id="udise-login-username" placeholder="UDISE username"/></label>
             <label>Password<div className="password-field"><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="section-udise current-password" name="udise-login-password" id="udise-login-password" placeholder="Password"/><button type="button" className="password-toggle" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword?"Hide password":"Show password"} title={showPassword?"Hide password":"Show password"}>{showPassword?"🙈":"👁️"}</button></div></label><label className="remember-row remember-prominent"><input type="checkbox" checked={rememberUdise} onChange={e=>setRememberUdise(e.target.checked)}/><span>Remember me</span></label>
             <div className="captcha-row">
-              {loginToken?<img className="captcha-image" src={"/api/udise-login/captcha?token="+encodeURIComponent(loginToken)+"&v="+captchaNonce} alt="UDISE CAPTCHA"/>:<div className="captcha-placeholder">Loading CAPTCHA…</div>}
-              <button type="button" className="secondary-button" onClick={beginUdiseLogin} disabled={loginBusy}>Refresh CAPTCHA</button>
+              {loginToken?<img className="captcha-image" src={"/api/udise-login/captcha?token="+encodeURIComponent(loginToken)+"&v="+captchaNonce} alt="UDISE CAPTCHA" onLoad={()=>setCaptchaError("")} onError={()=>setCaptchaError("CAPTCHA image failed to load. Refresh it and wait for the new image.")}/>:<div className="captcha-placeholder">{captchaError||"Select Refresh CAPTCHA to load a new challenge."}</div>}
+              <button type="button" className="secondary-button" onClick={beginUdiseLogin} disabled={loginBusy}>{loginBusy?"Loading…":"Refresh CAPTCHA"}</button>
             </div>
+            {captchaError&&loginToken&&<p className="captcha-error" role="alert">{captchaError}</p>}
             <label>CAPTCHA<input value={captcha} onChange={e=>setCaptcha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitUdiseLogin()} autoComplete="off" placeholder="Enter CAPTCHA"/></label>
             <button type="button" className="run-button" onClick={submitUdiseLogin} disabled={loginBusy}>{loginBusy?"Please wait…":"Sign in"}</button>
             <details className="advanced-login"><summary>Advanced / fallback login</summary><button type="button" className="secondary-button" onClick={connectExistingSession}>Use existing browser session</button></details>
