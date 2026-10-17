@@ -1121,6 +1121,8 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         "READ_ERROR": "Read error",
         "CWSN_CONFIRM_REQUIRED": "Confirmation required",
         "PREVIEW": "Eligible",
+        "OTHER": "Unclassified result — inspect reason/action",
+        "OTHERS": "Unclassified result — inspect reason/action",
     }
     grouped: dict[str, int] = {}
     for status, count in counts.items():
@@ -1149,7 +1151,7 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
             match = result_pattern.search(message)
             if match:
                 status, pen, name, detail = match.groups()
-                label = labels.get(status, status.replace("_", " ").title())
+                label = labels.get(status, f"Unclassified status ({status}) — inspect reason/action")
             elif stage == "gp":
                 # _progress_line normalizes GP_RESULT events to GP-UPDATE before
                 # storing them. Parse that persisted representation too, otherwise
@@ -1180,7 +1182,10 @@ def _result_table_message(job_id: str, stage: str, awaiting_confirmation: bool =
         return "RESULT_TABLE\nStatus|Count\nCompleted|1"
     lines = ["RESULT_TABLE", "Status|Count"]
     for label, count in grouped.items():
-        lines.append(f"{label}|{count}")
+        display_label = "Unclassified result — reason not mapped" if label.strip().lower() in {"other", "others"} else label
+        lines.append(f"{display_label}|{count}")
+    if any(label.strip().lower() in {"other", "others"} for label in grouped):
+        lines.append("Meaning|The runner did not provide a recognized status label for this item; inspect its detailed event/result output before deciding what action is needed.")
     return "\n".join(lines)
 
 
@@ -1803,12 +1808,52 @@ def submit_gp_manual(job_id: str, body: dict, authorization: str | None = Header
             conn.execute("UPDATE jobs SET status='awaiting_input',updated_at=?,message=? WHERE id=?",
                          (now, f"Manual GP batch queued; {len(remaining)} student(s) still need input.", job_id))
     else:
-        _event(job_id, f"GP-MANUAL-INPUT: all pending manual entries submitted in {len(manual_write_plan)} student(s); queued as a separate write batch.")
+        skipped_path = job_dir / "gp-manual-skipped.json"
+        skipped = _json_read(skipped_path) if skipped_path.is_file() else {}
+        skipped_count = len(skipped) if isinstance(skipped, dict) else 0
+        _event(job_id, f"GP-MANUAL-INPUT: all active manual entries submitted in {len(manual_write_plan)} student(s); queued as a separate write batch. Deferred candidates={skipped_count}.")
         with _db() as conn:
             conn.execute("UPDATE jobs SET status='completed',updated_at=?,message=? WHERE id=?",
-                         (now, "All manual entries submitted; manual batch queued separately.", job_id))
+                         (now, f"All active manual entries submitted; manual batch queued separately. {skipped_count} candidate(s) were deferred without any write." if skipped_count else "All manual entries submitted; manual batch queued separately.", job_id))
     threading.Thread(target=_run_job, args=(write_job_id,), daemon=True).start()
     return {"job_id": job_id, "write_job_id": write_job_id, "students": len(manual_write_plan), "remaining_students": len(remaining), "queued": True}
+
+
+@app.post("/api/v1/jobs/{job_id}/skip-gp-manual")
+def skip_gp_manual_student(job_id: str, body: dict, authorization: str | None = Header(default=None)) -> dict:
+    """Defer one manual GP candidate without writing any student data."""
+    require_api(authorization)
+    with _db() as conn:
+        preview = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not preview:
+        raise HTTPException(404, "GP preview job not found")
+    if preview["stage"] != "gp" or not bool(preview["preview"]) or preview["status"] != "awaiting_input":
+        raise HTTPException(409, "Only a GP preview awaiting manual input can skip a candidate")
+    key = str(body.get("student_key") or "").strip() if isinstance(body, dict) else ""
+    job_dir = JOBS / job_id
+    pending_path = job_dir / "gp-manual-pending.json"
+    skipped_path = job_dir / "gp-manual-skipped.json"
+    pending = _json_read(pending_path) if pending_path.is_file() else {}
+    if not isinstance(pending, dict) or key not in pending:
+        raise HTTPException(404, "This candidate is no longer in the manual GP queue")
+    item = pending.pop(key)
+    skipped = _json_read(skipped_path) if skipped_path.is_file() else {}
+    if not isinstance(skipped, dict):
+        skipped = {}
+    skipped[key] = {**item, "deferred_at": int(time.time()), "reason": "Skipped by operator; no GP write was sent"}
+    _json_write(skipped_path, skipped)
+    _json_write(pending_path, pending)
+    _event(job_id, f"GP-MANUAL-SKIPPED: {str(item.get('pen') or key)} - {str(item.get('name') or 'Student')} - Deferred by operator; no GP fields were submitted and no write was sent.")
+    now = int(time.time())
+    if pending:
+        message = f"Candidate deferred; {len(pending)} student(s) remain for manual GP review. Skipped candidates were not changed."
+        status = "awaiting_input"
+    else:
+        message = f"Manual GP review queue cleared. {len(skipped)} candidate(s) deferred/skipped; no data was written for them."
+        status = "completed"
+    with _db() as conn:
+        conn.execute("UPDATE jobs SET status=?,updated_at=?,message=? WHERE id=?", (status, now, message, job_id))
+    return {"job_id": job_id, "skipped": True, "student_key": key, "remaining_students": len(pending), "deferred_students": len(skipped), "status": status, "message": message}
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")

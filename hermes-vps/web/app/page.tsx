@@ -118,6 +118,7 @@ export default function Page(){
   const [customSaveLimit,setCustomSaveLimit]=useState("");
   const [manualGpValues,setManualGpValues]=useState<Record<string,Record<string,string>>>({});
   const [manualGpBusy,setManualGpBusy]=useState(false);
+  const [manualGpSkipBusy,setManualGpSkipBusy]=useState<string|null>(null);
   const [sessionHydrated,setSessionHydrated]=useState(false);
 
   const SESSION_STORAGE_KEY="udise_active_session";
@@ -393,6 +394,20 @@ export default function Page(){
     setMsg("Workflow cancelled.");
   }
 
+  async function skipManualGpStudent(key:string,item:ManualGpStudent){
+    if(!jobId||manualGpSkipBusy||manualGpBusy) return;
+    const ok=window.confirm(`Skip ${item.name||"this student"} for now? No GP data will be submitted for this student. You can review the student again in a fresh preview.`);
+    if(!ok) return;
+    setManualGpSkipBusy(key);
+    setMsg(`Deferring ${item.name||"student"}; no data will be written for this candidate…`);
+    const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/skip-gp-manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({student_key:key})});
+    const d=await r.json().catch(()=>({}));
+    setManualGpSkipBusy(null);
+    if(!r.ok){setMsg(clientFailure("UDISE General Profile","Skip manual candidate",d.detail||d.error||"Unknown error"));return;}
+    setMsg(d.message||`Candidate skipped; ${d.remaining_students||0} student(s) remain in manual review. No data was written for the skipped candidate.`);
+    setManualGpValues(previous=>{const next={...previous};delete next[key];return next;});
+  }
+
   async function submitManualGpFields(){
     if(!jobId||manualGpBusy) return;
     const pending=manualPendingForJob(job);
@@ -597,7 +612,7 @@ export default function Page(){
             <div className="gp-manual-heading"><strong>Manual fields needed</strong><span>{Object.keys(manualPendingForJob(job)).length} student(s) · Autofilled fields are hidden</span></div>
             <p>Enter verified school-record information only. Complete the required fields for just the student(s) you are ready to review; leave other students blank and they will remain pending without blocking the batch.</p>
             {Object.entries(manualPendingForJob(job)).map(([key,item],index)=><article className="gp-student-review" key={key}>
-              <div className="gp-student-title"><strong>{index+1}. {item.name||"Student"}</strong><span>PEN: {item.pen||key}</span>{item.father_name&&<small>Father: {item.father_name}</small>}</div>
+              <div className="gp-student-title"><strong>{index+1}. {item.name||"Student"}</strong><span>PEN: {item.pen||key}</span>{item.father_name&&<small>Father: {item.father_name}</small>}<button type="button" className="secondary-button" onClick={()=>skipManualGpStudent(key,item)} disabled={manualGpBusy||manualGpSkipBusy!==null}>{manualGpSkipBusy===key?"Skipping…":"Skip this student"}</button></div>
               <table className="gp-manual-table"><thead><tr><th>Required field</th><th>Enter verified value</th></tr></thead><tbody>
                 {item.fields.map(field=><tr key={field}><th scope="row">{field==="address"?"Address":field==="pincode"?"PIN code":field==="minorityId"?"Minority type":field}</th><td>
                   {field==="address"?<input aria-label={`${item.name} address`} maxLength={250} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))} placeholder="Enter address from school records"/>:
@@ -605,8 +620,8 @@ export default function Page(){
                    field==="minorityId"?<select aria-label={`${item.name} minority type`} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))}><option value="">Select option</option><option value="1">Muslim</option><option value="2">Christian</option><option value="3">Sikh</option><option value="4">Buddhist</option><option value="5">Jain</option><option value="6">Zoroastrian</option><option value="7">Not applicable</option></select>:<input aria-label={`${item.name} ${field}`} value={manualGpValues[key]?.[field]||""} onChange={e=>setManualGpValues(prev=>({...prev,[key]:{...(prev[key]||{}),[field]:e.target.value}}))}/>}</td></tr>)}
               </tbody></table>
             </article>)}
-            <button type="button" className="run-button" onClick={submitManualGpFields} disabled={manualGpBusy}>{manualGpBusy?"Validating…":"Save completed student entries and continue"}</button>
-            <small>Only students with all their required fields completed are submitted. Other students stay in the pending queue. Values are validated before a separate write job is queued, then each save is verified by read-back.</small>
+            <button type="button" className="run-button" onClick={submitManualGpFields} disabled={manualGpBusy||manualGpSkipBusy!==null}>{manualGpBusy?"Validating…":"Save completed student entries and continue"}</button>
+            <small>Only students with all required fields completed are submitted. Use “Skip this student” to defer a candidate and continue; the skipped candidate is not changed and can be reviewed again in a fresh preview. Values are validated before a separate write job is queued, then each save is verified by read-back.</small>
           </section>}
           <ul className="events" aria-live="polite">{job.events.slice(-50).map(e=><li key={e.id} className={e.level==="error"?"event-error":""}>{String(e.message||"").replace(/^LIVE\s*[·•:-]\s*/i,"")}</li>)}</ul>
           {job.job.has_result&&<a className="download" href={"/api/jobs/"+job.job.id+"/result"}>Download Excel workbook</a>}
