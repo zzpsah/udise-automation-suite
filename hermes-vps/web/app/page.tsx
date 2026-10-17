@@ -114,7 +114,7 @@ export default function Page(){
   const [job,setJob]=useState<JobState|null>(null);
   const [infoStage,setInfoStage]=useState<string|null>(null);
   const [msg,setMsg]=useState("");
-  const [saveLimit,setSaveLimit]=useState(1);
+  const [saveLimit,setSaveLimit]=useState(0);
   const [customSaveLimit,setCustomSaveLimit]=useState("");
   const [manualGpValues,setManualGpValues]=useState<Record<string,Record<string,string>>>({});
   const [manualGpBusy,setManualGpBusy]=useState(false);
@@ -406,6 +406,12 @@ export default function Page(){
     if(!r.ok){setMsg(clientFailure("UDISE General Profile","Skip manual candidate",d.detail||d.error||"Unknown error"));return;}
     setMsg(d.message||`Candidate skipped; ${d.remaining_students||0} student(s) remain in manual review. No data was written for the skipped candidate.`);
     setManualGpValues(previous=>{const next={...previous};delete next[key];return next;});
+    // Refresh the authoritative queue immediately; the normal poll can be up to
+    // 1.8 seconds behind. If this was the last manual candidate, follow the
+    // already-created automatic write job rather than leaving the preview open.
+    const refreshed=await fetch("/api/jobs/"+encodeURIComponent(jobId),{cache:"no-store"});
+    if(refreshed.ok){const latest=await refreshed.json();setJob(latest);}
+    if(!d.remaining_students&&d.write_job_id){setJobId(d.write_job_id);setMsg(`${d.deferred_students||0} candidate(s) skipped without writes. Continuing to approved-plan save job ${d.write_job_id.slice(0,8)}; review its verified results.`)}
   }
 
   async function submitManualGpFields(){

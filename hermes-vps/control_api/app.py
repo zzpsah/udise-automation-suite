@@ -1848,15 +1848,24 @@ def skip_gp_manual_student(job_id: str, body: dict, authorization: str | None = 
     _json_write(pending_path, pending)
     _event(job_id, f"GP-MANUAL-SKIPPED: {str(item.get('pen') or key)} - {str(item.get('name') or 'Student')} - Deferred by operator; no GP fields were submitted and no write was sent.")
     now = int(time.time())
+    write_job_id = str(preview["auto_write_job_id"] or "").strip()
+    if write_job_id:
+        with _db() as conn:
+            child = conn.execute("SELECT status FROM jobs WHERE id=? AND approved_from=?", (write_job_id, job_id)).fetchone()
+        if not child:
+            write_job_id = ""
     if pending:
         message = f"Candidate deferred; {len(pending)} student(s) remain for manual GP review. Skipped candidates were not changed."
         status = "awaiting_input"
+    elif write_job_id:
+        message = f"Manual GP queue cleared. {len(skipped)} candidate(s) deferred without writes. The approved-plan save job is {write_job_id[:8]}; review its result for saved, stale, failed, or limit-reached entries."
+        status = "completed"
     else:
-        message = f"Manual GP review queue cleared. {len(skipped)} candidate(s) deferred/skipped; no data was written for them."
+        message = f"Manual GP review queue cleared. {len(skipped)} candidate(s) deferred/skipped; no data was written for them. This was a preview-only run, so no automatic save job exists."
         status = "completed"
     with _db() as conn:
         conn.execute("UPDATE jobs SET status=?,updated_at=?,message=? WHERE id=?", (status, now, message, job_id))
-    return {"job_id": job_id, "skipped": True, "student_key": key, "remaining_students": len(pending), "deferred_students": len(skipped), "status": status, "message": message}
+    return {"job_id": job_id, "skipped": True, "student_key": key, "remaining_students": len(pending), "deferred_students": len(skipped), "status": status, "write_job_id": write_job_id or None, "message": message}
 
 
 @app.post("/api/v1/jobs/{job_id}/approve")
