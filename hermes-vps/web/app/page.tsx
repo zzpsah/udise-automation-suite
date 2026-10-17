@@ -446,7 +446,7 @@ export default function Page(){
       const values:Record<string,string>={};
       for(const field of item.fields) values[field]=manualGpValues[key]?.[field]||"";
       const address=String(values.address||"").trim();
-      const invalidAddress=item.fields.includes("address")&&(address.length<10||address.length>150);
+      const invalidAddress=item.fields.includes("address")&&address.length>0&&(address.length<10||address.length>150);
       if(item.fields.every(field=>Boolean(values[field].trim()))&&!invalidAddress) students[key]=values;
       else if(item.fields.some(field=>Boolean(values[field].trim()))||invalidAddress) incomplete.push(invalidAddress?`${item.name||key} (address must be 10–150 characters)`:item.name||key);
     }
