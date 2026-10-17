@@ -178,7 +178,14 @@ def test_skip_all_supported_gp_classes() -> None:
 def test_manual_gp_save_keeps_verified_fields_when_auto_defaults_go_stale() -> None:
     """Stale AUTO defaults are omitted, while verified manual fields can proceed."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from udise_vps.general_profile import resolve_approved_gp_changes
+    from udise_vps.general_profile import approved_gp_conflicts, resolve_approved_gp_changes
+
+    # The same invalid code 9 treated as eligible during preview must not be
+    # rejected as a stale nonblank value during save.
+    assert approved_gp_conflicts({"natIndYN": 9}, {"natIndYN": 1}) == []
+    assert approved_gp_conflicts({"isBplYN": "9"}, {"isBplYN": 2}) == []
+    assert approved_gp_conflicts({"natIndYN": 1}, {"natIndYN": 2}) == ["natIndYN"]
+    assert approved_gp_conflicts({"cwsnYN": 1}, {"cwsnYN": 2}) == []
 
     changes = {"motherTongue": 28, "isBplYN": 2, "address": "Verified address", "pincode": "843001", "minorityId": 1}
     updates, blocking, skipped = resolve_approved_gp_changes(

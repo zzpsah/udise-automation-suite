@@ -25,6 +25,7 @@ from .constants import (
     BLOOD_GROUP_API_ACCEPTED,
     BLOOD_GROUP_UNDER_INVESTIGATION,
     CLASS_LABEL,
+    CWSN_SKIP_CODES,
     EWS_EXCLUDED_CATEGORIES,
     EWS_NO,
     MOTHER_TONGUE_CHOICES,
@@ -56,6 +57,28 @@ def as_code(value) -> int | None:
         return int(float(str(value).strip()))
     except (TypeError, ValueError):
         return None
+
+
+INVALID_AUTO_GP_CODES = {"isBplYN", "ewsYN", "natIndYN", "ooscYN"}
+
+
+def approved_gp_conflicts(fresh: dict[str, Any], changes: dict[str, Any]) -> list[str]:
+    """Find true stale-value conflicts, excluding invalid AUTO placeholders.
+
+    Preview intentionally replaces code 9 for these four yes/no fields with a
+    valid approved 1/2 value. Save-time conflict detection must use the same
+    eligibility rule or it will reject its own approved plan.
+    """
+    conflicts = []
+    for field_name, value in changes.items():
+        live = fresh.get(field_name)
+        if field_name == "cwsnYN" and str(value) == "2" and str(live) in CWSN_SKIP_CODES:
+            continue
+        if field_name in INVALID_AUTO_GP_CODES and str(live).strip() == "9":
+            continue
+        if not is_blank(live) and str(live) != str(value):
+            conflicts.append(field_name)
+    return conflicts
 
 
 def resolve_approved_gp_changes(
@@ -113,12 +136,11 @@ def build_auto_gp_changes(fresh: dict, pen: str) -> tuple[str, dict]:
     """
     # School policy: CWSN is always set to No (2). This is an automatic
     # default, not a review gate; Yes and unexpected codes are normalized too.
-    invalid_auto_codes = {"isBplYN", "ewsYN", "natIndYN", "ooscYN"}
     updates = {
         field_name: default
         for field_name, default in AUTO_GP_DEFAULTS.items()
         if is_blank(fresh.get(field_name))
-        or (field_name in invalid_auto_codes and str(fresh.get(field_name)).strip() == "9")
+        or (field_name in INVALID_AUTO_GP_CODES and str(fresh.get(field_name)).strip() == "9")
     }
     if as_code(fresh.get("cwsnYN")) != 2:
         updates["cwsnYN"] = 2
@@ -465,16 +487,7 @@ def run_auto_gp(
             # change the live Yes value to No. It is expected that the fresh
             # read still shows Yes immediately before the POST, so this
             # authorized transition must not be treated as a state conflict.
-            conflicts = [
-                f for f, v in changes.items()
-                if not (
-                    f == "cwsnYN"
-                    and str(v) == "2"
-                    and str(fresh.get(f)) in CWSN_SKIP_CODES
-                )
-                and not is_blank(fresh.get(f))
-                and str(fresh.get(f)) != str(v)
-            ]
+            conflicts = approved_gp_conflicts(fresh, changes)
             manual_fields = set(plan.get("manual_fields") or []) if isinstance(plan, dict) else set()
             updates, blocking_conflicts, skipped_auto_conflicts = resolve_approved_gp_changes(
                 changes, conflicts, manual_fields
