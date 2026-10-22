@@ -377,3 +377,7 @@ Recent control-plane/runner work is documented in the commit history and include
 Activity messages must be understandable to school staff. For skipped records, show the concise status `SKIPPED`, the actual reason in plain language, and an action only when it adds useful information. Remove generic instructions such as “Preview if you expected a change.” Do not conflate “not included in approved changes” with “no change required.” Preserve the approved-plan gate, never imply a write occurred when none did, and retain technical detail only where it helps explain the outcome.
 
 Suggested shape: `SKIPPED` / `Reason: Not included in approved changes` / `Action: No data was modified` (only when accurate for that path). Each message must reflect the actual runner outcome, not a guessed generic explanation.
+
+## Cross-project AI handoff
+
+For cross-repository ownership, shared infrastructure dependencies, and safe AI handoff rules, start with the [Oracle VPS cross-project map](https://github.com/zzpsah/oracle-server/blob/main/docs/CROSS-PROJECT-MAP.md). Then follow this repository’s own AGENTS.md, architecture, current-state, security, and test documentation. The map is navigation guidance, not a substitute for verifying live state.
