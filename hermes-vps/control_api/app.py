@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import hmac
 import json
 import os
 import re
@@ -39,6 +40,10 @@ ESK_UPLOAD = RUNTIME / "eshiksha-upload.xlsx"
 ESK_UPLOAD_META = RUNTIME / "eshiksha-upload.json"
 DB = STATE / "jobs.sqlite3"
 CONTROL_TOKEN_FILE = Path(os.environ.get("UDISE_CONTROL_TOKEN_FILE", Path.home() / ".config/udise-control/api-token"))
+# Dedicated read-only machine credential; never reuse the control-plane bearer.
+VIDYADESK_READ_TOKEN = os.environ.get("UDISE_VIDYADESK_READ_TOKEN", "")
+VIDYADESK_SCHOOL_ID = "2497128"  # UMV Tetahali internal SDMS school ID
+VIDYADESK_UDISE_CODE = "10160203806"
 RUNNER = Path(os.environ.get("UDISE_VPS_RUNNER", Path.home() / ".local/bin/udise-vps"))
 SESSION_TTL = 45 * 60
 REQUEST_TTL = 10 * 60
@@ -401,6 +406,84 @@ async def _expire_login_browser(token: str, created_at: int) -> None:
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "service": "udise-control", "version": app.version}
+
+
+def _vidyadesk_job_summary(*, now: int | None = None) -> dict[str, Any]:
+    """Aggregate-only UDISE job status for the configured VidyaDesk school."""
+    timestamp = int(time.time()) if now is None else int(now)
+    # Open SQLite in read-only mode: this integration must not initialise,
+    # migrate, or otherwise mutate the owning control-plane database.
+    try:
+        conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=5)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                """SELECT status, stage, created_at, updated_at
+                   FROM jobs WHERE school=?""",
+                (VIDYADESK_SCHOOL_ID,),
+            ).fetchall()
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        raise HTTPException(503, "UDISE status data is temporarily unavailable") from exc
+
+    statuses = ("queued", "running", "awaiting_input", "awaiting_confirmation", "completed", "failed", "cancelled")
+    stages = ("students", "snapshot", "completion", "gp", "ep", "facility", "finalize")
+    by_status = {key: 0 for key in statuses}
+    by_stage = {key: 0 for key in stages}
+    by_status_other = 0
+    by_stage_other = 0
+    stale_queued = stale_running = 0
+    latest: int | None = None
+    for row in rows:
+        status = str(row["status"] or "other")
+        stage = str(row["stage"] or "other")
+        if status in by_status:
+            by_status[status] += 1
+        else:
+            by_status_other += 1
+        if stage in by_stage:
+            by_stage[stage] += 1
+        else:
+            by_stage_other += 1
+        created = int(row["created_at"] or 0)
+        updated = int(row["updated_at"] or created)
+        latest = max(latest or updated, updated)
+        age = max(0, timestamp - created)
+        if status == "queued" and age >= 1800:
+            stale_queued += 1
+        elif status == "running" and max(0, timestamp - updated) >= 1200:
+            stale_running += 1
+
+    return {
+        "contractVersion": "1.0.0",
+        "ok": stale_queued == 0 and stale_running == 0 and by_status_other == 0 and by_stage_other == 0,
+        "service": "udise-control",
+        "scope": {
+            "schoolKey": "umv-tetahali",
+            "schoolName": "UMV Tetahali",
+            "udiseCode": VIDYADESK_UDISE_CODE,
+        },
+        "totalJobs": len(rows),
+        "byStatus": by_status,
+        "byStage": by_stage,
+        "unknownStatusCount": by_status_other,
+        "unknownStageCount": by_stage_other,
+        "staleQueued": stale_queued,
+        "staleRunning": stale_running,
+        "latestJobAt": latest,
+        "retrievedAt": timestamp,
+    }
+
+
+@app.get("/api/v1/integrations/vidyadesk/status")
+def vidyadesk_status(x_vidyadesk_token: str | None = Header(default=None, alias="X-Vidyadesk-Token")) -> dict:
+    """Dedicated read-only aggregate contract; does not expose the control API."""
+    if not VIDYADESK_READ_TOKEN or not x_vidyadesk_token or not hmac.compare_digest(
+        x_vidyadesk_token, VIDYADESK_READ_TOKEN
+    ):
+        raise HTTPException(401, "Unauthorized")
+    return _vidyadesk_job_summary()
 
 
 @app.get("/api/v1/capabilities")
